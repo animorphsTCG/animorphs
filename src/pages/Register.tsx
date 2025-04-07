@@ -7,54 +7,160 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { Tables } from "@/types/supabase";
+
+// Define the form validation schema
+const registerSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters").max(50),
+  email: z.string().email("Invalid email address"),
+  name: z.string().min(1, "First name is required"),
+  surname: z.string().min(1, "Last name is required"),
+  age: z.coerce.number().int().min(13, "You must be at least 13 years old"),
+  gender: z.string().optional(),
+  country: z.string().optional(),
+  vipCode: z.string().optional(),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "You must accept the Terms and Conditions"
+  })
+});
+
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 const Register = () => {
-  const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    name: "",
-    surname: "",
-    age: "",
-    gender: "",
-    country: "",
-    vipCode: "",
+  const [isLoading, setIsLoading] = useState(false);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const navigate = useNavigate();
+  
+  const form = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      username: "",
+      email: "",
+      name: "",
+      surname: "",
+      age: undefined,
+      gender: "",
+      country: "",
+      vipCode: "",
+      acceptTerms: false
+    }
   });
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [acceptTerms, setAcceptTerms] = useState(false);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const validateVipCode = async (vipCode: string): Promise<boolean> => {
+    if (!vipCode || vipCode.trim() === "") return false;
     
-    if (!acceptTerms) {
-      toast({
-        title: "Error",
-        description: "You must accept the Terms and Conditions",
-        variant: "destructive",
-      });
-      return;
+    try {
+      const { data, error } = await supabase
+        .from("vip_codes")
+        .select("*")
+        .eq("code", vipCode.trim())
+        .single();
+      
+      if (error || !data) return false;
+      
+      // Check if the code has remaining uses
+      return data.current_uses < data.max_uses;
+    } catch (err) {
+      console.error("Error validating VIP code:", err);
+      return false;
     }
+  };
 
+  const updateVipCodeUsage = async (vipCode: string) => {
+    try {
+      const { data } = await supabase
+        .from("vip_codes")
+        .select("current_uses")
+        .eq("code", vipCode.trim())
+        .single();
+      
+      if (data) {
+        await supabase
+          .from("vip_codes")
+          .update({ current_uses: data.current_uses + 1 })
+          .eq("code", vipCode.trim());
+      }
+    } catch (err) {
+      console.error("Error updating VIP code usage:", err);
+    }
+  };
+
+  const handleRegister = async (values: RegisterFormValues) => {
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      toast({
-        title: "Registration Submitted",
-        description: "Your account has been registered successfully!",
+    try {
+      // Validate VIP code if provided
+      let isVipValid = false;
+      if (values.vipCode && values.vipCode.trim() !== "") {
+        isVipValid = await validateVipCode(values.vipCode);
+        
+        if (!isVipValid) {
+          toast({
+            title: "Invalid VIP Code",
+            description: "The VIP code is invalid or has been used too many times.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Create the user account with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.username + "123!@#", // Creating a simple password pattern
+        options: {
+          data: {
+            username: values.username,
+            name: values.name,
+            surname: values.surname,
+            age: values.age,
+            gender: values.gender || null,
+            country: values.country || null,
+          }
+        }
       });
+      
+      if (error) {
+        toast({
+          title: "Registration Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // If we have a valid VIP code, update its usage
+      if (isVipValid && values.vipCode) {
+        await updateVipCodeUsage(values.vipCode);
+      }
+      
+      // Show success message
+      toast({
+        title: "Registration Successful",
+        description: "Your account has been created successfully. Please check your email for verification.",
+      });
+      
+      // Redirect to home page or login
+      navigate("/");
+      
+    } catch (err) {
+      console.error("Registration error:", err);
+      toast({
+        title: "Registration Failed",
+        description: "An unexpected error occurred. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-      // In a real implementation, you would redirect the user or show a success screen
-    }, 1500);
+    }
   };
 
   const countries = ["United States", "Canada", "United Kingdom", "Australia", "Germany", "France", "Japan", "Brazil", "Other"];
@@ -70,155 +176,227 @@ const Register = () => {
           </CardHeader>
           
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
                     name="username"
-                    placeholder="Choose a unique username"
-                    value={formData.username}
-                    onChange={handleChange}
-                    required
-                    className="fantasy-input"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>Username</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            placeholder="Choose a unique username" 
+                            className="fantasy-input"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
+                  
+                  <FormField
+                    control={form.control}
                     name="email"
-                    type="email"
-                    placeholder="Your email address"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="fantasy-input"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="email" 
+                            placeholder="Your email address" 
+                            className="fantasy-input"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="name">First Name</Label>
-                  <Input
-                    id="name"
+                  
+                  <FormField
+                    control={form.control}
                     name="name"
-                    placeholder="Your first name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="fantasy-input"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            placeholder="Your first name" 
+                            className="fantasy-input"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="surname">Last Name</Label>
-                  <Input
-                    id="surname"
+                  
+                  <FormField
+                    control={form.control}
                     name="surname"
-                    placeholder="Your last name"
-                    value={formData.surname}
-                    onChange={handleChange}
-                    required
-                    className="fantasy-input"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            placeholder="Your last name" 
+                            className="fantasy-input"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
-                  <Input
-                    id="age"
+                  
+                  <FormField
+                    control={form.control}
                     name="age"
-                    type="number"
-                    min="13"
-                    max="120"
-                    placeholder="Your age"
-                    value={formData.age}
-                    onChange={handleChange}
-                    required
-                    className="fantasy-input"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>Age</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="number" 
+                            min="13"
+                            max="120"
+                            placeholder="Your age" 
+                            className="fantasy-input"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender (Optional)</Label>
-                  <Select value={formData.gender} onValueChange={(value) => handleSelectChange("gender", value)}>
-                    <SelectTrigger id="gender" className="fantasy-input">
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {genderOptions.map((option) => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country (Optional)</Label>
-                  <Select value={formData.country} onValueChange={(value) => handleSelectChange("country", value)}>
-                    <SelectTrigger id="country" className="fantasy-input">
-                      <SelectValue placeholder="Select country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {countries.map((country) => (
-                        <SelectItem key={country} value={country}>{country}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="vipCode">VIP Code (Optional)</Label>
-                  <Input
-                    id="vipCode"
+                  
+                  <FormField
+                    control={form.control}
+                    name="gender"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>Gender (Optional)</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="fantasy-input">
+                              <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {genderOptions.map((option) => (
+                              <SelectItem key={option} value={option}>{option}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>Country (Optional)</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="fantasy-input">
+                              <SelectValue placeholder="Select country" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {countries.map((country) => (
+                              <SelectItem key={country} value={country}>{country}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
                     name="vipCode"
-                    placeholder="Enter your VIP code if you have one"
-                    value={formData.vipCode}
-                    onChange={handleChange}
-                    className="fantasy-input"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>VIP Code (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            placeholder="Enter your VIP code if you have one" 
+                            className="fantasy-input"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-              </div>
-              
-              <div className="flex items-center space-x-2 pt-4">
-                <Checkbox 
-                  id="terms" 
-                  checked={acceptTerms}
-                  onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                  className="border-fantasy-accent data-[state=checked]:bg-fantasy-accent data-[state=checked]:text-black"
+                
+                <FormField
+                  control={form.control}
+                  name="acceptTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 space-y-0 pt-4">
+                      <FormControl>
+                        <Checkbox 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange}
+                          className="border-fantasy-accent data-[state=checked]:bg-fantasy-accent data-[state=checked]:text-black"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          I accept the <button 
+                            type="button" 
+                            onClick={() => setTermsModalOpen(true)}
+                            className="text-fantasy-accent underline"
+                          >
+                            Terms and Conditions
+                          </button>
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
                 />
-                <label
-                  htmlFor="terms"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                
+                <Button 
+                  type="submit" 
+                  className="fantasy-button w-full text-lg py-6" 
+                  disabled={isLoading}
                 >
-                  I accept the <a href="#" className="text-fantasy-accent underline">Terms and Conditions</a> and <a href="#" className="text-fantasy-accent underline">Privacy Policy</a>
-                </label>
-              </div>
-            </form>
+                  {isLoading ? "Creating Your Account..." : "Register Now"}
+                </Button>
+              </form>
+            </Form>
           </CardContent>
           
           <CardFooter>
-            <Button 
-              className="fantasy-button w-full text-lg py-6" 
-              onClick={handleSubmit}
-              disabled={isLoading}
-            >
-              {isLoading ? "Creating Your Account..." : "Register Now"}
-            </Button>
+            <div className="w-full text-center">
+              <p className="text-gray-300">
+                Already have an account?{" "}
+                <a href="#" className="text-fantasy-accent hover:underline">
+                  Login here
+                </a>
+              </p>
+            </div>
           </CardFooter>
         </Card>
-        
-        <div className="mt-8 text-center">
-          <p className="text-gray-300">
-            Already have an account?{" "}
-            <a href="#" className="text-fantasy-accent hover:underline">
-              Login here
-            </a>
-          </p>
-        </div>
       </div>
+      
+      {/* Terms Modal would go here - implement with a UI dialog component */}
     </div>
   );
 };

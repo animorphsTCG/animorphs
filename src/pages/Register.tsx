@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Tables } from "@/types/supabase";
 
 // Define the form validation schema
@@ -387,16 +386,14 @@ const Register = () => {
             <div className="w-full text-center">
               <p className="text-gray-300">
                 Already have an account?{" "}
-                <a href="#" className="text-fantasy-accent hover:underline">
+                <Link to="/login" className="text-fantasy-accent hover:underline">
                   Login here
-                </a>
+                </Link>
               </p>
             </div>
           </CardFooter>
         </Card>
       </div>
-      
-      {/* Terms Modal would go here - implement with a UI dialog component */}
     </div>
   );
 };

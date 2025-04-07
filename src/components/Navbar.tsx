@@ -53,9 +53,11 @@ const Navbar = () => {
                     Register
                   </Button>
                 </Link>
-                <Button className="fantasy-button-secondary">
-                  Login
-                </Button>
+                <Link to="/login">
+                  <Button className="fantasy-button-secondary">
+                    Login
+                  </Button>
+                </Link>
               </>
             )}
           </div>
@@ -102,9 +104,11 @@ const Navbar = () => {
                     Register
                   </Button>
                 </Link>
-                <Button className="fantasy-button-secondary w-full">
-                  Login
-                </Button>
+                <Link to="/login" className="w-full">
+                  <Button className="fantasy-button-secondary w-full">
+                    Login
+                  </Button>
+                </Link>
               </div>
             )}
           </div>

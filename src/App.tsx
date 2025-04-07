@@ -11,6 +11,11 @@ import Login from "./pages/Login";
 import Battle from "./pages/Battle";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import VisitorDemoBattle from "./pages/VisitorDemoBattle";
+import OneVOneBattle from "./pages/OneVOneBattle";
+import ThreePlayerBattle from "./pages/ThreePlayerBattle";
+import FourPlayerPublicBattle from "./pages/FourPlayerPublicBattle";
+import FourPlayerUserLobby from "./pages/FourPlayerUserLobby";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -33,6 +38,11 @@ const App = () => (
                 <Route path="/register" element={<Register />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/battle" element={<Battle />} />
+                <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
+                <Route path="/1v1-battle" element={<OneVOneBattle />} />
+                <Route path="/3-player-battle" element={<ThreePlayerBattle />} />
+                <Route path="/4-player-public-battle" element={<FourPlayerPublicBattle />} />
+                <Route path="/4-player-user-lobby" element={<FourPlayerUserLobby />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

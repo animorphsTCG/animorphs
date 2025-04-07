@@ -9,6 +9,149 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      animorph_cards: {
+        Row: {
+          animorph_type: string
+          attack: number
+          card_number: number
+          created_at: string
+          health: number
+          id: number
+          image_url: string
+          nft_name: string
+          power: number
+          sats: number
+          size: number
+        }
+        Insert: {
+          animorph_type: string
+          attack: number
+          card_number: number
+          created_at?: string
+          health: number
+          id?: number
+          image_url: string
+          nft_name: string
+          power: number
+          sats: number
+          size: number
+        }
+        Update: {
+          animorph_type?: string
+          attack?: number
+          card_number?: number
+          created_at?: string
+          health?: number
+          id?: number
+          image_url?: string
+          nft_name?: string
+          power?: number
+          sats?: number
+          size?: number
+        }
+        Relationships: []
+      }
+      battle_participants: {
+        Row: {
+          battle_id: string
+          created_at: string
+          id: string
+          is_ai: boolean
+          player_number: number
+          rounds_won: number
+          user_id: string | null
+        }
+        Insert: {
+          battle_id: string
+          created_at?: string
+          id?: string
+          is_ai?: boolean
+          player_number: number
+          rounds_won?: number
+          user_id?: string | null
+        }
+        Update: {
+          battle_id?: string
+          created_at?: string
+          id?: string
+          is_ai?: boolean
+          player_number?: number
+          rounds_won?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_participants_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battle_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_sessions: {
+        Row: {
+          battle_type: string
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+          winner_id: string | null
+        }
+        Insert: {
+          battle_type: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Update: {
+          battle_type?: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Relationships: []
+      }
+      deck_cards: {
+        Row: {
+          card_id: number
+          created_at: string
+          deck_id: string
+          id: string
+        }
+        Insert: {
+          card_id: number
+          created_at?: string
+          deck_id: string
+          id?: string
+        }
+        Update: {
+          card_id?: number
+          created_at?: string
+          deck_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deck_cards_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "animorph_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deck_cards_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "user_decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           age: number
@@ -66,6 +209,27 @@ export type Database = {
           online_times_gmt2?: string | null
           surname?: string
           username?: string
+        }
+        Relationships: []
+      }
+      user_decks: {
+        Row: {
+          created_at: string
+          deck_name: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deck_name: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deck_name?: string
+          id?: string
+          user_id?: string
         }
         Relationships: []
       }

@@ -3,10 +3,11 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // Replace with actual auth state
+  const { user, signOut, isLoading } = useAuth();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -33,14 +34,14 @@ const Navbar = () => {
             <Link to="/battle" className="text-white hover:text-fantasy-accent transition-colors font-medium">
               Battle
             </Link>
-            {isLoggedIn ? (
+            {!isLoading && user ? (
               <>
                 <Link to="/profile" className="text-white hover:text-fantasy-accent">
                   <User className="h-5 w-5" />
                 </Link>
                 <Button 
                   className="fantasy-button"
-                  onClick={() => setIsLoggedIn(false)}
+                  onClick={signOut}
                 >
                   Logout
                 </Button>
@@ -82,14 +83,14 @@ const Navbar = () => {
             <Link to="/battle" className="text-white hover:text-fantasy-accent text-lg font-medium">
               Battle
             </Link>
-            {isLoggedIn ? (
+            {!isLoading && user ? (
               <>
                 <Link to="/profile" className="text-white hover:text-fantasy-accent text-lg font-medium">
                   Profile
                 </Link>
                 <Button 
                   className="fantasy-button w-full"
-                  onClick={() => setIsLoggedIn(false)}
+                  onClick={signOut}
                 >
                   Logout
                 </Button>

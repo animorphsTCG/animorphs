@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
+import { Database } from "@/integrations/supabase/types";
 import { Tables } from "@/types/supabase";
 
 // Define the form validation schema
@@ -64,7 +66,7 @@ const Register = () => {
       if (error || !data) return false;
       
       // Check if the code has remaining uses
-      return (data as Tables["vip_codes"]["Row"]).current_uses < (data as Tables["vip_codes"]["Row"]).max_uses;
+      return data.current_uses < data.max_uses;
     } catch (err) {
       console.error("Error validating VIP code:", err);
       return false;
@@ -82,7 +84,7 @@ const Register = () => {
       if (data) {
         await supabase
           .from("vip_codes")
-          .update({ current_uses: (data as Tables["vip_codes"]["Row"]).current_uses + 1 })
+          .update({ current_uses: data.current_uses + 1 })
           .eq("code", vipCode.trim());
       }
     } catch (err) {

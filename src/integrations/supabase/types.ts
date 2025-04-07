@@ -9,7 +9,90 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          age: number
+          ai_points: number
+          country: string | null
+          created_at: string
+          digi: number
+          favorite_animorph: string | null
+          favorite_battle_mode: string | null
+          gender: string | null
+          gold: number
+          id: string
+          lbp: number
+          mp: number
+          music_unlocked: boolean
+          name: string
+          online_times_gmt2: string | null
+          surname: string
+          username: string
+        }
+        Insert: {
+          age: number
+          ai_points?: number
+          country?: string | null
+          created_at?: string
+          digi?: number
+          favorite_animorph?: string | null
+          favorite_battle_mode?: string | null
+          gender?: string | null
+          gold?: number
+          id: string
+          lbp?: number
+          mp?: number
+          music_unlocked?: boolean
+          name: string
+          online_times_gmt2?: string | null
+          surname: string
+          username: string
+        }
+        Update: {
+          age?: number
+          ai_points?: number
+          country?: string | null
+          created_at?: string
+          digi?: number
+          favorite_animorph?: string | null
+          favorite_battle_mode?: string | null
+          gender?: string | null
+          gold?: number
+          id?: string
+          lbp?: number
+          mp?: number
+          music_unlocked?: boolean
+          name?: string
+          online_times_gmt2?: string | null
+          surname?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      vip_codes: {
+        Row: {
+          code: string
+          created_at: string
+          current_uses: number
+          id: number
+          max_uses: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_uses?: number
+          id?: number
+          max_uses?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_uses?: number
+          id?: number
+          max_uses?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

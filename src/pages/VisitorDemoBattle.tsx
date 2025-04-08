@@ -1,59 +1,59 @@
+
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
-import CardDisplay from "@/components/CardDisplay";
-import { Loader2, AlertTriangle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Loader2, RefreshCw } from "lucide-react";
 import { AnimorphCard } from "@/types";
-import { fetchAnimorphCards } from "@/lib/db";
+import { fetchAnimorphCards, getRandomDeck } from "@/lib/db";
+import { compareStats } from "@/lib/battleUtils";
+import BattleCardDisplay from "@/components/BattleCardDisplay";
+import { useNavigate } from "react-router-dom";
 
 const statsOptions = ['power', 'health', 'attack', 'sats', 'size'];
 
 const VisitorDemoBattle = () => {
-  const [visitorCard, setVisitorCard] = useState<AnimorphCard | null>(null);
-  const [aiCard, setAiCard] = useState<AnimorphCard | null>(null);
-  const [aiStat, setAiStat] = useState<string | null>(null);
-  const [result, setResult] = useState<'win' | 'lose' | 'tie' | null>(null);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [isAiThinking, setIsAiThinking] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [availableCards, setAvailableCards] = useState<AnimorphCard[]>([]);
-  const [selectedVisitorCard, setSelectedVisitorCard] = useState<number | null>(null);
-  const [loadingError, setLoadingError] = useState<string | null>(null);
-  
   const navigate = useNavigate();
+  
+  // Player decks
+  const [playerDeck, setPlayerDeck] = useState<AnimorphCard[]>([]);
+  const [aiDeck, setAiDeck] = useState<AnimorphCard[]>([]);
+  
+  // Game state
+  const [round, setRound] = useState(1);
+  const [isPlayerTurn, setIsPlayerTurn] = useState(true);
+  const [playerWins, setPlayerWins] = useState(0);
+  const [aiWins, setAiWins] = useState(0);
+  const [selectedStat, setSelectedStat] = useState<string | null>(null);
+  const [cardsRevealed, setCardsRevealed] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [gameOver, setGameOver] = useState(false);
+  const [winner, setWinner] = useState<string | null>(null);
 
-  // Fetch a selection of cards for the demo battle
+  // Initialize game with random deck
   useEffect(() => {
-    const getCards = async () => {
+    const initGame = async () => {
       try {
-        setIsLoading(true);
-        setLoadingError(null);
+        // Get all cards to separate into two decks
+        const allCards = await fetchAnimorphCards(20);
         
-        // Get 25 cards for the demo
-        const cards = await fetchAnimorphCards(25);
-        
-        if (cards && cards.length > 0) {
-          setAvailableCards(cards);
-          // Select a random card for the AI
-          const randomIndex = Math.floor(Math.random() * cards.length);
-          setAiCard(cards[randomIndex]);
+        if (allCards.length >= 20) {
+          // Split cards into two decks
+          const shuffled = [...allCards].sort(() => Math.random() - 0.5);
+          setPlayerDeck(shuffled.slice(0, 10));
+          setAiDeck(shuffled.slice(10, 20));
         } else {
-          setLoadingError("No cards available for battle. Please try again later.");
           toast({
-            title: "No Cards Available",
-            description: "There are no cards available for battle at this time.",
+            title: "Error",
+            description: "Not enough cards available. Please try again.",
             variant: "destructive",
           });
         }
-        
       } catch (error) {
-        console.error("Error fetching cards:", error);
-        setLoadingError("Failed to load cards. Please refresh the page.");
+        console.error("Error initializing battle:", error);
         toast({
           title: "Error",
-          description: "Failed to fetch cards. Please try again.",
+          description: "Failed to start battle. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -61,82 +61,95 @@ const VisitorDemoBattle = () => {
       }
     };
     
-    getCards();
+    initGame();
   }, []);
 
-  const handleSelectCard = (card: AnimorphCard) => {
-    setVisitorCard(card);
-    setSelectedVisitorCard(card.id);
-  };
-
-  const handleBattle = () => {
-    if (!visitorCard) {
-      toast({
-        title: "Select a Card",
-        description: "Please select a card before battling.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Start AI thinking delay
-    setIsAiThinking(true);
-    setResult(null);
-    setAiStat(null);
-
-    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000; // between 3 and 5 seconds - reduced to improve UX
+  const handleStatSelection = (stat: string) => {
+    setSelectedStat(stat);
+    setCardsRevealed(true);
+    
+    // Compare stats after a short delay
     setTimeout(() => {
-      const randomStat = statsOptions[Math.floor(Math.random() * statsOptions.length)];
-      setAiStat(randomStat);
-      setIsAiThinking(false);
-
-      if (visitorCard && aiCard) {
-        // Use the randomly chosen stat from both cards
-        const userValue = visitorCard[randomStat as keyof typeof visitorCard] as number;
-        const aiValue = aiCard[randomStat as keyof typeof aiCard] as number;
-
-        if (userValue > aiValue) {
-          setResult('win');
-          setIsPopupOpen(true);
-        } else if (userValue < aiValue) {
-          setResult('lose');
-        } else {
-          setResult('tie');
-        }
+      const playerCard = playerDeck[0];
+      const aiCard = aiDeck[0];
+      
+      if (!playerCard || !aiCard) return;
+      
+      const playerValue = playerCard[stat as keyof typeof playerCard] as number;
+      const aiValue = aiCard[stat as keyof typeof aiCard] as number;
+      
+      if (playerValue > aiValue) {
+        // Player wins round
+        setPlayerWins(prev => prev + 1);
+        toast({
+          title: "Round Won!",
+          description: `You won with ${stat}: ${playerValue} vs ${aiValue}`
+        });
+      } else if (aiValue > playerValue) {
+        // AI wins round
+        setAiWins(prev => prev + 1);
+        toast({
+          title: "Round Lost",
+          description: `AI won with ${stat}: ${aiValue} vs ${playerValue}`
+        });
+      } else {
+        // It's a tie
+        toast({
+          title: "It's a tie!",
+          description: `Both players have ${stat}: ${playerValue}`
+        });
       }
-    }, delay);
+      
+      // Move to next round after a delay
+      setTimeout(() => {
+        const newRound = round + 1;
+        setRound(newRound);
+        
+        // Move cards to end of deck
+        setPlayerDeck(prev => [...prev.slice(1), prev[0]]);
+        setAiDeck(prev => [...prev.slice(1), prev[0]]);
+        
+        // Alternate turns
+        setIsPlayerTurn(!isPlayerTurn);
+        setCardsRevealed(false);
+        setSelectedStat(null);
+        
+        // Check if game is over (10 rounds)
+        if (newRound > 10) {
+          setGameOver(true);
+          if (playerWins > aiWins) {
+            setWinner("player");
+          } else if (aiWins > playerWins) {
+            setWinner("ai");
+          } else {
+            setWinner("draw");
+          }
+        }
+      }, 1500);
+    }, 1500);
   };
+  
+  // Handle AI turn
+  useEffect(() => {
+    if (!isLoading && !isPlayerTurn && !selectedStat && !gameOver) {
+      // Simulate AI thinking
+      const aiThinkingTime = 2000;
+      
+      const aiTimeout = setTimeout(() => {
+        // AI selects a random stat
+        const randomStat = statsOptions[Math.floor(Math.random() * statsOptions.length)];
+        handleStatSelection(randomStat);
+      }, aiThinkingTime);
+      
+      return () => clearTimeout(aiTimeout);
+    }
+  }, [isLoading, isPlayerTurn, selectedStat, gameOver]);
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent mr-2" />
-        <p className="ml-2 text-lg">Loading cards...</p>
-      </div>
-    );
-  }
-
-  if (loadingError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center flex-col">
-        <div className="text-center max-w-md p-6 bg-black/60 rounded-lg border border-fantasy-danger">
-          <AlertTriangle className="h-12 w-12 text-fantasy-danger mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2 text-fantasy-danger">Error Loading Cards</h2>
-          <p className="mb-4">{loadingError}</p>
-          <Button 
-            variant="outline" 
-            onClick={() => window.location.reload()}
-            className="mr-2"
-          >
-            Try Again
-          </Button>
-          <Button 
-            className="fantasy-button"
-            onClick={() => navigate("/")}
-          >
-            Return Home
-          </Button>
-        </div>
+        <p className="ml-2 text-lg">Setting up demo battle...</p>
       </div>
     );
   }
@@ -146,108 +159,87 @@ const VisitorDemoBattle = () => {
       <Card className="border-2 border-fantasy-primary bg-black/70">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-fantasy text-fantasy-accent">Visitor Demo Battle</CardTitle>
+          <CardDescription>
+            Try out a sample battle against the AI
+          </CardDescription>
         </CardHeader>
         
         <CardContent>
-          {!visitorCard ? (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Select Your Card</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                {availableCards.slice(0, 10).map((card) => (
-                  <div 
-                    key={card.id}
-                    onClick={() => handleSelectCard(card)}
-                    className="cursor-pointer transition-all transform hover:scale-105"
-                  >
-                    <CardDisplay card={card} />
-                  </div>
-                ))}
-              </div>
+          <div className="flex justify-between items-center mb-6">
+            <div className="bg-fantasy-primary/20 p-3 rounded">
+              <p className="text-lg">Round: {round} / 10</p>
             </div>
-          ) : (
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <h3 className="text-xl font-medium text-center">Your Card</h3>
-                  <CardDisplay card={visitorCard} />
-                </div>
-                <div className="space-y-4">
-                  <h3 className="text-xl font-medium text-center">AI's Card</h3>
-                  {aiCard && <CardDisplay card={aiCard} />}
-                  {aiStat ? (
-                    <div className="text-center bg-fantasy-accent/20 p-3 rounded-lg">
-                      <p className="text-lg">Comparing <span className="font-bold uppercase">{aiStat}</span></p>
-                    </div>
-                  ) : (
-                    <div className="text-center bg-gray-800/50 p-3 rounded-lg">
-                      <p>{isAiThinking ? 'AI is thinking...' : 'Awaiting battle'}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="text-center">
+            <div className="bg-fantasy-accent/20 p-3 rounded">
+              <p className="text-lg">
+                Turn: {isPlayerTurn ? "Your Turn" : "AI's Turn"}
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 justify-items-center">
+            <BattleCardDisplay 
+              card={playerDeck[0]}
+              isFlipped={true}
+              isActive={isPlayerTurn && !cardsRevealed && !gameOver}
+              roundWins={playerWins}
+              playerName="You"
+              cardCount={playerDeck.length}
+              onStatSelect={isPlayerTurn && !cardsRevealed && !gameOver ? handleStatSelection : undefined}
+              selectedStat={selectedStat}
+            />
+            
+            <BattleCardDisplay 
+              card={aiDeck[0]}
+              isFlipped={cardsRevealed}
+              isActive={!isPlayerTurn && !cardsRevealed && !gameOver}
+              roundWins={aiWins}
+              playerName="AI Opponent"
+              cardCount={aiDeck.length}
+            />
+          </div>
+          
+          {gameOver && (
+            <div className="mt-8 text-center bg-fantasy-accent/30 p-6 rounded">
+              <p className="text-2xl font-bold">Game Over!</p>
+              {winner === "player" && (
+                <p className="text-xl mt-2">You win with {playerWins} rounds!</p>
+              )}
+              {winner === "ai" && (
+                <p className="text-xl mt-2">AI wins with {aiWins} rounds!</p>
+              )}
+              {winner === "draw" && (
+                <p className="text-xl mt-2">It's a tie!</p>
+              )}
+              <div className="mt-4 flex justify-center gap-4">
                 <Button 
-                  className="fantasy-button text-lg py-6 px-12" 
-                  onClick={handleBattle} 
-                  disabled={isAiThinking}
+                  className="fantasy-button" 
+                  onClick={() => window.location.reload()}
                 >
-                  {isAiThinking ? 'AI is Thinking...' : 'Battle!'}
+                  <RefreshCw className="mr-2 h-4 w-4" /> Play Again
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate("/battle")}
+                >
+                  Back to Battle Menu
                 </Button>
               </div>
               
-              {result && visitorCard && aiCard && aiStat && (
-                <div className="bg-gray-800/70 p-4 rounded-lg text-center">
-                  {result === 'win' && (
-                    <p className="text-lg">
-                      <span className="text-green-500 font-bold">You won!</span> Your {aiStat.toUpperCase()}: {visitorCard[aiStat as keyof typeof visitorCard]} vs. AI's {aiStat.toUpperCase()}: {aiCard[aiStat as keyof typeof aiCard]}
-                    </p>
-                  )}
-                  {result === 'lose' && (
-                    <p className="text-lg">
-                      <span className="text-red-500 font-bold">You lost.</span> Your {aiStat.toUpperCase()}: {visitorCard[aiStat as keyof typeof visitorCard]} vs. AI's {aiStat.toUpperCase()}: {aiCard[aiStat as keyof typeof aiCard]}
-                    </p>
-                  )}
-                  {result === 'tie' && (
-                    <p className="text-lg">
-                      <span className="text-yellow-500 font-bold">It's a tie!</span> Both cards have {aiStat.toUpperCase()}: {visitorCard[aiStat as keyof typeof visitorCard]}
-                    </p>
-                  )}
+              <div className="mt-6">
+                <p className="text-lg">Want to play with your own cards and earn rewards?</p>
+                <div className="mt-2">
+                  <Button 
+                    className="fantasy-button"
+                    onClick={() => navigate("/register")}
+                  >
+                    Create an Account
+                  </Button>
                 </div>
-              )}
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
-      
-      {isPopupOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/80">
-          <div className="bg-gray-900 border-2 border-fantasy-accent p-8 rounded-lg max-w-md w-full">
-            <h3 className="text-2xl font-bold text-fantasy-accent mb-4">Congratulations!</h3>
-            <p className="mb-6">
-              Well Played! You may have what it takes to reach the top of the Leader Board.
-              Register now and use <strong className="text-fantasy-secondary">WonAgainstAi</strong> in the VIP Code box when registering to claim
-              1 of 50 free 200‑card decks!!! Users must be 18 or older and complete Future KYC Verification to unlock
-              withdrawal of earnings!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsPopupOpen(false)}
-                className="w-full sm:w-auto"
-              >
-                Close
-              </Button>
-              <Button 
-                className="fantasy-button w-full sm:w-auto"
-                onClick={() => navigate("/register?vip=WonAgainstAi")}
-              >
-                Join Now
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

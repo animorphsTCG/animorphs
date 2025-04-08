@@ -16,6 +16,7 @@ import OneVOneBattle from "./pages/OneVOneBattle";
 import ThreePlayerBattle from "./pages/ThreePlayerBattle";
 import FourPlayerPublicBattle from "./pages/FourPlayerPublicBattle";
 import FourPlayerUserLobby from "./pages/FourPlayerUserLobby";
+import Leaderboard from "./pages/Leaderboard";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -43,6 +44,7 @@ const App = () => (
                 <Route path="/3-player-battle" element={<ThreePlayerBattle />} />
                 <Route path="/4-player-public-battle" element={<FourPlayerPublicBattle />} />
                 <Route path="/4-player-user-lobby" element={<FourPlayerUserLobby />} />
+                <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

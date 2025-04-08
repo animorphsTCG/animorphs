@@ -1,93 +1,53 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import CardDisplay from "@/components/CardDisplay";
-import { Card } from "@/types";
+import { AnimorphCard } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fetchAnimorphCards } from "@/lib/db";
+import { Loader2 } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 const CardGallery = () => {
-  // Sample card data
-  const allCards: Card[] = [
-    {
-      id: 1,
-      card_number: 101,
-      image_url: "https://images.unsplash.com/photo-1560707854-8c642b4f2106?q=80&w=1922&auto=format&fit=crop",
-      nft_name: "Dragon Mage",
-      animorph_type: "Mythical",
-      power: 95,
-      health: 120,
-      attack: 85,
-      sats: 120,
-      size: 8
-    },
-    {
-      id: 2,
-      card_number: 102,
-      image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1770&auto=format&fit=crop",
-      nft_name: "Tech Warrior",
-      animorph_type: "Cyber",
-      power: 80,
-      health: 90,
-      attack: 110,
-      sats: 100,
-      size: 7
-    },
-    {
-      id: 3,
-      card_number: 103,
-      image_url: "https://images.unsplash.com/photo-1534423861386-85a16f5d13fd?q=80&w=1770&auto=format&fit=crop",
-      nft_name: "Forest Guardian",
-      animorph_type: "Nature",
-      power: 75,
-      health: 150,
-      attack: 65,
-      sats: 90,
-      size: 6
-    },
-    {
-      id: 4,
-      card_number: 104,
-      image_url: "https://images.unsplash.com/photo-1604623452055-586dd82bf6d6?q=80&w=1770&auto=format&fit=crop",
-      nft_name: "Shadow Assassin",
-      animorph_type: "Dark",
-      power: 110,
-      health: 70,
-      attack: 130,
-      sats: 140,
-      size: 5
-    },
-    {
-      id: 5,
-      card_number: 105,
-      image_url: "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?q=80&w=1770&auto=format&fit=crop",
-      nft_name: "Phoenix Mage",
-      animorph_type: "Fire",
-      power: 100,
-      health: 85,
-      attack: 120,
-      sats: 130,
-      size: 7
-    },
-    {
-      id: 6,
-      card_number: 106,
-      image_url: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?q=80&w=1974&auto=format&fit=crop",
-      nft_name: "Ice Guardian",
-      animorph_type: "Water",
-      power: 85,
-      health: 110,
-      attack: 75,
-      sats: 95,
-      size: 8
-    }
-  ];
-
-  const [cards, setCards] = useState<Card[]>(allCards);
+  const [allCards, setAllCards] = useState<AnimorphCard[]>([]);
+  const [cards, setCards] = useState<AnimorphCard[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [selectedCard, setSelectedCard] = useState<AnimorphCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load cards from database
+  useEffect(() => {
+    const loadCards = async () => {
+      setIsLoading(true);
+      try {
+        const loadedCards = await fetchAnimorphCards();
+        if (loadedCards && loadedCards.length > 0) {
+          setAllCards(loadedCards);
+          setCards(loadedCards);
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to load card data. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error loading cards:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load card data. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadCards();
+  }, []);
 
   // Get unique card types
   const cardTypes = [...new Set(allCards.map(card => card.animorph_type))].filter(Boolean) as string[];
@@ -114,17 +74,26 @@ const CardGallery = () => {
       );
     }
     
-    if (type) {
+    if (type && type !== "all") {
       filtered = filtered.filter(card => card.animorph_type === type);
     }
     
     setCards(filtered);
   };
 
-  const handleCardClick = (card: Card) => {
+  const handleCardClick = (card: AnimorphCard) => {
     setSelectedCard(card);
     setIsDialogOpen(true);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent mr-2" />
+        <p>Loading cards...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-16 px-4">

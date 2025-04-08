@@ -1,52 +1,35 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Hero from "@/components/Hero";
 import FeatureSection from "@/components/FeatureSection";
 import CardDisplay from "@/components/CardDisplay";
-import { Card } from "@/types";
+import { AnimorphCard } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { fetchAnimorphCards } from "@/lib/db";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  // Sample featured cards
-  const featuredCards: Card[] = [
-    {
-      id: 1,
-      card_number: 101,
-      image_url: "https://images.unsplash.com/photo-1560707854-8c642b4f2106?q=80&w=1922&auto=format&fit=crop",
-      nft_name: "Dragon Mage",
-      animorph_type: "Mythical",
-      power: 95,
-      health: 120,
-      attack: 85,
-      sats: 120,
-      size: 8
-    },
-    {
-      id: 2,
-      card_number: 102,
-      image_url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1770&auto=format&fit=crop",
-      nft_name: "Tech Warrior",
-      animorph_type: "Cyber",
-      power: 80,
-      health: 90,
-      attack: 110,
-      sats: 100,
-      size: 7
-    },
-    {
-      id: 3,
-      card_number: 103,
-      image_url: "https://images.unsplash.com/photo-1534423861386-85a16f5d13fd?q=80&w=1770&auto=format&fit=crop",
-      nft_name: "Forest Guardian",
-      animorph_type: "Nature",
-      power: 75,
-      health: 150,
-      attack: 65,
-      sats: 90,
-      size: 6
-    }
-  ];
+  const [featuredCards, setFeaturedCards] = useState<AnimorphCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFeaturedCards = async () => {
+      try {
+        // Get the first 3 cards for featuring
+        const cards = await fetchAnimorphCards(3);
+        if (cards && cards.length > 0) {
+          setFeaturedCards(cards);
+        }
+      } catch (error) {
+        console.error("Error loading featured cards:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadFeaturedCards();
+  }, []);
 
   return (
     <main>
@@ -65,11 +48,18 @@ const Index = () => {
             </p>
           </div>
           
-          <div className="flex flex-wrap justify-center gap-8">
-            {featuredCards.map((card) => (
-              <CardDisplay key={card.id} card={card} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent mr-2" />
+              <p>Loading featured cards...</p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap justify-center gap-8">
+              {featuredCards.map((card) => (
+                <CardDisplay key={card.id} card={card} />
+              ))}
+            </div>
+          )}
           
           <div className="text-center mt-16">
             <Link to="/card-gallery">

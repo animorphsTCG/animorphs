@@ -32,12 +32,17 @@ const BattleChat: React.FC<BattleChatProps> = ({
   ]);
   const [newMessage, setNewMessage] = useState("");
   
+  // Get username safely from user object
+  const getUsername = () => {
+    return user?.username || user?.email?.split('@')[0] || 'Guest';
+  };
+  
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
     
     const message: Message = {
       id: Date.now().toString(),
-      sender: user ? user.username : "Guest",
+      sender: getUsername(),
       text: newMessage.trim(),
       timestamp: new Date()
     };
@@ -69,14 +74,14 @@ const BattleChat: React.FC<BattleChatProps> = ({
                 className={`p-2 rounded ${
                   message.sender === "System" 
                     ? "bg-gray-800/50" 
-                    : message.sender === (user ? user.username : "Guest") 
+                    : message.sender === getUsername() 
                       ? "bg-fantasy-primary/20" 
                       : "bg-gray-700/20"
                 }`}
               >
                 <div className="flex justify-between text-xs text-gray-400">
                   <span className="font-medium">
-                    {message.sender === (user ? user.username : "Guest") ? "You" : message.sender}
+                    {message.sender === getUsername() ? "You" : message.sender}
                   </span>
                   <span>{formatTime(message.timestamp)}</span>
                 </div>

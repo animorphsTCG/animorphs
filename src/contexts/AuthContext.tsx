@@ -1,10 +1,11 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Session } from "@supabase/supabase-js";
+import { User as SupabaseUser, Session } from "@supabase/supabase-js";
+import { User } from "@/types";
 
 type AuthContextType = {
-  user: User | null;
+  user: (SupabaseUser & Partial<User>) | null;
   session: Session | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
@@ -13,19 +14,77 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<(SupabaseUser & Partial<User>) | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Function to fetch user profile data
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
+    }
+  };
+
+  // Update user state with profile data
+  const updateUserWithProfile = async (authUser: SupabaseUser | null) => {
+    if (!authUser) {
+      setUser(null);
+      return;
+    }
+
+    try {
+      const profileData = await fetchUserProfile(authUser.id);
+      if (profileData) {
+        // Merge auth user with profile data
+        setUser({
+          ...authUser,
+          ...profileData
+        });
+      } else {
+        // Fallback if profile doesn't exist yet
+        setUser({
+          ...authUser,
+          username: authUser.email?.split('@')[0] || 'User'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating user with profile:', error);
+      // Fallback username from email
+      setUser({
+        ...authUser,
+        username: authUser.email?.split('@')[0] || 'User'
+      });
+    }
+  };
 
   useEffect(() => {
     console.log("AuthProvider: Setting up auth state listener");
     
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         console.log("AuthProvider: Auth state changed", event, session?.user?.id);
         setSession(session);
-        setUser(session?.user ?? null);
+        
+        // Defer profile fetching to avoid deadlocks
+        setTimeout(() => {
+          updateUserWithProfile(session?.user ?? null);
+        }, 0);
+        
         setIsLoading(false);
       }
     );
@@ -34,7 +93,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log("AuthProvider: Initial session check", session?.user?.id);
       setSession(session);
-      setUser(session?.user ?? null);
+      
+      // Defer profile fetching to avoid deadlocks
+      setTimeout(() => {
+        updateUserWithProfile(session?.user ?? null);
+      }, 0);
+      
       setIsLoading(false);
     });
 

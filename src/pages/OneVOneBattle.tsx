@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +42,11 @@ const OneVOneBattle = () => {
   const [winner, setWinner] = useState<"player1" | "player2" | "draw" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  // Get username safely from user object
+  const getUsername = () => {
+    return user?.username || user?.email?.split('@')[0] || 'Player';
+  };
+
   // Load all cards for selection
   useEffect(() => {
     const loadCards = async () => {
@@ -64,7 +68,7 @@ const OneVOneBattle = () => {
     loadCards();
   }, []);
   
-  // Handle card selection for deck building
+  // Toggle card selection for deck building
   const toggleCardSelection = (cardId: number) => {
     if (selectedCardIds.includes(cardId)) {
       setSelectedCardIds(selectedCardIds.filter(id => id !== cardId));
@@ -365,7 +369,7 @@ const OneVOneBattle = () => {
               isFlipped={true}
               isActive={player1Turn && !cardsRevealed && !gameOver}
               roundWins={suddenDeath ? suddenDeathWins.player1 : player1Wins}
-              playerName={user ? user.username : "You"}
+              playerName={getUsername()}
               onStatSelect={player1Turn && !cardsRevealed && !gameOver ? handleStatSelection : undefined}
               selectedStat={selectedStat}
             />

@@ -14,14 +14,16 @@ export async function fetchAnimorphCards(limit: number = 200, offset: number = 0
       throw error;
     }
     
-    if (!data || data.length === 0) {
-      console.warn("No cards found in the database");
+    if (!data) {
+      console.warn("No cards found or null data returned");
+      return [];
     }
     
-    return data as AnimorphCard[] || [];
+    // Even if data is empty (data.length === 0), we return an empty array instead of throwing an error
+    return data as AnimorphCard[];
   } catch (error) {
     console.error("Error fetching animorph cards:", error);
-    return [];
+    throw error; // Re-throwing to allow components to handle the error
   }
 }
 
@@ -50,10 +52,10 @@ export async function getRandomDeck(size: number = 10, excludeCardIds: number[] 
     // Shuffle and slice to get random subset
     return (data as AnimorphCard[])
       .sort(() => Math.random() - 0.5)
-      .slice(0, size);
+      .slice(0, Math.min(size, data.length)); // Make sure we don't try to slice more than available
   } catch (error) {
     console.error("Error getting random deck:", error);
-    return [];
+    throw error; // Re-throwing to allow components to handle the error
   }
 }
 
@@ -73,7 +75,7 @@ export async function fetchCardsByType(type: string, limit: number = 5): Promise
     return data as AnimorphCard[] || [];
   } catch (error) {
     console.error(`Error fetching ${type} cards:`, error);
-    return [];
+    throw error; // Re-throwing to allow components to handle the error
   }
 }
 
@@ -97,6 +99,6 @@ export async function fetchCardById(id: number): Promise<AnimorphCard | null> {
     return data as AnimorphCard;
   } catch (error) {
     console.error(`Error fetching card with id ${id}:`, error);
-    return null;
+    throw error; // Re-throwing to allow components to handle the error
   }
 }

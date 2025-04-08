@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import CardDisplay from "@/components/CardDisplay";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AnimorphCard } from "@/types";
 import { fetchAnimorphCards } from "@/lib/db";
@@ -21,6 +20,7 @@ const VisitorDemoBattle = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [availableCards, setAvailableCards] = useState<AnimorphCard[]>([]);
   const [selectedVisitorCard, setSelectedVisitorCard] = useState<number | null>(null);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   
   const navigate = useNavigate();
 
@@ -29,6 +29,8 @@ const VisitorDemoBattle = () => {
     const getCards = async () => {
       try {
         setIsLoading(true);
+        setLoadingError(null);
+        
         // Get 25 cards for the demo
         const cards = await fetchAnimorphCards(25);
         
@@ -38,15 +40,17 @@ const VisitorDemoBattle = () => {
           const randomIndex = Math.floor(Math.random() * cards.length);
           setAiCard(cards[randomIndex]);
         } else {
+          setLoadingError("No cards available for battle. Please try again later.");
           toast({
-            title: "Error",
-            description: "Failed to fetch cards. Please try again.",
+            title: "No Cards Available",
+            description: "There are no cards available for battle at this time.",
             variant: "destructive",
           });
         }
         
       } catch (error) {
         console.error("Error fetching cards:", error);
+        setLoadingError("Failed to load cards. Please refresh the page.");
         toast({
           title: "Error",
           description: "Failed to fetch cards. Please try again.",
@@ -80,7 +84,7 @@ const VisitorDemoBattle = () => {
     setResult(null);
     setAiStat(null);
 
-    const delay = Math.floor(Math.random() * (7000 - 5000 + 1)) + 5000; // between 5 and 7 seconds
+    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000; // between 3 and 5 seconds - reduced to improve UX
     setTimeout(() => {
       const randomStat = statsOptions[Math.floor(Math.random() * statsOptions.length)];
       setAiStat(randomStat);
@@ -108,6 +112,31 @@ const VisitorDemoBattle = () => {
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent mr-2" />
         <p className="ml-2 text-lg">Loading cards...</p>
+      </div>
+    );
+  }
+
+  if (loadingError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center flex-col">
+        <div className="text-center max-w-md p-6 bg-black/60 rounded-lg border border-fantasy-danger">
+          <AlertTriangle className="h-12 w-12 text-fantasy-danger mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2 text-fantasy-danger">Error Loading Cards</h2>
+          <p className="mb-4">{loadingError}</p>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.reload()}
+            className="mr-2"
+          >
+            Try Again
+          </Button>
+          <Button 
+            className="fantasy-button"
+            onClick={() => navigate("/")}
+          >
+            Return Home
+          </Button>
+        </div>
       </div>
     );
   }

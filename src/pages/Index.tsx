@@ -18,11 +18,10 @@ const Index = () => {
       try {
         // Get the first 3 cards for featuring
         const cards = await fetchAnimorphCards(3);
-        if (cards && cards.length > 0) {
-          setFeaturedCards(cards);
-        }
+        setFeaturedCards(cards); // Set cards even if empty array
       } catch (error) {
         console.error("Error loading featured cards:", error);
+        // Don't show an error toast on the homepage for better UX
       } finally {
         setIsLoading(false);
       }
@@ -53,21 +52,32 @@ const Index = () => {
               <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent mr-2" />
               <p>Loading featured cards...</p>
             </div>
-          ) : (
+          ) : featuredCards.length > 0 ? (
             <div className="flex flex-wrap justify-center gap-8">
               {featuredCards.map((card) => (
                 <CardDisplay key={card.id} card={card} />
               ))}
             </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-xl text-gray-400 mb-6">Discover amazing battle cards in our gallery!</p>
+              <Link to="/card-gallery">
+                <Button className="fantasy-button text-lg px-8 py-3">
+                  Browse Card Gallery
+                </Button>
+              </Link>
+            </div>
           )}
           
-          <div className="text-center mt-16">
-            <Link to="/card-gallery">
-              <Button className="fantasy-button text-lg px-8 py-3">
-                View All Cards
-              </Button>
-            </Link>
-          </div>
+          {featuredCards.length > 0 && (
+            <div className="text-center mt-16">
+              <Link to="/card-gallery">
+                <Button className="fantasy-button text-lg px-8 py-3">
+                  View All Cards
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
       

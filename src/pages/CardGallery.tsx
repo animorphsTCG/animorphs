@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchAnimorphCards } from "@/lib/db";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const CardGallery = () => {
   const [allCards, setAllCards] = useState<AnimorphCard[]>([]);
@@ -17,25 +19,32 @@ const CardGallery = () => {
   const [selectedCard, setSelectedCard] = useState<AnimorphCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  
+  const navigate = useNavigate();
 
   // Load cards from database
   useEffect(() => {
     const loadCards = async () => {
       setIsLoading(true);
+      setLoadingError(null);
+      
       try {
         const loadedCards = await fetchAnimorphCards();
         if (loadedCards && loadedCards.length > 0) {
           setAllCards(loadedCards);
           setCards(loadedCards);
         } else {
+          setLoadingError("No cards found in the database.");
           toast({
-            title: "Error",
-            description: "Failed to load card data. Please try again.",
+            title: "No Cards Found",
+            description: "There are no cards available in the gallery at this time.",
             variant: "destructive",
           });
         }
       } catch (error) {
         console.error("Error loading cards:", error);
+        setLoadingError("Failed to load card data. Please try again later.");
         toast({
           title: "Error",
           description: "Failed to load card data. Please try again.",
@@ -91,6 +100,31 @@ const CardGallery = () => {
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent mr-2" />
         <p>Loading cards...</p>
+      </div>
+    );
+  }
+
+  if (loadingError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center flex-col">
+        <div className="text-center max-w-md p-6 bg-black/60 rounded-lg border border-fantasy-danger">
+          <AlertTriangle className="h-12 w-12 text-fantasy-danger mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2 text-fantasy-danger">Gallery Error</h2>
+          <p className="mb-4">{loadingError}</p>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.reload()}
+            className="mr-2"
+          >
+            Try Again
+          </Button>
+          <Button 
+            className="fantasy-button"
+            onClick={() => navigate("/")}
+          >
+            Return Home
+          </Button>
+        </div>
       </div>
     );
   }

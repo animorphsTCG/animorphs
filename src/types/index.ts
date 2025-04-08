@@ -33,6 +33,20 @@ export interface Card {
   size?: number;
 }
 
+export interface AnimorphCard {
+  id: number;
+  card_number: number;
+  image_url: string;
+  nft_name: string;
+  animorph_type: string;
+  power: number;
+  health: number;
+  attack: number;
+  sats: number;
+  size: number;
+  created_at?: string;
+}
+
 export interface DisplayCard {
   id: number;
   card_number: number;

@@ -4,22 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import CardDisplay from "@/components/CardDisplay";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
-
-interface AnimorphCard {
-  id: number;
-  card_number: number;
-  image_url: string;
-  nft_name: string;
-  animorph_type: string;
-  power: number;
-  health: number;
-  attack: number;
-  sats: number;
-  size: number;
-}
+import { AnimorphCard } from "@/types";
+import { getRandomDeck } from "@/lib/db";
 
 const statsOptions = ['power', 'health', 'attack', 'sats', 'size'];
 
@@ -41,22 +29,14 @@ const OneVOneBattle = () => {
   useEffect(() => {
     const fetchCards = async () => {
       try {
-        // For demo purposes, we'll fetch a selection of cards and create two decks
-        const { data, error } = await supabase
-          .from("animorph_cards")
-          .select("*")
-          .limit(20); // 10 cards for each player
+        setIsLoading(true);
+        // Get 10 random cards for each player
+        const player1Cards = await getRandomDeck(10);
+        // Get 10 different random cards for player 2
+        const player2Cards = await getRandomDeck(10, player1Cards.map(c => c.id));
         
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          // Shuffle cards randomly
-          const shuffled = [...data].sort(() => Math.random() - 0.5);
-          
-          // Split into two decks
-          setDeck1(shuffled.slice(0, 10) as AnimorphCard[]);
-          setDeck2(shuffled.slice(10, 20) as AnimorphCard[]);
-        }
+        setDeck1(player1Cards);
+        setDeck2(player2Cards);
       } catch (error) {
         console.error("Error fetching cards:", error);
         toast({

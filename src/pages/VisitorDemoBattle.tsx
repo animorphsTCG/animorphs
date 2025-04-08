@@ -4,22 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import CardDisplay from "@/components/CardDisplay";
-import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-interface AnimorphCard {
-  id: number;
-  card_number: number;
-  image_url: string;
-  nft_name: string;
-  animorph_type: string;
-  power: number;
-  health: number;
-  attack: number;
-  sats: number;
-  size: number;
-}
+import { AnimorphCard } from "@/types";
+import { fetchAnimorphCards } from "@/lib/db";
 
 const statsOptions = ['power', 'health', 'attack', 'sats', 'size'];
 
@@ -38,21 +26,23 @@ const VisitorDemoBattle = () => {
 
   // Fetch a selection of cards for the demo battle
   useEffect(() => {
-    const fetchCards = async () => {
+    const getCards = async () => {
       try {
-        // Get 25 cards (5 from each type) for the demo
-        const { data, error } = await supabase
-          .from("animorph_cards")
-          .select("*")
-          .limit(25);
+        setIsLoading(true);
+        // Get 25 cards for the demo
+        const cards = await fetchAnimorphCards(25);
         
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setAvailableCards(data as AnimorphCard[]);
+        if (cards && cards.length > 0) {
+          setAvailableCards(cards);
           // Select a random card for the AI
-          const randomIndex = Math.floor(Math.random() * data.length);
-          setAiCard(data[randomIndex] as AnimorphCard);
+          const randomIndex = Math.floor(Math.random() * cards.length);
+          setAiCard(cards[randomIndex]);
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to fetch cards. Please try again.",
+            variant: "destructive",
+          });
         }
         
       } catch (error) {
@@ -67,7 +57,7 @@ const VisitorDemoBattle = () => {
       }
     };
     
-    fetchCards();
+    getCards();
   }, []);
 
   const handleSelectCard = (card: AnimorphCard) => {

@@ -3,22 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import CardDisplay from "@/components/CardDisplay";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
-
-interface AnimorphCard {
-  id: number;
-  card_number: number;
-  image_url: string;
-  nft_name: string;
-  animorph_type: string;
-  power: number;
-  health: number;
-  attack: number;
-  sats: number;
-  size: number;
-}
+import { AnimorphCard } from "@/types";
+import { fetchAnimorphCards } from "@/lib/db";
 
 const statsOptions = ['power', 'health', 'attack', 'sats', 'size'];
 
@@ -43,26 +31,21 @@ const FourPlayerPublicBattle = () => {
 
   // Fetch cards and set up decks
   useEffect(() => {
-    const fetchCards = async () => {
+    const fetchCardData = async () => {
       try {
-        // For demo purposes, fetch a selection of cards
-        const { data, error } = await supabase
-          .from("animorph_cards")
-          .select("*")
-          .limit(200); // Get all 200 cards
+        // Fetch up to 200 cards
+        const cardData = await fetchAnimorphCards(200);
         
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
+        if (cardData && cardData.length > 0) {
           // Shuffle cards randomly
-          const shuffled = [...data].sort(() => Math.random() - 0.5);
+          const shuffled = [...cardData].sort(() => Math.random() - 0.5);
           
           // Split into four decks (50 cards each)
           setDecks({
-            player1: shuffled.slice(0, 50) as AnimorphCard[],
-            player2: shuffled.slice(50, 100) as AnimorphCard[],
-            player3: shuffled.slice(100, 150) as AnimorphCard[],
-            ai: shuffled.slice(150) as AnimorphCard[]
+            player1: shuffled.slice(0, 50),
+            player2: shuffled.slice(50, 100),
+            player3: shuffled.slice(100, 150),
+            ai: shuffled.slice(150, 200)
           });
         }
       } catch (error) {
@@ -77,7 +60,7 @@ const FourPlayerPublicBattle = () => {
       }
     };
     
-    fetchCards();
+    fetchCardData();
   }, []);
 
   // Initialize turn to player 1 when battle starts
@@ -252,6 +235,7 @@ const FourPlayerPublicBattle = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <h3 className="text-xl font-medium text-center">Player 1</h3>
+                  <div className="text-center mb-2">Cards: {decks.player1.length}</div>
                   {decks.player1[0] ? (
                     <CardDisplay card={decks.player1[0]} />
                   ) : (
@@ -262,6 +246,7 @@ const FourPlayerPublicBattle = () => {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-xl font-medium text-center">Player 2</h3>
+                  <div className="text-center mb-2">Cards: {decks.player2.length}</div>
                   {decks.player2[0] ? (
                     <CardDisplay card={decks.player2[0]} />
                   ) : (
@@ -272,6 +257,7 @@ const FourPlayerPublicBattle = () => {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-xl font-medium text-center">Player 3</h3>
+                  <div className="text-center mb-2">Cards: {decks.player3.length}</div>
                   {decks.player3[0] ? (
                     <CardDisplay card={decks.player3[0]} />
                   ) : (
@@ -282,6 +268,7 @@ const FourPlayerPublicBattle = () => {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-xl font-medium text-center">AI</h3>
+                  <div className="text-center mb-2">Cards: {decks.ai.length}</div>
                   {decks.ai[0] ? (
                     <>
                       <CardDisplay card={decks.ai[0]} />
@@ -313,7 +300,9 @@ const FourPlayerPublicBattle = () => {
                 <>
                   {turn !== 'ai' && !selectedStat && (
                     <div className="space-y-3">
-                      <p className="text-center">{turn?.toUpperCase()}, select a stat to compare:</p>
+                      <p className="text-center">
+                        {turn === 'player1' ? 'Player 1' : turn === 'player2' ? 'Player 2' : 'Player 3'}, select a stat to compare:
+                      </p>
                       <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
                         {statsOptions.map((stat) => (
                           <Button

@@ -16,6 +16,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Database } from "@/integrations/supabase/types";
 import { Tables } from "@/types/supabase";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import TermsAndConditionsDialog from "@/components/TermsAndConditionsDialog";
 
 // Define the form validation schema
 const registerSchema = z.object({
@@ -42,7 +43,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [termsDialogOpen, setTermsDialogOpen] = useState(false);
   const navigate = useNavigate();
   
   const form = useForm<RegisterFormValues>({
@@ -177,6 +178,10 @@ const Register = () => {
     "Germany", "France", "Japan", "Brazil", "South Africa", "Other"
   ];
   const genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say"];
+  
+  const handleTermsAccept = () => {
+    form.setValue("acceptTerms", true);
+  };
 
   return (
     <div className="min-h-screen py-16 px-4">
@@ -391,7 +396,7 @@ const Register = () => {
                         <FormLabel>
                           I accept the <button 
                             type="button" 
-                            onClick={() => setTermsModalOpen(true)}
+                            onClick={() => setTermsDialogOpen(true)}
                             className="text-fantasy-accent underline"
                           >
                             Terms and Conditions
@@ -426,6 +431,12 @@ const Register = () => {
           </CardFooter>
         </Card>
       </div>
+      
+      <TermsAndConditionsDialog 
+        open={termsDialogOpen} 
+        onOpenChange={setTermsDialogOpen}
+        onAccept={handleTermsAccept}
+      />
     </div>
   );
 };

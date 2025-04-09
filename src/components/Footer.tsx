@@ -1,10 +1,7 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
-
 const Footer = () => {
-  return (
-    <footer className="bg-black text-white border-t border-fantasy-primary/30">
+  return <footer className="bg-black text-white border-t border-fantasy-primary/30">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
@@ -57,9 +54,7 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-bold mb-4">Support</h3>
             <ul className="space-y-2">
-              <li>
-                <Link to="#" className="text-gray-400 hover:text-fantasy-accent">FAQ</Link>
-              </li>
+              
               <li>
                 <Link to="#" className="text-gray-400 hover:text-fantasy-accent">Rules</Link>
               </li>
@@ -77,8 +72,6 @@ const Footer = () => {
           <p>© {new Date().getFullYear()} Animorph Battle Verse. All rights reserved.</p>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
-
 export default Footer;

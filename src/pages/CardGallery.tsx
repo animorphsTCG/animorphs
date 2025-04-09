@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 const CardGallery = () => {
+  // State management
   const [allCards, setAllCards] = useState<AnimorphCard[]>([]);
   const [cards, setCards] = useState<AnimorphCard[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,7 +33,10 @@ const CardGallery = () => {
       setLoadingError(null);
       
       try {
+        console.log("Fetching all cards from animorph_cards table...");
         const loadedCards = await fetchAnimorphCards();
+        console.log(`Fetched ${loadedCards.length} cards from database`);
+        
         if (loadedCards && loadedCards.length > 0) {
           setAllCards(loadedCards);
           setCards(loadedCards);
@@ -118,7 +122,7 @@ const CardGallery = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent mr-2" />
-        <p>Loading cards...</p>
+        <p>Loading cards from database...</p>
       </div>
     );
   }

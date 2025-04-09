@@ -1,10 +1,10 @@
 
 import React from "react";
-import { Card as CardType } from "@/types";
+import { AnimorphCard } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface CardDisplayProps {
-  card: CardType;
+  card: AnimorphCard;
   onClick?: () => void;
   className?: string;
 }
@@ -14,8 +14,9 @@ const CardDisplay = ({
   onClick,
   className
 }: CardDisplayProps) => {
-  // Default image fallback if none is provided
-  const imageUrl = card.image_url || "https://images.unsplash.com/photo-1569878698890-cf22a9a4ab4a?q=80&w=2069&auto=format&fit=crop";
+  // Only use real data, no fallbacks
+  const imageUrl = card.image_url;
+  const cardName = card.nft_name;
   
   return (
     <div 
@@ -28,19 +29,30 @@ const CardDisplay = ({
         <div className="h-full w-full">
           <img 
             src={imageUrl} 
-            alt={card.nft_name || `Card #${card.card_number}`} 
+            alt={cardName || `Card #${card.card_number}`} 
             className="w-full h-full rounded-lg object-cover" 
             loading="lazy"
           />
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
             <h3 className="text-lg font-bold text-white truncate">
-              {card.nft_name || `Card #${card.card_number}`}
+              {cardName || `Card #${card.card_number}`}
             </h3>
             {card.animorph_type && (
               <span className="text-sm text-fantasy-accent">
                 {card.animorph_type}
               </span>
             )}
+            <div className="grid grid-cols-3 gap-1 mt-1">
+              <div className="bg-fantasy-primary/30 px-1 py-0.5 rounded text-xs text-center">
+                PWR: {card.power}
+              </div>
+              <div className="bg-fantasy-success/30 px-1 py-0.5 rounded text-xs text-center">
+                HP: {card.health}
+              </div>
+              <div className="bg-fantasy-danger/30 px-1 py-0.5 rounded text-xs text-center">
+                ATK: {card.attack}
+              </div>
+            </div>
           </div>
         </div>
       </div>

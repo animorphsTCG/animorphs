@@ -1,35 +1,23 @@
-
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
 interface TermsAndConditionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAccept: () => void;
 }
-
 const TermsAndConditionsDialog = ({
   open,
   onOpenChange,
-  onAccept,
+  onAccept
 }: TermsAndConditionsDialogProps) => {
   const handleAccept = () => {
     onAccept();
     onOpenChange(false);
   };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col border-2 border-fantasy-primary bg-black/90">
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col border-2 border-fantasy-primary bg-black/90 my-0 py-0 rounded-none overflow-y-auto scrollbar-thin scrollbar-thumb-fantasy-primary\n">
         <DialogHeader>
           <DialogTitle className="text-2xl font-fantasy text-fantasy-accent">
             Terms and Conditions for Animorphs Web Game
@@ -166,16 +154,11 @@ const TermsAndConditionsDialog = ({
               Close
             </Button>
           </DialogClose>
-          <Button 
-            onClick={handleAccept} 
-            className="bg-fantasy-accent text-black hover:bg-fantasy-accent/80"
-          >
+          <Button onClick={handleAccept} className="bg-fantasy-accent text-black hover:bg-fantasy-accent/80">
             I Accept
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 };
-
 export default TermsAndConditionsDialog;

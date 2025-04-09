@@ -1,12 +1,15 @@
+
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
 interface TermsAndConditionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAccept: () => void;
 }
+
 const TermsAndConditionsDialog = ({
   open,
   onOpenChange,
@@ -16,15 +19,19 @@ const TermsAndConditionsDialog = ({
     onAccept();
     onOpenChange(false);
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col border-2 border-fantasy-primary bg-black/90 my-0 py-0 rounded-none overflow-y-auto scrollbar-thin scrollbar-thumb-fantasy-primary\n">
-        <DialogHeader>
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col border-2 border-fantasy-primary bg-black/90 my-0 py-0 rounded-none">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-2xl font-fantasy text-fantasy-accent">
             Terms and Conditions for Animorphs Web Game
           </DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 pr-4 my-4">
-          <div className="text-sm space-y-4">
+        
+        {/* Scrollable content area with fixed height */}
+        <ScrollArea className="flex-1 px-6 py-4 overflow-y-auto max-h-[calc(90vh-180px)]" type="always">
+          <div className="text-sm space-y-4 pr-4">
             <p className="text-gray-400">Last Updated: [09/April/2025]</p>
 
             <div className="space-y-2">
@@ -148,7 +155,8 @@ const TermsAndConditionsDialog = ({
             </div>
           </div>
         </ScrollArea>
-        <DialogFooter className="flex justify-between sm:justify-between gap-4">
+        
+        <DialogFooter className="flex justify-between sm:justify-between gap-4 px-6 py-4 border-t border-fantasy-primary/30">
           <DialogClose asChild>
             <Button variant="outline" className="border-fantasy-accent text-fantasy-accent hover:bg-fantasy-accent/20">
               Close
@@ -159,6 +167,8 @@ const TermsAndConditionsDialog = ({
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>;
+    </Dialog>
+  );
 };
+
 export default TermsAndConditionsDialog;

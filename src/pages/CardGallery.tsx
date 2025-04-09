@@ -20,6 +20,8 @@ const CardGallery = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const cardsPerPage = 24;
   
   const navigate = useNavigate();
 
@@ -34,6 +36,10 @@ const CardGallery = () => {
         if (loadedCards && loadedCards.length > 0) {
           setAllCards(loadedCards);
           setCards(loadedCards);
+          toast({
+            title: "Cards Loaded Successfully",
+            description: `${loadedCards.length} Animorph cards found.`,
+          });
         } else {
           setLoadingError("No cards found in the database.");
           toast({
@@ -66,11 +72,13 @@ const CardGallery = () => {
     const term = e.target.value;
     setSearchTerm(term);
     filterCards(term, typeFilter);
+    setCurrentPage(1);
   };
 
   const handleTypeFilter = (value: string) => {
     setTypeFilter(value);
     filterCards(searchTerm, value);
+    setCurrentPage(1);
   };
 
   const filterCards = (term: string, type: string) => {
@@ -93,6 +101,17 @@ const CardGallery = () => {
   const handleCardClick = (card: AnimorphCard) => {
     setSelectedCard(card);
     setIsDialogOpen(true);
+  };
+
+  // Pagination logic
+  const totalPages = Math.ceil(cards.length / cardsPerPage);
+  const indexOfLastCard = currentPage * cardsPerPage;
+  const indexOfFirstCard = indexOfLastCard - cardsPerPage;
+  const currentCards = cards.slice(indexOfFirstCard, indexOfLastCard);
+
+  const paginate = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo(0, 0);
   };
 
   if (isLoading) {
@@ -165,10 +184,19 @@ const CardGallery = () => {
           </div>
         </div>
         
+        {/* Card Stats */}
+        <div className="mb-6 text-center">
+          <p className="text-sm text-gray-400">
+            Showing {currentCards.length} of {cards.length} cards
+            {typeFilter && typeFilter !== "all" ? ` (Type: ${typeFilter})` : ""}
+            {searchTerm ? ` matching "${searchTerm}"` : ""}
+          </p>
+        </div>
+        
         {/* Card Grid */}
-        {cards.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
-            {cards.map((card) => (
+        {currentCards.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 justify-items-center">
+            {currentCards.map((card) => (
               <CardDisplay 
                 key={card.id} 
                 card={card} 
@@ -179,6 +207,73 @@ const CardGallery = () => {
         ) : (
           <div className="text-center py-16">
             <p className="text-lg text-gray-400">No cards found matching your filters.</p>
+          </div>
+        )}
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-12 flex justify-center">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => paginate(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="fantasy-button-outline"
+              >
+                Previous
+              </Button>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(pageNum => 
+                  pageNum === 1 || 
+                  pageNum === totalPages || 
+                  (pageNum >= currentPage - 2 && pageNum <= currentPage + 2)
+                )
+                .map((pageNum, index, array) => {
+                  // Add ellipsis
+                  if (index > 0 && pageNum - array[index - 1] > 1) {
+                    return (
+                      <React.Fragment key={`ellipsis-${pageNum}`}>
+                        <Button 
+                          variant="outline" 
+                          disabled 
+                          className="text-gray-400"
+                        >
+                          ...
+                        </Button>
+                        <Button
+                          variant={pageNum === currentPage ? "default" : "outline"}
+                          onClick={() => paginate(pageNum)}
+                          className={pageNum === currentPage ? "fantasy-button" : "fantasy-button-outline"}
+                        >
+                          {pageNum}
+                        </Button>
+                      </React.Fragment>
+                    );
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={pageNum === currentPage ? "default" : "outline"}
+                      onClick={() => paginate(pageNum)}
+                      className={pageNum === currentPage ? "fantasy-button" : "fantasy-button-outline"}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })
+              }
+              
+              <Button
+                variant="outline"
+                onClick={() => paginate(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="fantasy-button-outline"
+              >
+                Next
+              </Button>
+            </div>
           </div>
         )}
 

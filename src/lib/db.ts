@@ -2,11 +2,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { AnimorphCard } from "@/types";
 
-export async function fetchAnimorphCards(limit: number = 200, offset: number = 0): Promise<AnimorphCard[]> {
+export async function fetchAnimorphCards(limit: number = 1000, offset: number = 0): Promise<AnimorphCard[]> {
   try {
     const { data, error } = await supabase
       .from("animorph_cards")
       .select("*")
+      .order('card_number', { ascending: true })
       .range(offset, offset + limit - 1);
       
     if (error) {

@@ -8,6 +8,7 @@ import { fetchAnimorphCards, getRandomDeck } from "@/lib/db";
 import { compareStats } from "@/lib/battleUtils";
 import BattleCardDisplay from "@/components/BattleCardDisplay";
 import { useNavigate } from "react-router-dom";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const statsOptions = ['power', 'health', 'attack', 'sats', 'size'];
 

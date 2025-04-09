@@ -15,16 +15,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { Database } from "@/integrations/supabase/types";
 import { Tables } from "@/types/supabase";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Define the form validation schema
 const registerSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(50),
   email: z.string().email("Invalid email address"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
   name: z.string().min(1, "First name is required"),
   surname: z.string().min(1, "Last name is required"),
   age: z.coerce.number().int().min(13, "You must be at least 13 years old"),
-  gender: z.string().optional(),
-  country: z.string().optional(),
+  gender: z.string().min(1, "Gender selection is required"),
+  country: z.string().min(1, "Country selection is required"),
   vipCode: z.string().optional(),
   acceptTerms: z.boolean().refine(val => val === true, {
     message: "You must accept the Terms and Conditions"
@@ -43,6 +50,7 @@ const Register = () => {
     defaultValues: {
       username: "",
       email: "",
+      password: "",
       name: "",
       surname: "",
       age: undefined,
@@ -115,15 +123,15 @@ const Register = () => {
       // Create the user account with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
-        password: values.username + "123!@#", // Creating a simple password pattern
+        password: values.password, // Now using the actual password entered by user
         options: {
           data: {
             username: values.username,
             name: values.name,
             surname: values.surname,
             age: values.age,
-            gender: values.gender || null,
-            country: values.country || null,
+            gender: values.gender,
+            country: values.country,
           }
         }
       });
@@ -164,7 +172,10 @@ const Register = () => {
     }
   };
 
-  const countries = ["United States", "Canada", "United Kingdom", "Australia", "Germany", "France", "Japan", "Brazil", "Other"];
+  const countries = [
+    "United States", "Canada", "United Kingdom", "Australia", 
+    "Germany", "France", "Japan", "Brazil", "South Africa", "Other"
+  ];
   const genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say"];
 
   return (
@@ -209,6 +220,25 @@ const Register = () => {
                             {...field} 
                             type="email" 
                             placeholder="Your email address" 
+                            className="fantasy-input"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="password" 
+                            placeholder="Create a secure password"
                             className="fantasy-input"
                           />
                         </FormControl>
@@ -279,7 +309,7 @@ const Register = () => {
                     name="gender"
                     render={({ field }) => (
                       <FormItem className="space-y-2">
-                        <FormLabel>Gender (Optional)</FormLabel>
+                        <FormLabel>Gender</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
                           defaultValue={field.value}
@@ -305,7 +335,7 @@ const Register = () => {
                     name="country"
                     render={({ field }) => (
                       <FormItem className="space-y-2">
-                        <FormLabel>Country (Optional)</FormLabel>
+                        <FormLabel>Country</FormLabel>
                         <Select 
                           onValueChange={field.onChange} 
                           defaultValue={field.value}

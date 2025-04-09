@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -144,6 +143,24 @@ const VisitorDemoBattle = () => {
       return () => clearTimeout(aiTimeout);
     }
   }, [isLoading, isPlayerTurn, selectedStat, gameOver]);
+
+  const showVictoryMessage = (hasVisitorWon) => {
+    if (hasVisitorWon) {
+      toast({
+        title: "Congratulations!",
+        description: (
+          <Alert className="mt-4 bg-fantasy-primary/20 border-fantasy-accent">
+            <AlertTitle className="text-fantasy-accent">Victory Against the AI!</AlertTitle>
+            <AlertDescription>
+              Well done on beating the AI, you may have what it takes to reach the top of the Leaderboard! 
+              Register now and use WonAgainstAi during registration to unlock 1 of 50 free 200 card decks.
+            </AlertDescription>
+          </Alert>
+        ),
+        duration: 10000, // Show for 10 seconds
+      });
+    }
+  };
 
   if (isLoading) {
     return (

@@ -16,9 +16,8 @@ const Hero = () => {
       
       <div className="container mx-auto px-4 z-10">
         <div className="text-center max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-fantasy-accent via-fantasy-primary to-fantasy-secondary bg-clip-text text-transparent">
-            Animorph Battle Verse
-          </h1>
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-fantasy-accent via-fantasy-primary to-fantasy-secondary bg-clip-text text-transparent">Welcome to                                                                                                  
+Animorphs </h1>
           <p className="text-xl md:text-2xl mb-8 text-gray-200">Tranforming play in to pupose by investing in a brighter future for everyone!</p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link to="/register">

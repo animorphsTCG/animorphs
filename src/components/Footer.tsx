@@ -10,10 +10,7 @@ const Footer = () => {
                 <span className="text-fantasy-accent">ANIMORPH</span> BATTLE
               </h1>
             </Link>
-            <p className="text-gray-400 mb-4">
-              Transform, battle, and conquer in this immersive card battle experience. 
-              Collect rare cards and challenge players from around the world.
-            </p>
+            <p className="text-gray-400 mb-4">Collect, battle, and conquer in this immersive card battle experience. Collect rare cards and challenge players from around the world.</p>
             <div className="flex space-x-4">
               <a href="#" className="text-gray-400 hover:text-fantasy-accent">
                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">

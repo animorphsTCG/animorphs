@@ -43,7 +43,7 @@ const Index = () => {
               Featured <span className="text-fantasy-accent">Battle Cards</span>
             </h2>
             <p className="text-gray-300 max-w-3xl mx-auto">
-              Discover powerful Animorph cards to add to your collection. Each card offers unique abilities and strengths to help you dominate the battlefield.
+              Discover powerful Animorph cards to add to your battle deck. Each card offers 5 unique statistics to use for dominating the battlefield.
             </p>
           </div>
           

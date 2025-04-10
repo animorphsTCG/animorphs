@@ -9,6 +9,7 @@ type AuthContextType = {
   session: Session | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  isEmailVerified: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,6 +18,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<(SupabaseUser & Partial<User>) | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
 
   // Function to fetch user profile data
   const fetchUserProfile = async (userId: string) => {
@@ -43,10 +45,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUserWithProfile = async (authUser: SupabaseUser | null) => {
     if (!authUser) {
       setUser(null);
+      setIsEmailVerified(false);
       return;
     }
 
     try {
+      // Check email verification status
+      setIsEmailVerified(authUser.email_confirmed_at !== null);
+
       const profileData = await fetchUserProfile(authUser.id);
       if (profileData) {
         // Merge auth user with profile data
@@ -112,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, signOut }}>
+    <AuthContext.Provider value={{ user, session, isLoading, signOut, isEmailVerified }}>
       {children}
     </AuthContext.Provider>
   );

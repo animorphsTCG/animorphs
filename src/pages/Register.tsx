@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +43,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [termsDialogOpen, setTermsDialogOpen] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
   const navigate = useNavigate();
   
   const form = useForm<RegisterFormValues>({
@@ -63,17 +63,22 @@ const Register = () => {
   });
 
   const validateVipCode = async (vipCode: string): Promise<boolean> => {
-    if (!vipCode || vipCode.trim() === "") return false;
+    if (!vipCode || vipCode.trim() === "") return true; // Empty code is valid (optional)
     
     try {
+      console.log("Validating VIP code:", vipCode.trim());
       const { data, error } = await supabase
         .from("vip_codes")
         .select("*")
-        .eq("code", vipCode.trim())
+        .ilike("code", vipCode.trim())
         .single();
       
-      if (error || !data) return false;
+      if (error || !data) {
+        console.error("VIP code validation error:", error);
+        return false;
+      }
       
+      console.log("VIP code found:", data);
       // Check if the code has remaining uses
       return data.current_uses < data.max_uses;
     } catch (err) {
@@ -87,7 +92,7 @@ const Register = () => {
       const { data } = await supabase
         .from("vip_codes")
         .select("current_uses")
-        .eq("code", vipCode.trim())
+        .ilike("code", vipCode.trim())
         .single();
       
       if (data) {
@@ -106,7 +111,7 @@ const Register = () => {
     
     try {
       // Validate VIP code if provided
-      let isVipValid = false;
+      let isVipValid = true;
       if (values.vipCode && values.vipCode.trim() !== "") {
         isVipValid = await validateVipCode(values.vipCode);
         
@@ -124,7 +129,7 @@ const Register = () => {
       // Create the user account with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
-        password: values.password, // Now using the actual password entered by user
+        password: values.password,
         options: {
           data: {
             username: values.username,
@@ -133,7 +138,8 @@ const Register = () => {
             age: values.age,
             gender: values.gender,
             country: values.country,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/login`
         }
       });
       
@@ -148,18 +154,16 @@ const Register = () => {
       }
       
       // If we have a valid VIP code, update its usage
-      if (isVipValid && values.vipCode) {
+      if (isVipValid && values.vipCode && values.vipCode.trim() !== "") {
         await updateVipCodeUsage(values.vipCode);
       }
       
       // Show success message
+      setRegistrationComplete(true);
       toast({
         title: "Registration Successful",
-        description: "Your account has been created successfully. Please check your email for verification.",
+        description: "Please check your email for verification instructions.",
       });
-      
-      // Redirect to home page or login
-      navigate("/");
       
     } catch (err) {
       console.error("Registration error:", err);
@@ -182,6 +186,41 @@ const Register = () => {
   const handleTermsAccept = () => {
     form.setValue("acceptTerms", true);
   };
+
+  if (registrationComplete) {
+    return (
+      <div className="min-h-screen py-16 px-4">
+        <div className="container mx-auto max-w-3xl">
+          <Card className="border-2 border-fantasy-primary bg-black/70">
+            <CardHeader className="text-center">
+              <CardTitle className="text-3xl font-fantasy text-fantasy-accent">Email Verification Required</CardTitle>
+              <CardDescription>We've sent a verification email to your inbox</CardDescription>
+            </CardHeader>
+            
+            <CardContent className="space-y-6 text-center">
+              <Alert className="bg-fantasy-primary/10 border-fantasy-primary text-white">
+                <AlertTitle className="text-fantasy-accent">Check your inbox</AlertTitle>
+                <AlertDescription>
+                  Please check your email and click the verification link to complete your registration.
+                </AlertDescription>
+              </Alert>
+              
+              <p className="text-gray-300">
+                Once verified, you'll be able to log in and enjoy all features of the Animorph Battle Verse.
+              </p>
+              
+              <Button 
+                className="fantasy-button-secondary"
+                onClick={() => navigate("/login")}
+              >
+                Go to Login Page
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-16 px-4">

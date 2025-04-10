@@ -102,3 +102,71 @@ export async function fetchCardById(id: number): Promise<AnimorphCard | null> {
     throw error;
   }
 }
+
+// Create or update VIP codes to ensure they are in the database
+export async function ensureVipCodesExist() {
+  try {
+    const vipCodes = [
+      { code: "ZypherDan", max_uses: 51, description: "Promotional code for early supporters" },
+      { code: "WonAgainstAi", max_uses: 50, description: "Victory reward code" }
+    ];
+    
+    for (const codeData of vipCodes) {
+      // Check if code exists
+      const { data } = await supabase
+        .from("vip_codes")
+        .select("*")
+        .ilike("code", codeData.code);
+      
+      if (!data || data.length === 0) {
+        // Create new code
+        await supabase
+          .from("vip_codes")
+          .insert({
+            code: codeData.code,
+            max_uses: codeData.max_uses,
+            current_uses: 0,
+            description: codeData.description
+          });
+        console.log(`Created VIP code: ${codeData.code}`);
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error ensuring VIP codes exist:", error);
+    return false;
+  }
+}
+
+// Function to check database connection and tables
+export async function checkDatabaseHealth(): Promise<boolean> {
+  try {
+    // Check VIP codes table
+    const { error: vipError } = await supabase
+      .from('vip_codes')
+      .select('count')
+      .limit(1);
+    
+    if (vipError) {
+      console.error('VIP codes table check failed:', vipError);
+      return false;
+    }
+    
+    // Check animorph_cards table
+    const { error: cardsError } = await supabase
+      .from('animorph_cards')
+      .select('count')
+      .limit(1);
+    
+    if (cardsError) {
+      console.error('Animorph cards table check failed:', cardsError);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    return false;
+  }
+}

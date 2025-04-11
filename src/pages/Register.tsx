@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import { Database } from "@/integrations/supabase/types";
 import { Tables } from "@/types/supabase";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import TermsAndConditionsDialog from "@/components/TermsAndConditionsDialog";
+import { validateVipCode, updateVipCodeUsage } from "@/lib/db";
 
 // Define the form validation schema
 const registerSchema = z.object({
@@ -32,12 +34,15 @@ const registerSchema = z.object({
     message: "You must accept the Terms and Conditions"
   })
 });
+
 type RegisterFormValues = z.infer<typeof registerSchema>;
+
 const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [termsDialogOpen, setTermsDialogOpen] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const navigate = useNavigate();
+  
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -53,41 +58,7 @@ const Register = () => {
       acceptTerms: false
     }
   });
-  const validateVipCode = async (vipCode: string): Promise<boolean> => {
-    if (!vipCode || vipCode.trim() === "") return true; // Empty code is valid (optional)
 
-    try {
-      console.log("Validating VIP code:", vipCode.trim());
-      const {
-        data,
-        error
-      } = await supabase.from("vip_codes").select("*").ilike("code", vipCode.trim()).single();
-      if (error || !data) {
-        console.error("VIP code validation error:", error);
-        return false;
-      }
-      console.log("VIP code found:", data);
-      // Check if the code has remaining uses
-      return data.current_uses < data.max_uses;
-    } catch (err) {
-      console.error("Error validating VIP code:", err);
-      return false;
-    }
-  };
-  const updateVipCodeUsage = async (vipCode: string) => {
-    try {
-      const {
-        data
-      } = await supabase.from("vip_codes").select("current_uses").ilike("code", vipCode.trim()).single();
-      if (data) {
-        await supabase.from("vip_codes").update({
-          current_uses: data.current_uses + 1
-        }).eq("code", vipCode.trim());
-      }
-    } catch (err) {
-      console.error("Error updating VIP code usage:", err);
-    }
-  };
   const handleRegister = async (values: RegisterFormValues) => {
     setIsLoading(true);
     try {
@@ -106,11 +77,18 @@ const Register = () => {
         }
       }
 
+      console.log("Creating user with data:", {
+        email: values.email,
+        username: values.username,
+        name: values.name,
+        surname: values.surname,
+        age: values.age,
+        gender: values.gender,
+        country: values.country
+      });
+
       // Create the user account with Supabase Auth
-      const {
-        data,
-        error
-      } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
@@ -125,7 +103,9 @@ const Register = () => {
           emailRedirectTo: `${window.location.origin}/login`
         }
       });
+      
       if (error) {
+        console.error("Registration error:", error);
         toast({
           title: "Registration Failed",
           description: error.message,
@@ -135,9 +115,38 @@ const Register = () => {
         return;
       }
 
+      console.log("User created successfully:", data);
+
+      // Create the user profile manually if needed
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            username: values.username,
+            name: values.name,
+            surname: values.surname,
+            age: values.age,
+            gender: values.gender,
+            country: values.country,
+          });
+          
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
+          // Don't return here, we still want to proceed with registration
+        } else {
+          console.log("Profile created successfully");
+        }
+      }
+
       // If we have a valid VIP code, update its usage
       if (isVipValid && values.vipCode && values.vipCode.trim() !== "") {
-        await updateVipCodeUsage(values.vipCode);
+        const updated = await updateVipCodeUsage(values.vipCode);
+        if (!updated) {
+          console.error("Failed to update VIP code usage");
+        } else {
+          console.log("VIP code usage updated successfully");
+        }
       }
 
       // Show success message
@@ -157,13 +166,17 @@ const Register = () => {
       setIsLoading(false);
     }
   };
+
   const countries = ["United States", "Canada", "United Kingdom", "Australia", "Germany", "France", "Japan", "Brazil", "South Africa", "Other"];
   const genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say"];
+  
   const handleTermsAccept = () => {
     form.setValue("acceptTerms", true);
   };
+
   if (registrationComplete) {
-    return <div className="min-h-screen py-16 px-4">
+    return (
+      <div className="min-h-screen py-16 px-4">
         <div className="container mx-auto max-w-3xl">
           <Card className="border-2 border-fantasy-primary bg-black/70">
             <CardHeader className="text-center">
@@ -187,9 +200,12 @@ const Register = () => {
             </CardContent>
           </Card>
         </div>
-      </div>;
+      </div>
+    );
   }
-  return <div className="min-h-screen py-16 px-4">
+
+  return (
+    <div className="min-h-screen py-16 px-4">
       <div className="container mx-auto max-w-3xl">
         <Card className="border-2 border-fantasy-primary bg-black/70">
           <CardHeader className="text-center">
@@ -201,69 +217,95 @@ const Register = () => {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={form.control} name="username" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>Username</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="Choose a unique username" className="fantasy-input" />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <FormField control={form.control} name="email" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>Email</FormLabel>
                         <FormControl>
                           <Input {...field} type="email" placeholder="Your email address" className="fantasy-input" />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <FormField control={form.control} name="password" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>Password</FormLabel>
                         <FormControl>
                           <Input {...field} type="password" placeholder="Create a secure password" className="fantasy-input" />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <FormField control={form.control} name="name" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>First Name</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="Your first name" className="fantasy-input" />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <FormField control={form.control} name="surname" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="surname"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>Last Name</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="Your last name" className="fantasy-input" />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <FormField control={form.control} name="age" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="age"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>Age</FormLabel>
                         <FormControl>
                           <Input {...field} type="number" min="13" max="120" placeholder="Your age" className="fantasy-input" />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <FormField control={form.control} name="gender" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="gender"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>Gender</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
@@ -276,11 +318,15 @@ const Register = () => {
                           </SelectContent>
                         </Select>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <FormField control={form.control} name="country" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>Country</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
@@ -293,22 +339,30 @@ const Register = () => {
                           </SelectContent>
                         </Select>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
-                  <FormField control={form.control} name="vipCode" render={({
-                  field
-                }) => <FormItem className="space-y-2">
+                  <FormField
+                    control={form.control}
+                    name="vipCode"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
                         <FormLabel>VIP Code (Optional)</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="Enter your VIP code if you have one" className="fantasy-input" />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                 </div>
                 
-                <FormField control={form.control} name="acceptTerms" render={({
-                field
-              }) => <FormItem className="flex flex-row items-center space-x-2 space-y-0 pt-4">
+                <FormField
+                  control={form.control}
+                  name="acceptTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 space-y-0 pt-4">
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} className="border-fantasy-accent data-[state=checked]:bg-fantasy-accent data-[state=checked]:text-black" />
                       </FormControl>
@@ -320,7 +374,9 @@ const Register = () => {
                         </FormLabel>
                         <FormMessage />
                       </div>
-                    </FormItem>} />
+                    </FormItem>
+                  )}
+                />
                 
                 <Button type="submit" className="fantasy-button w-full text-lg py-6" disabled={isLoading}>
                   {isLoading ? "Creating Your Account..." : "Register Now"}
@@ -343,6 +399,8 @@ const Register = () => {
       </div>
       
       <TermsAndConditionsDialog open={termsDialogOpen} onOpenChange={setTermsDialogOpen} onAccept={handleTermsAccept} />
-    </div>;
+    </div>
+  );
 };
+
 export default Register;

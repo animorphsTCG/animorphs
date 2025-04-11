@@ -170,3 +170,72 @@ export async function checkDatabaseHealth(): Promise<boolean> {
     return false;
   }
 }
+
+// Fixed function to validate VIP codes - no case sensitivity 
+export async function validateVipCode(vipCode: string): Promise<boolean> {
+  if (!vipCode || vipCode.trim() === "") {
+    return true; // Empty code is valid (optional)
+  }
+
+  try {
+    console.log("Validating VIP code:", vipCode.trim());
+    
+    // Use case-insensitive search with ilike
+    const { data, error } = await supabase
+      .from("vip_codes")
+      .select("*")
+      .ilike("code", vipCode.trim())
+      .maybeSingle();
+      
+    if (error) {
+      console.error("VIP code validation error:", error);
+      return false;
+    }
+    
+    if (!data) {
+      console.log("VIP code not found in database");
+      return false;
+    }
+    
+    console.log("VIP code found:", data);
+    // Check if the code has remaining uses
+    return data.current_uses < data.max_uses;
+  } catch (err) {
+    console.error("Error validating VIP code:", err);
+    return false;
+  }
+}
+
+// Fixed function to update VIP code usage count
+export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
+  try {
+    // Use case-insensitive search with ilike
+    const { data, error } = await supabase
+      .from("vip_codes")
+      .select("current_uses")
+      .ilike("code", vipCode.trim())
+      .single();
+      
+    if (error || !data) {
+      console.error("Error getting VIP code for update:", error);
+      return false;
+    }
+    
+    const { error: updateError } = await supabase
+      .from("vip_codes")
+      .update({
+        current_uses: data.current_uses + 1
+      })
+      .ilike("code", vipCode.trim());
+      
+    if (updateError) {
+      console.error("Error updating VIP code usage:", updateError);
+      return false;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error("Error updating VIP code usage:", err);
+    return false;
+  }
+}

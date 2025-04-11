@@ -16,9 +16,9 @@ const Index = () => {
   useEffect(() => {
     const loadFeaturedCards = async () => {
       try {
-        // Fetch specific card numbers to showcase all five elemental types
-        const cardNumbers = [1, 41, 81, 121, 161];
-        const cardPromises = cardNumbers.map(id => fetchCardById(id));
+        // Fetch specific card IDs to showcase all five elemental types
+        const cardIds = [1, 6, 11, 16, 21];
+        const cardPromises = cardIds.map(id => fetchCardById(id));
         
         const loadedCards = await Promise.all(cardPromises);
         // Filter out any null results (in case a card wasn't found)

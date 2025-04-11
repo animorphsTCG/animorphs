@@ -6,7 +6,7 @@ import CardDisplay from "@/components/CardDisplay";
 import { AnimorphCard } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { fetchAnimorphCards } from "@/lib/db";
+import { fetchCardById } from "@/lib/db";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -16,9 +16,13 @@ const Index = () => {
   useEffect(() => {
     const loadFeaturedCards = async () => {
       try {
-        // Get the first 3 cards for featuring
-        const cards = await fetchAnimorphCards(3);
-        setFeaturedCards(cards); // Set cards even if empty array
+        // Fetch specific card numbers to showcase all five elemental types
+        const cardNumbers = [1, 41, 81, 121, 161];
+        const cardPromises = cardNumbers.map(id => fetchCardById(id));
+        
+        const loadedCards = await Promise.all(cardPromises);
+        // Filter out any null results (in case a card wasn't found)
+        setFeaturedCards(loadedCards.filter(card => card !== null) as AnimorphCard[]);
       } catch (error) {
         console.error("Error loading featured cards:", error);
         // Don't show an error toast on the homepage for better UX
@@ -43,7 +47,7 @@ const Index = () => {
               Featured <span className="text-fantasy-accent">Battle Cards</span>
             </h2>
             <p className="text-gray-300 max-w-3xl mx-auto">
-              Discover powerful Animorph cards to add to your battle deck. Each card offers 5 unique statistics to use for dominating the battlefield.
+              Discover powerful Animorph cards to add to your battle deck. Each card represents one of the five elemental types available in the game.
             </p>
           </div>
           

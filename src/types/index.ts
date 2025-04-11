@@ -58,6 +58,8 @@ export interface VipCode {
   code: string;
   max_uses: number;
   current_uses: number;
+  description?: string;
+  created_at?: string;
 }
 
 export interface Song {

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +22,11 @@ import { validateVipCode, updateVipCodeUsage } from "@/lib/db";
 const registerSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(50),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters").regex(/[A-Z]/, "Password must contain at least one uppercase letter").regex(/[a-z]/, "Password must contain at least one lowercase letter").regex(/[0-9]/, "Password must contain at least one number").regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
+  password: z.string().min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
   name: z.string().min(1, "First name is required"),
   surname: z.string().min(1, "Last name is required"),
   age: z.coerce.number().int().min(13, "You must be at least 13 years old"),
@@ -41,6 +44,7 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [termsDialogOpen, setTermsDialogOpen] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
   const navigate = useNavigate();
   
   const form = useForm<RegisterFormValues>({
@@ -61,6 +65,8 @@ const Register = () => {
 
   const handleRegister = async (values: RegisterFormValues) => {
     setIsLoading(true);
+    setRegistrationError(null);
+    
     try {
       // Validate VIP code if provided
       let isVipValid = true;
@@ -111,39 +117,27 @@ const Register = () => {
           description: error.message,
           variant: "destructive"
         });
+        setRegistrationError(error.message);
         setIsLoading(false);
         return;
       }
 
       console.log("User created successfully:", data);
 
-      // Create the user profile manually if needed
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            username: values.username,
-            name: values.name,
-            surname: values.surname,
-            age: values.age,
-            gender: values.gender,
-            country: values.country,
-          });
-          
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
-          // Don't return here, we still want to proceed with registration
-        } else {
-          console.log("Profile created successfully");
-        }
-      }
+      // The profile will be created automatically by the database trigger
+      // We don't need to manually create it anymore
 
       // If we have a valid VIP code, update its usage
       if (isVipValid && values.vipCode && values.vipCode.trim() !== "") {
         const updated = await updateVipCodeUsage(values.vipCode);
         if (!updated) {
           console.error("Failed to update VIP code usage");
+          // Non-blocking error, we still proceed with registration
+          toast({
+            title: "VIP Code Issue",
+            description: "Your account was created, but there was an issue with the VIP code.",
+            variant: "default"
+          });
         } else {
           console.log("VIP code usage updated successfully");
         }
@@ -155,13 +149,15 @@ const Register = () => {
         title: "Registration Successful",
         description: "Please check your email for verification instructions."
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Registration error:", err);
+      const errorMessage = err?.message || "An unexpected error occurred. Please try again later.";
       toast({
         title: "Registration Failed",
-        description: "An unexpected error occurred. Please try again later.",
+        description: errorMessage,
         variant: "destructive"
       });
+      setRegistrationError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -214,6 +210,15 @@ const Register = () => {
           </CardHeader>
           
           <CardContent>
+            {registrationError && (
+              <Alert className="mb-6 bg-red-900/20 border-red-500 text-white">
+                <AlertTitle className="text-red-300">Registration Error</AlertTitle>
+                <AlertDescription>
+                  {registrationError}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

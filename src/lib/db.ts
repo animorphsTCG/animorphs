@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { AnimorphCard } from "@/types";
 
@@ -49,7 +48,6 @@ export async function getRandomDeck(size: number = 10, excludeCardIds: number[] 
       return [];
     }
     
-    // Shuffle and slice to get random subset
     return (data as AnimorphCard[])
       .sort(() => Math.random() - 0.5)
       .slice(0, Math.min(size, data.length));
@@ -171,68 +169,82 @@ export async function checkDatabaseHealth(): Promise<boolean> {
   }
 }
 
-// Fixed function to validate VIP codes - no case sensitivity 
+// Fixed function to validate VIP codes with improved logging and error handling
 export async function validateVipCode(vipCode: string): Promise<boolean> {
   if (!vipCode || vipCode.trim() === "") {
     return true; // Empty code is valid (optional)
   }
 
   try {
-    console.log("Validating VIP code:", vipCode.trim());
+    const trimmedCode = vipCode.trim();
+    console.log("Validating VIP code:", trimmedCode);
     
-    // Use case-insensitive search with ilike
+    // Explicitly log the query we're about to execute
+    console.log(`SELECT * FROM vip_codes WHERE LOWER(code) = '${trimmedCode.toLowerCase()}'`);
+    
+    // Use explicit LOWER function to ensure case insensitivity
     const { data, error } = await supabase
       .from("vip_codes")
       .select("*")
-      .ilike("code", vipCode.trim())
-      .maybeSingle();
+      .filter('code', 'ilike', trimmedCode);
       
     if (error) {
       console.error("VIP code validation error:", error);
       return false;
     }
     
-    if (!data) {
+    console.log("VIP code query result:", data);
+    
+    if (!data || data.length === 0) {
       console.log("VIP code not found in database");
       return false;
     }
     
-    console.log("VIP code found:", data);
+    console.log("VIP code found:", data[0]);
     // Check if the code has remaining uses
-    return data.current_uses < data.max_uses;
+    return data[0].current_uses < data[0].max_uses;
   } catch (err) {
     console.error("Error validating VIP code:", err);
     return false;
   }
 }
 
-// Fixed function to update VIP code usage count
+// Fixed function to update VIP code usage count with improved logging
 export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
+  if (!vipCode || vipCode.trim() === "") {
+    return true; // No code to update
+  }
+
   try {
-    // Use case-insensitive search with ilike
+    const trimmedCode = vipCode.trim();
+    console.log("Updating usage for VIP code:", trimmedCode);
+    
+    // Use explicit filter to ensure case insensitivity
     const { data, error } = await supabase
       .from("vip_codes")
-      .select("current_uses")
-      .ilike("code", vipCode.trim())
-      .single();
+      .select("*")
+      .filter('code', 'ilike', trimmedCode);
       
-    if (error || !data) {
-      console.error("Error getting VIP code for update:", error);
+    if (error || !data || data.length === 0) {
+      console.error("Error getting VIP code for update:", error || "No data found");
       return false;
     }
+    
+    console.log("Current usage:", data[0].current_uses, "Max uses:", data[0].max_uses);
     
     const { error: updateError } = await supabase
       .from("vip_codes")
       .update({
-        current_uses: data.current_uses + 1
+        current_uses: data[0].current_uses + 1
       })
-      .ilike("code", vipCode.trim());
+      .eq("id", data[0].id);
       
     if (updateError) {
       console.error("Error updating VIP code usage:", updateError);
       return false;
     }
     
+    console.log("VIP code usage updated successfully");
     return true;
   } catch (err) {
     console.error("Error updating VIP code usage:", err);

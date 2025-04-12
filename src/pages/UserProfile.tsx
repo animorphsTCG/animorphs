@@ -153,11 +153,11 @@ const UserProfile = () => {
         }
 
         // Fetch payment status if viewing own profile
-        if (isOwnProfile && user && profileData) {
+        if (isOwnProfile && user) {
           const { data: paymentData, error: paymentError } = await supabase
             .from('payment_status')
             .select('has_paid, payment_date, payment_method')
-            .eq('username', user.username || user.id)
+            .eq('id', user.id)
             .maybeSingle();
 
           if (!paymentError && paymentData) {

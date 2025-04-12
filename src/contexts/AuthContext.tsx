@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profileData = await fetchUserProfile(authUser.id);
       if (profileData) {
         console.log("Merging auth user with profile data:", profileData);
-        // Merge auth user with profile data - fixed spread operator usage
+        // Fix: Replace spread operator with Object.assign
         const combinedData = Object.assign({}, authUser, profileData) as (SupabaseUser & Partial<User>);
         setUser(combinedData);
       } else {
@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Fetch the newly created profile
               const newProfile = await fetchUserProfile(authUser.id);
               if (newProfile) {
-                // Fixed spread operator usage
+                // Fix: Replace spread operator with Object.assign
                 const combinedData = Object.assign({}, authUser, newProfile) as (SupabaseUser & Partial<User>);
                 setUser(combinedData);
                 return;
@@ -133,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Fallback if profile doesn't exist yet or creation failed
         console.log("Using fallback username from email");
+        // Fix: Replace spread operator with Object.assign
         const fallbackUser = Object.assign({}, authUser, {
           username: authUser.email?.split('@')[0] || 'User'
         }) as (SupabaseUser & Partial<User>);
@@ -141,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error updating user with profile:', error);
       // Fallback username from email
+      // Fix: Replace spread operator with Object.assign
       const fallbackUser = Object.assign({}, authUser, {
         username: authUser.email?.split('@')[0] || 'User'
       }) as (SupabaseUser & Partial<User>);

@@ -21,7 +21,7 @@ const RegistrationFormHeader = ({ errorMessage }: RegistrationFormHeaderProps) =
         <Info className="h-4 w-4" />
         <AlertDescription className="text-xs">
           <p>
-            After registration, you'll be automatically logged in and redirected to the game.
+            After registration, you'll be automatically logged in and redirected to the battle page.
           </p>
           <p className="mt-1">
             <strong>Important:</strong> Remember your login credentials for future sessions:
@@ -31,7 +31,7 @@ const RegistrationFormHeader = ({ errorMessage }: RegistrationFormHeaderProps) =
             <li>The password you created during registration</li>
           </ul>
           <p className="mt-1">
-            <strong>Note:</strong> If you don't see the login success message after registration, please try logging in manually with your new credentials.
+            <strong>Note:</strong> Registration is completely free. You can upgrade your account later to unlock all 200 cards.
           </p>
         </AlertDescription>
       </Alert>

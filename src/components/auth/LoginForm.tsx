@@ -75,6 +75,7 @@ const LoginForm = () => {
     setErrorMessage(null);
     setDebugInfo(null);
     
+    // Check if account is locked
     if (isAccountLocked(email)) {
       setIsLocked(true);
       setLockoutTime(getLockoutTimeRemaining(email));
@@ -82,12 +83,14 @@ const LoginForm = () => {
       return;
     }
     
+    // Validate email
     const emailValidation = validateEmail(email);
     if (!emailValidation.valid) {
       setErrorMessage(emailValidation.message || "Invalid email");
       return;
     }
     
+    // Validate password
     if (!password || password.length < 6) {
       setErrorMessage("Password must be at least 6 characters");
       return;
@@ -98,29 +101,54 @@ const LoginForm = () => {
     try {
       console.log("Attempting login with:", { email });
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      console.log("Login response:", { data, error });
-      
-      recordAuthAttempt(email, !error);
+      // Improved login logic with retries
+      let loginAttempt = 1;
+      const maxAttempts = 2;
+      let success = false;
+      let loginError = null;
+      let userData = null;
 
-      if (error) {
-        console.error("Login error:", error);
+      while (loginAttempt <= maxAttempts && !success) {
+        console.log(`Login attempt ${loginAttempt}/${maxAttempts}`);
+        
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (error) {
+          console.error(`Login error (attempt ${loginAttempt}/${maxAttempts}):`, error);
+          loginError = error;
+          loginAttempt++;
+          
+          // Short delay before retry
+          if (loginAttempt <= maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } else {
+          success = true;
+          userData = data;
+          break;
+        }
+      }
+
+      // Record the auth attempt result
+      recordAuthAttempt(email, success);
+      
+      if (!success) {
+        console.error("Login failed after all attempts:", loginError);
         
         // Provide more helpful error messages
-        if (error.message === "Invalid login credentials") {
+        if (loginError?.message === "Invalid login credentials") {
           setErrorMessage("Incorrect email or password");
           
-          // Debug information for development
+          // Add debug information for development
           const userCheck = await checkUserExists(email);
           setDebugInfo(`Debug info: ${userCheck}`);
-        } else if (error.message.includes("Email not confirmed")) {
+        } else if (loginError?.message.includes("Email not confirmed")) {
           setErrorMessage("Your email is not confirmed. Please check your inbox for a confirmation email.");
         } else {
-          setErrorMessage(error.message);
+          setErrorMessage(loginError?.message || "Login failed");
         }
         
         toast({
@@ -128,8 +156,8 @@ const LoginForm = () => {
           description: "Please check your credentials and try again",
           variant: "destructive",
         });
-      } else if (data?.user) {
-        console.log("Login successful, user:", data.user);
+      } else if (userData?.user) {
+        console.log("Login successful, user:", userData.user);
         
         // Wait a moment before refreshing to ensure Supabase trigger has run
         setTimeout(async () => {

@@ -3,8 +3,15 @@
  * Validation utilities for form inputs
  */
 
+// Common return type for validation functions
+export interface ValidationResult {
+  valid: boolean;
+  message?: string;
+  strength?: string;
+}
+
 // Username validation
-export function validateUsername(username: string): { valid: boolean; message?: string } {
+export function validateUsername(username: string): ValidationResult {
   if (!username || username.trim() === '') {
     return { valid: false, message: 'Username is required' };
   }
@@ -22,7 +29,7 @@ export function validateUsername(username: string): { valid: boolean; message?: 
 }
 
 // Email validation with strong regex for RFC 5322 standard
-export function validateEmail(email: string): { valid: boolean; message?: string } {
+export function validateEmail(email: string): ValidationResult {
   if (!email || email.trim() === '') {
     return { valid: false, message: 'Email is required' };
   }
@@ -49,7 +56,7 @@ export function validateEmail(email: string): { valid: boolean; message?: string
 }
 
 // Password validation - enforcing stronger requirements
-export function validatePassword(password: string): { valid: boolean; message?: string; strength?: string } {
+export function validatePassword(password: string): ValidationResult {
   if (!password || password === '') {
     return { valid: false, message: 'Password is required' };
   }
@@ -115,7 +122,7 @@ export function validatePassword(password: string): { valid: boolean; message?: 
 }
 
 // Age validation
-export function validateAge(age: number | string): { valid: boolean; message?: string } {
+export function validateAge(age: number | string): ValidationResult {
   const ageNumber = typeof age === 'string' ? parseInt(age, 10) : age;
   
   if (isNaN(ageNumber)) {
@@ -134,7 +141,7 @@ export function validateAge(age: number | string): { valid: boolean; message?: s
 }
 
 // Name validation
-export function validateName(name: string): { valid: boolean; message?: string } {
+export function validateName(name: string): ValidationResult {
   if (!name || name.trim() === '') {
     return { valid: false, message: 'Name is required' };
   }
@@ -152,7 +159,7 @@ export function validateName(name: string): { valid: boolean; message?: string }
 }
 
 // VIP code validation
-export function validateVipCode(code: string): { valid: boolean; message?: string } {
+export function validateVipCode(code: string): ValidationResult {
   // VIP code is optional
   if (!code || code.trim() === '') {
     return { valid: true };

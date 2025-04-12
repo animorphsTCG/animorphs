@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { validateEmail, validatePassword, validateUsername, validateAge, validateName, validateVipCode } from "@/lib/validation";
+import { validateEmail, validatePassword, validateUsername, validateAge, validateName, validateVipCode, ValidationResult } from "@/lib/validation";
 import { validateVipCode as validateVipCodeServer, updateVipCodeUsage } from "@/lib/db";
 import { AlertCircle, Info, Check, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -57,7 +58,7 @@ const RegistrationForm = () => {
     vipCode: ""
   });
   
-  const [validations, setValidations] = useState<Record<string, { valid: boolean; message?: string; strength?: string }>>({});
+  const [validations, setValidations] = useState<Record<string, ValidationResult>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [passwordStrength, setPasswordStrength] = useState<string | undefined>(undefined);
@@ -80,7 +81,7 @@ const RegistrationForm = () => {
   
   // Individual field validation
   const validateField = (name: string, value: any) => {
-    let result = { valid: true };
+    let result: ValidationResult = { valid: true };
     
     switch (name) {
       case "username":

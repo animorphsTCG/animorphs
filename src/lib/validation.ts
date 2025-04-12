@@ -1,7 +1,7 @@
 
-// Add or update the validation functions to ensure they return the proper interface
+// Export the validation functions and interface to ensure they can be imported elsewhere
 
-interface ValidationResult {
+export interface ValidationResult {
   valid: boolean;
   message?: string;
   strength?: string;
@@ -98,6 +98,23 @@ export const validateAge = (age: string): ValidationResult => {
   
   if (ageNum > 120) {
     return { valid: false, message: "Please enter a valid age" };
+  }
+  
+  return { valid: true };
+};
+
+// Add the missing validateVipCode function
+export const validateVipCode = (code: string): ValidationResult => {
+  if (!code || code.trim() === '') {
+    // VIP code is optional, so empty is valid
+    return { valid: true };
+  }
+  
+  // Simple validation - in production you'd verify this against your database
+  const validCodes = ['ZypherDan', 'WonAgainstAi'];
+  
+  if (!validCodes.includes(code)) {
+    return { valid: false, message: "Invalid VIP code" };
   }
   
   return { valid: true };

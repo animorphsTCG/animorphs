@@ -69,11 +69,16 @@ const LoginForm = () => {
     }
     
     setIsLoading(true);
+    
     try {
+      console.log("Attempting login with:", { email });
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      
+      console.log("Login response:", { data, error });
       
       // Record the login attempt
       recordAuthAttempt(email, !error);
@@ -90,13 +95,17 @@ const LoginForm = () => {
           description: "Please check your credentials and try again",
           variant: "destructive",
         });
-      } else {
+      } else if (data?.user) {
         // Success
+        console.log("Login successful, user:", data.user);
         toast({
           title: "Login successful",
           description: "Welcome back!",
         });
         navigate("/battle");
+      } else {
+        console.error("No user data returned after successful login");
+        setErrorMessage("An unexpected error occurred. Please try again.");
       }
     } catch (err) {
       console.error("Unexpected login error:", err);

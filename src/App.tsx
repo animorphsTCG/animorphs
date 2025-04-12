@@ -36,19 +36,20 @@ const queryClient = new QueryClient({
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    if (!isLoading && !user && !location.pathname.includes("/login") && !location.pathname.includes("/register")) {
+    if (!isLoading && !session && !location.pathname.includes("/login") && !location.pathname.includes("/register")) {
+      console.log("User not authenticated, redirecting to login");
       toast({
         title: "Authentication Required",
         description: "Please log in to access this page",
       });
       navigate("/login");
     }
-  }, [user, isLoading, navigate, location.pathname]);
+  }, [user, session, isLoading, navigate, location.pathname]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">
@@ -61,6 +62,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Main app component
 const AppContent = () => {
+  const { session, user } = useAuth(); // Add session here
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   useEffect(() => {
     const initializeApp = async () => {
       try {
@@ -79,6 +84,14 @@ const AppContent = () => {
     
     initializeApp();
   }, []);
+  
+  // Redirect logged in users to battle page if they're on login or register page
+  useEffect(() => {
+    if (session && (location.pathname === "/login" || location.pathname === "/register")) {
+      console.log("User already authenticated, redirecting from auth page to battle");
+      navigate("/battle");
+    }
+  }, [session, location.pathname, navigate]);
   
   return (
     <div className="flex flex-col min-h-screen">

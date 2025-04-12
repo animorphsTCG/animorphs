@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,6 +170,8 @@ const RegistrationForm = () => {
     setIsLoading(true);
     
     try {
+      // Handle VIP code validation first
+      let vipCodeValid = true;
       if (formData.vipCode.trim()) {
         console.log(`Validating VIP code: "${formData.vipCode.trim()}"`);
         setVipCodeValidationInProgress(true);
@@ -179,6 +182,7 @@ const RegistrationForm = () => {
             setErrorMessage("Invalid VIP code or code has reached maximum uses");
             setIsLoading(false);
             setVipCodeValidationInProgress(false);
+            vipCodeValid = false;
             return;
           }
           console.log("VIP code validated successfully");
@@ -187,13 +191,19 @@ const RegistrationForm = () => {
           setErrorMessage("Error validating VIP code. Please try again.");
           setIsLoading(false);
           setVipCodeValidationInProgress(false);
+          vipCodeValid = false;
           return;
+        } finally {
+          setVipCodeValidationInProgress(false);
         }
-        
-        setVipCodeValidationInProgress(false);
       }
       
+      if (!vipCodeValid) return;
+      
       console.log("Registering user with Supabase");
+      // Convert age to integer
+      const ageInt = parseInt(formData.age);
+      
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -202,12 +212,14 @@ const RegistrationForm = () => {
             username: formData.username,
             name: formData.name,
             surname: formData.surname,
-            age: parseInt(formData.age),
+            age: ageInt,
             gender: formData.gender || null,
             country: formData.country || null
           }
         }
       });
+      
+      console.log("Registration response:", { data, error });
       
       if (error) {
         console.error("Registration error:", error);
@@ -217,9 +229,10 @@ const RegistrationForm = () => {
           description: error.message,
           variant: "destructive",
         });
-      } else {
-        console.log("Registration successful:", data);
+      } else if (data?.user) {
+        console.log("Registration successful:", data.user);
         
+        // Update VIP code usage if provided
         if (formData.vipCode.trim()) {
           console.log(`Updating VIP code usage: "${formData.vipCode.trim()}"`);
           try {
@@ -236,10 +249,20 @@ const RegistrationForm = () => {
         
         toast({
           title: "Registration successful!",
-          description: "Check your email to verify your account.",
+          description: "You can now log in with your credentials.",
         });
         
+        // After successful registration, redirect to login page
         navigate("/login");
+      } else {
+        // This should not happen but handle it just in case
+        console.error("No user data returned but no error either");
+        setErrorMessage("An unexpected error occurred during registration. Please try again.");
+        toast({
+          title: "Registration error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (err) {
       console.error("Unexpected registration error:", err);

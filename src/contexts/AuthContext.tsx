@@ -10,6 +10,7 @@ type AuthContextType = {
   isLoading: boolean;
   signOut: () => Promise<void>;
   isEmailVerified: boolean;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,6 +24,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to fetch user profile data
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log("Fetching profile data for user:", userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -34,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
       
+      console.log("Profile data fetched:", data);
       return data;
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
@@ -44,10 +48,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Update user state with profile data
   const updateUserWithProfile = async (authUser: SupabaseUser | null) => {
     if (!authUser) {
+      console.log("No auth user to update profile for");
       setUser(null);
       setIsEmailVerified(false);
       return;
     }
+
+    console.log("Updating user profile for:", authUser.id);
 
     try {
       // Check email verification status
@@ -55,6 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const profileData = await fetchUserProfile(authUser.id);
       if (profileData) {
+        console.log("Merging auth user with profile data:", profileData);
         // Merge auth user with profile data
         setUser({
           ...authUser,
@@ -62,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       } else {
         // Fallback if profile doesn't exist yet
+        console.log("No profile found, using fallback username");
         setUser({
           ...authUser,
           username: authUser.email?.split('@')[0] || 'User'
@@ -74,6 +83,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...authUser,
         username: authUser.email?.split('@')[0] || 'User'
       });
+    }
+  };
+  
+  // Function to manually refresh user data
+  const refreshUser = async () => {
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        console.log("Manually refreshing user data");
+        await updateUserWithProfile(data.user);
+      }
+    } catch (error) {
+      console.error("Error refreshing user data:", error);
     }
   };
 
@@ -114,11 +136,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
+    console.log("Signing out user");
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, signOut, isEmailVerified }}>
+    <AuthContext.Provider value={{ user, session, isLoading, signOut, isEmailVerified, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

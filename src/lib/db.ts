@@ -421,27 +421,54 @@ export async function validateVipCode(vipCode: string): Promise<boolean> {
       return isValid;
     }
     
+    // Modified query to handle case-insensitive comparison without ILIKE
     const { data, error } = await dbConnection.retry(async () => {
       return supabase
         .from("vip_codes")
         .select("*")
-        .ilike("code", trimmedCode);
+        .eq("code", trimmedCode); // Try exact match first
     });
       
     if (error) {
       console.error("VIP code validation error:", error);
       return false;
     }
-    
+
     console.log(`VIP code database query for "${trimmedCode}" returned:`, data);
     
-    if (!data || data.length === 0) {
-      console.log("VIP code not found in database");
-      return false;
-    }
+    let vipCodeData;
     
-    const vipCodeData = data[0] as VipCode;
-    console.log(`Found VIP code in database: ${vipCodeData.code} (uses: ${vipCodeData.current_uses}/${vipCodeData.max_uses})`);
+    if (!data || data.length === 0) {
+      // If no exact match, try case-insensitive comparison manually
+      const { data: allCodes, error: allCodesError } = await dbConnection.retry(async () => {
+        return supabase
+          .from("vip_codes")
+          .select("*");
+      });
+      
+      if (allCodesError) {
+        console.error("Error fetching all VIP codes:", allCodesError);
+        return false;
+      }
+      
+      console.log("All VIP codes for manual case-insensitive search:", allCodes);
+      
+      // Manual case-insensitive comparison
+      const matchedCode = allCodes?.find(code => 
+        code.code.toLowerCase() === trimmedCode.toLowerCase()
+      );
+      
+      if (!matchedCode) {
+        console.log("VIP code not found in database (case insensitive search)");
+        return false;
+      }
+      
+      vipCodeData = matchedCode;
+      console.log("Found VIP code using manual case-insensitive search:", vipCodeData);
+    } else {
+      vipCodeData = data[0];
+      console.log(`Found VIP code in database: ${vipCodeData.code} (uses: ${vipCodeData.current_uses}/${vipCodeData.max_uses})`);
+    }
     
     cache.addToCache(
       cache.vipCodes, 
@@ -479,11 +506,12 @@ export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
       throw new Error("Too many update attempts. Please try again later.");
     }
     
-    const { data, error } = await dbConnection.retry(async () => {
+    // Try exact match first
+    let { data, error } = await dbConnection.retry(async () => {
       return supabase
         .from("vip_codes")
         .select("*")
-        .ilike("code", trimmedCode);
+        .eq("code", trimmedCode);
     });
       
     if (error) {
@@ -491,12 +519,33 @@ export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
       return false;
     }
     
+    // If no exact match, try case-insensitive manual search
     if (!data || data.length === 0) {
-      console.log(`VIP code "${trimmedCode}" not found in database for update`);
-      return false;
+      const { data: allCodes, error: allCodesError } = await dbConnection.retry(async () => {
+        return supabase
+          .from("vip_codes")
+          .select("*");
+      });
+      
+      if (allCodesError) {
+        console.error("Error fetching all VIP codes for update:", allCodesError);
+        return false;
+      }
+      
+      // Manual case-insensitive comparison
+      const matchedCode = allCodes?.find(code => 
+        code.code.toLowerCase() === trimmedCode.toLowerCase()
+      );
+      
+      if (!matchedCode) {
+        console.log(`VIP code "${trimmedCode}" not found in database for update (case insensitive)`);
+        return false;
+      }
+      
+      data = [matchedCode];
     }
     
-    const vipCodeData = data[0] as VipCode;
+    const vipCodeData = data[0];
     console.log(`Found VIP code in database for update: ${vipCodeData.code} (current uses: ${vipCodeData.current_uses}/${vipCodeData.max_uses})`);
     
     if (vipCodeData.current_uses >= vipCodeData.max_uses) {

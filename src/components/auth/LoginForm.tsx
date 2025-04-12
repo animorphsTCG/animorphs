@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,13 +23,11 @@ const LoginForm = () => {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
 
-  // Check for account lockout
   useEffect(() => {
     if (email && isAccountLocked(email)) {
       setIsLocked(true);
       setLockoutTime(getLockoutTimeRemaining(email));
       
-      // Update lockout timer
       const interval = setInterval(() => {
         const remaining = getLockoutTimeRemaining(email);
         setLockoutTime(remaining);
@@ -52,7 +49,6 @@ const LoginForm = () => {
     setErrorMessage(null);
     setShowEmailVerificationReminder(false);
     
-    // Check for account lockout first
     if (isAccountLocked(email)) {
       setIsLocked(true);
       setLockoutTime(getLockoutTimeRemaining(email));
@@ -60,14 +56,12 @@ const LoginForm = () => {
       return;
     }
     
-    // Validate email
     const emailValidation = validateEmail(email);
     if (!emailValidation.valid) {
       setErrorMessage(emailValidation.message || "Invalid email");
       return;
     }
     
-    // Validate password
     if (!password || password.length < 6) {
       setErrorMessage("Password must be at least 6 characters");
       return;
@@ -85,23 +79,17 @@ const LoginForm = () => {
       
       console.log("Login response:", { data, error });
       
-      // Record the login attempt
       recordAuthAttempt(email, !error);
 
       if (error) {
         console.error("Login error:", error);
         
-        // Special handling for unverified email
         if (error.message === "Email not confirmed") {
           setShowEmailVerificationReminder(true);
           setErrorMessage("Your email address has not been verified. Please check your inbox for the verification link.");
-        }
-        // Special handling for invalid credentials
-        else if (error.message === "Invalid login credentials") {
+        } else if (error.message === "Invalid login credentials") {
           setErrorMessage("Incorrect email or password");
-        }
-        // Fallback for other errors
-        else {
+        } else {
           setErrorMessage(error.message);
         }
         
@@ -111,10 +99,8 @@ const LoginForm = () => {
           variant: "destructive",
         });
       } else if (data?.user) {
-        // Success
         console.log("Login successful, user:", data.user);
         
-        // Make sure we have the latest user data
         await refreshUser();
         
         toast({
@@ -141,7 +127,6 @@ const LoginForm = () => {
     }
   };
 
-  // Format lockout time for display
   const formatLockoutTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -159,7 +144,10 @@ const LoginForm = () => {
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
-        email: email
+        email: email,
+        options: {
+          emailRedirectTo: window.location.origin + '/login'
+        }
       });
       
       if (error) {
@@ -171,9 +159,10 @@ const LoginForm = () => {
           variant: "destructive",
         });
       } else {
+        setShowEmailVerificationReminder(true);
         toast({
           title: "Verification email sent",
-          description: "Please check your inbox for the verification link",
+          description: "Please check your inbox and spam folder for the verification link",
         });
       }
     } catch (err) {
@@ -198,6 +187,10 @@ const LoginForm = () => {
           <Mail className="h-4 w-4" />
           <AlertDescription className="flex flex-col space-y-2">
             <span>Please verify your email address before logging in.</span>
+            <p className="text-xs mt-1">
+              If you can't find the email in your inbox, please check your spam folder.
+              Verification emails typically arrive within a few minutes.
+            </p>
             <Button 
               variant="outline" 
               size="sm" 

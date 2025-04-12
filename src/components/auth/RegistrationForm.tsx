@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -183,7 +182,8 @@ const RegistrationForm = () => {
             age: ageInt,
             gender: formData.gender || null,
             country: formData.country || null
-          }
+          },
+          emailRedirectTo: window.location.origin + '/login'
         }
       });
       

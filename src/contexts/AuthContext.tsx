@@ -96,13 +96,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("Refreshed auth user data:", data?.user);
       if (data?.user) {
         await updateUserWithProfile(data.user);
-        return true;
       }
-      return false;
+      // Remove the boolean return
     } catch (error) {
       console.error("Error refreshing user data:", error);
-      return false;
     }
+    // The function now implicitly returns Promise<void>
   };
 
   useEffect(() => {

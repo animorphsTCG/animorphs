@@ -18,6 +18,7 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
   const { isLoaded: isClerkLoaded, userId, sessionId, signOut: clerkSignOut } = useClerkAuth();
   const { user, isLoaded: isUserLoaded } = useUser();
   const [redirected, setRedirected] = useState(false);
+  const navigate = useNavigate();
   
   const isLoading = !isClerkLoaded || !isUserLoaded;
 
@@ -27,25 +28,33 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
       if (user && isClerkLoaded && isUserLoaded) {
         try {
           // Check if profile exists
-          const { data: profile } = await supabase
+          const { data: profile, error: checkError } = await supabase
             .from('profiles')
             .select('id')
-            .eq('id', user.id)
+            .eq('username', user.username || user.id)
             .maybeSingle();
+            
+          if (checkError) {
+            console.error("Error checking profile:", checkError);
+          }
             
           if (!profile) {
             // Create a profile if it doesn't exist
-            await supabase
+            const { error: insertError } = await supabase
               .from('profiles')
               .insert({
-                id: user.id,
+                id: userId, // Use the clean ID from Clerk
                 username: user.username || user.id,
                 name: user.firstName || "User",
                 surname: user.lastName || "",
                 age: 18
               });
               
-            console.log("Created profile for user", user.id);
+            if (insertError) {
+              console.error("Error creating profile:", insertError);
+            } else {
+              console.log("Created profile for user", user.id);
+            }
           }
         } catch (err) {
           console.error("Error syncing user profile:", err);
@@ -54,7 +63,7 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     syncUserProfile();
-  }, [user, isClerkLoaded, isUserLoaded]);
+  }, [user, isClerkLoaded, isUserLoaded, userId]);
 
   useEffect(() => {
     // If user is logged in and not on the profile page, redirect them there
@@ -70,13 +79,15 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
       // Those routes have their own redirect logic in PaidAccessRoute component
       if (!requiresPaymentPages.some(page => window.location.pathname.startsWith(page))) {
         setRedirected(true);
+        navigate('/profile');
       }
     }
-  }, [user, redirected]);
+  }, [user, redirected, navigate]);
 
   const handleSignOut = async () => {
     try {
       await clerkSignOut();
+      navigate('/');
     } catch (error) {
       console.error("Sign out error:", error);
     }

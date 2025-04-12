@@ -15,6 +15,11 @@ const Navbar = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  const handleProfileClick = () => {
+    navigate("/profile");
+    setIsMenuOpen(false);
+  };
+
   return (
     <nav className="bg-black/80 backdrop-blur-sm sticky top-0 z-50 border-b border-fantasy-accent/30">
       <div className="container mx-auto px-4 py-3">
@@ -43,13 +48,13 @@ const Navbar = () => {
             </SignedIn>
             
             <SignedIn>
-              <Link 
-                to="/profile" 
-                className="text-white hover:text-fantasy-accent flex items-center gap-1"
+              <div 
+                onClick={handleProfileClick}
+                className="text-white hover:text-fantasy-accent flex items-center gap-1 cursor-pointer"
               >
                 <UserButton afterSignOutUrl="/" />
                 <span className="ml-2">Profile</span>
-              </Link>
+              </div>
             </SignedIn>
             
             <SignedOut>
@@ -94,9 +99,12 @@ const Navbar = () => {
               <Link to="/search-users" className="text-white hover:text-fantasy-accent text-lg font-medium">
                 <Users className="h-4 w-4 inline mr-1" /> Players
               </Link>
-              <Link to="/profile" className="text-white hover:text-fantasy-accent text-lg font-medium">
+              <div 
+                onClick={handleProfileClick} 
+                className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer"
+              >
                 Profile
-              </Link>
+              </div>
               <UserButton afterSignOutUrl="/" />
             </SignedIn>
             

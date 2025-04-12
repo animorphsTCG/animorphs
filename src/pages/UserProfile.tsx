@@ -63,48 +63,20 @@ const UserProfile = () => {
         setIsLoading(true);
         setError(null);
         
-        // First try to create a profile if it doesn't exist yet for this user
-        if (isOwnProfile && user) {
-          // Check if profile exists
-          const { data: existingProfile, error: checkError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', user.id)
-            .maybeSingle();
-            
-          if (checkError) {
-            console.log("Error checking for profile:", checkError);
-          }
-            
-          if (!existingProfile) {
-            console.log("Profile not found, creating one");
-            // Create a basic profile based on Clerk user data
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert({
-                id: user.id,
-                username: user.username || user.id,
-                name: user.firstName || "User",
-                surname: user.lastName || "",
-                age: 18
-              });
-                
-            if (insertError) {
-              console.error("Error creating profile:", insertError);
-              setError("Could not create user profile");
-              setIsLoading(false);
-              return;
-            }
-          }
+        if (!user && isOwnProfile) {
+          setError("You must be logged in to view your profile");
+          setIsLoading(false);
+          return;
         }
         
+        // Try to fetch the profile
         let query;
         if (isOwnProfile && user) {
-          // Fetch own profile
+          // First try by username
           query = supabase
             .from('profiles')
             .select('*')
-            .eq('id', user.id)
+            .eq('username', user.username || user.id)
             .maybeSingle();
         } else if (username) {
           // Try to fetch by username
@@ -122,40 +94,81 @@ const UserProfile = () => {
         if (profileError) {
           console.error("Error fetching profile:", profileError);
           setError("Could not load user profile");
+          setIsLoading(false);
           return;
         }
 
-        if (!profile) {
+        if (!profile && isOwnProfile && user) {
+          // Create a new profile for the current user if one doesn't exist
+          console.log("Profile not found, creating one");
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              username: user.username || user.id,
+              name: user.firstName || "User",
+              surname: user.lastName || "",
+              age: 18
+            });
+              
+          if (insertError) {
+            console.error("Error creating profile:", insertError);
+            setError("Could not create user profile");
+            setIsLoading(false);
+            return;
+          }
+          
+          // Try fetching the profile again
+          const { data: newProfile, error: newProfileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('username', user.username || user.id)
+            .maybeSingle();
+            
+          if (newProfileError || !newProfile) {
+            setError("Could not load newly created profile");
+            setIsLoading(false);
+            return;
+          }
+          
+          setProfileData(newProfile);
+          setFormData({
+            bio: newProfile.bio || "",
+            playing_times: newProfile.playing_times || "",
+            country: newProfile.country || "",
+            profile_image_url: newProfile.profile_image_url || ""
+          });
+        } else if (profile) {
+          setProfileData(profile);
+          setFormData({
+            bio: profile.bio || "",
+            playing_times: profile.playing_times || "",
+            country: profile.country || "",
+            profile_image_url: profile.profile_image_url || ""
+          });
+        } else {
           setError("User profile not found");
+          setIsLoading(false);
           return;
         }
-
-        setProfileData(profile);
-        setFormData({
-          bio: profile.bio || "",
-          playing_times: profile.playing_times || "",
-          country: profile.country || "",
-          profile_image_url: profile.profile_image_url || ""
-        });
 
         // Fetch payment status if viewing own profile
-        if (isOwnProfile) {
+        if (isOwnProfile && user && profileData) {
           const { data: paymentData, error: paymentError } = await supabase
             .from('payment_status')
             .select('has_paid, payment_date, payment_method')
-            .eq('id', user.id)
+            .eq('username', user.username || user.id)
             .maybeSingle();
 
-          if (paymentError) {
-            console.error("Error fetching payment status:", paymentError);
-          } else if (paymentData) {
+          if (!paymentError && paymentData) {
             setPaymentStatus(paymentData);
           }
         }
+        
+        setIsLoading(false);
       } catch (err) {
         console.error("Error:", err);
         setError("Failed to load profile information");
-      } finally {
         setIsLoading(false);
       }
     };
@@ -184,7 +197,7 @@ const UserProfile = () => {
           country: formData.country,
           profile_image_url: formData.profile_image_url
         })
-        .eq('id', user.id);
+        .eq('username', user.username || user.id);
 
       if (error) {
         console.error("Error updating profile:", error);

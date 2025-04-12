@@ -178,6 +178,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             title: "Signed in",
             description: "You are now signed in.",
           });
+          
+          // Navigate to profile page instead of battle
+          window.location.href = "/profile";
         } else if (event === 'SIGNED_OUT') {
           toast({
             title: "Signed out",

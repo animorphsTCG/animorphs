@@ -152,10 +152,41 @@ export type Database = {
           },
         ]
       }
+      payment_status: {
+        Row: {
+          created_at: string
+          has_paid: boolean
+          id: string
+          payment_date: string | null
+          payment_method: string | null
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          has_paid?: boolean
+          id: string
+          payment_date?: string | null
+          payment_method?: string | null
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          has_paid?: boolean
+          id?: string
+          payment_date?: string | null
+          payment_method?: string | null
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           age: number
           ai_points: number
+          bio: string | null
           country: string | null
           created_at: string
           digi: number
@@ -169,12 +200,15 @@ export type Database = {
           music_unlocked: boolean
           name: string
           online_times_gmt2: string | null
+          playing_times: string | null
+          profile_image_url: string | null
           surname: string
           username: string
         }
         Insert: {
           age: number
           ai_points?: number
+          bio?: string | null
           country?: string | null
           created_at?: string
           digi?: number
@@ -188,12 +222,15 @@ export type Database = {
           music_unlocked?: boolean
           name: string
           online_times_gmt2?: string | null
+          playing_times?: string | null
+          profile_image_url?: string | null
           surname: string
           username: string
         }
         Update: {
           age?: number
           ai_points?: number
+          bio?: string | null
           country?: string | null
           created_at?: string
           digi?: number
@@ -207,6 +244,8 @@ export type Database = {
           music_unlocked?: boolean
           name?: string
           online_times_gmt2?: string | null
+          playing_times?: string | null
+          profile_image_url?: string | null
           surname?: string
           username?: string
         }

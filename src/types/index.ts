@@ -8,6 +8,9 @@ export interface User {
   age: number;
   gender?: string;
   country?: string;
+  bio?: string;
+  playing_times?: string;
+  profile_image_url?: string;
   mp: number;
   ai_points: number;
   lbp: number;
@@ -76,4 +79,14 @@ export interface Game {
   game_state: any;
   round: number;
   created_at: string;
+}
+
+export interface PaymentStatus {
+  id: string;
+  has_paid: boolean;
+  payment_date: string | null;
+  payment_method: string | null;
+  transaction_id: string | null;
+  created_at: string;
+  updated_at: string;
 }

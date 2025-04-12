@@ -1,14 +1,15 @@
 
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User } from "lucide-react";
+import { Menu, X, User, Users } from "lucide-react";
 import { useAuth } from "@/contexts/ClerkAuthContext";
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { signOut, isLoading } = useAuth();
+  const { signOut, isLoading, user } = useAuth();
+  const navigate = useNavigate();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -32,13 +33,22 @@ const Navbar = () => {
             <Link to="/card-gallery" className="text-white hover:text-fantasy-accent transition-colors font-medium">
               Cards
             </Link>
-            <Link to="/battle" className="text-white hover:text-fantasy-accent transition-colors font-medium">
-              Battle
-            </Link>
+            <SignedIn>
+              <Link to="/battle" className="text-white hover:text-fantasy-accent transition-colors font-medium">
+                Battle
+              </Link>
+              <Link to="/search-users" className="text-white hover:text-fantasy-accent transition-colors font-medium">
+                <Users className="h-4 w-4 inline mr-1" /> Players
+              </Link>
+            </SignedIn>
             
             <SignedIn>
-              <Link to="/profile" className="text-white hover:text-fantasy-accent">
+              <Link 
+                to="/profile" 
+                className="text-white hover:text-fantasy-accent flex items-center gap-1"
+              >
                 <UserButton afterSignOutUrl="/" />
+                <span className="ml-2">Profile</span>
               </Link>
             </SignedIn>
             
@@ -76,11 +86,14 @@ const Navbar = () => {
             <Link to="/card-gallery" className="text-white hover:text-fantasy-accent text-lg font-medium">
               Cards
             </Link>
-            <Link to="/battle" className="text-white hover:text-fantasy-accent text-lg font-medium">
-              Battle
-            </Link>
             
             <SignedIn>
+              <Link to="/battle" className="text-white hover:text-fantasy-accent text-lg font-medium">
+                Battle
+              </Link>
+              <Link to="/search-users" className="text-white hover:text-fantasy-accent text-lg font-medium">
+                <Users className="h-4 w-4 inline mr-1" /> Players
+              </Link>
               <Link to="/profile" className="text-white hover:text-fantasy-accent text-lg font-medium">
                 Profile
               </Link>

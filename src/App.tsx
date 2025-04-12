@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +8,7 @@ import Index from "./pages/Index";
 import CardGallery from "./pages/CardGallery";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
+import Verify from "./pages/Verify";
 import Battle from "./pages/Battle";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -35,7 +35,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
@@ -57,7 +56,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// Main app component
 const AppContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,13 +63,11 @@ const AppContent = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Check database health
         const isHealthy = await checkDatabaseHealth();
         if (!isHealthy) {
           console.error("Database health check failed");
         }
         
-        // Ensure VIP codes exist
         await ensureVipCodesExist();
       } catch (error) {
         console.error("Initialization error:", error);
@@ -90,6 +86,7 @@ const AppContent = () => {
           <Route path="/card-gallery" element={<CardGallery />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/verify" element={<Verify />} />
           <Route path="/battle" element={<ProtectedRoute><Battle /></ProtectedRoute>} />
           <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
           <Route path="/1v1-battle" element={<ProtectedRoute><OneVOneBattle /></ProtectedRoute>} />

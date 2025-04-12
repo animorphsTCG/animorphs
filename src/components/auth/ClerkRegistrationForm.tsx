@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useSignUp } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
@@ -173,9 +172,8 @@ const ClerkRegistrationForm = () => {
         description: "Please check your email for a verification code",
       });
       
-      // Navigate to a verification page or show verification UI inline
-      // For simplicity, we're redirecting to login but ideally you'd create a verify page
-      navigate("/login");
+      // Navigate to verification page with email in state
+      navigate("/verify", { state: { email: formData.email, verifyingSignUp: true } });
     } catch (err: any) {
       console.error("Registration error:", err);
       

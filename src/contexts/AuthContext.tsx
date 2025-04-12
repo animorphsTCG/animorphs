@@ -91,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Merge auth user with profile data
         setUser({
           ...authUser,
-          ...profileData
+          ...(profileData as object)
         });
       } else {
         // If profile doesn't exist yet, we might need to create it
@@ -124,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (newProfile) {
                 setUser({
                   ...authUser,
-                  ...newProfile
+                  ...(newProfile as object)
                 });
                 return;
               }
@@ -152,19 +152,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   // Function to manually refresh user data
-  const refreshUser = async () => {
+  const refreshUser = async (): Promise<void> => {
     try {
       console.log("Manually refreshing user data");
       const { data } = await supabase.auth.getUser();
       console.log("Refreshed auth user data:", data?.user);
       if (data?.user) {
         await updateUserWithProfile(data.user);
-        return true;
       }
-      return false;
     } catch (error) {
       console.error("Error refreshing user data:", error);
-      return false;
     }
   };
 

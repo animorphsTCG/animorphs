@@ -48,15 +48,26 @@ const LoginForm = () => {
   // Debug function to check if user exists
   const checkUserExists = async (email: string) => {
     try {
-      const { data, error } = await supabase.auth.admin.getUserByEmail(email);
-      if (error) {
+      // Note: getUserByEmail is not available in the client SDK
+      // We'll use a different approach to check if the user exists
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false // This checks if the user exists without sending an email
+        }
+      });
+      
+      if (error && error.message.includes("User not found")) {
+        return "User not found";
+      } else if (error) {
         console.error("Error checking if user exists:", error);
         return `Error checking user: ${error.message}`;
       }
-      return data ? `User exists with ID: ${data.id}` : "User not found";
+      
+      return "User exists";
     } catch (err) {
       console.error("Exception checking if user exists:", err);
-      return "Admin API not available in client";
+      return "Error checking user";
     }
   };
 

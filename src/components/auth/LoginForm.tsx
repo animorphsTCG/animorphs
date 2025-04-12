@@ -119,7 +119,7 @@ const LoginForm = () => {
           const userCheck = await checkUserExists(email);
           setDebugInfo(`Debug info: ${userCheck}`);
         } else if (error.message.includes("Email not confirmed")) {
-          setErrorMessage("Your email is not confirmed. However, this application doesn't require email verification. Please try registering again.");
+          setErrorMessage("Your email is not confirmed. Please check your inbox for a confirmation email.");
         } else {
           setErrorMessage(error.message);
         }

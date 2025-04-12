@@ -185,8 +185,7 @@ const RegistrationForm = () => {
             gender: formData.gender || null,
             country: formData.country || null
           },
-          // Without email verification
-          emailRedirectTo: undefined
+          emailRedirectTo: window.location.origin
         }
       });
       
@@ -222,36 +221,48 @@ const RegistrationForm = () => {
         
         toast({
           title: "Registration successful!",
-          description: "You can now login with your email and password.",
+          description: "You can now log in with your email and password.",
         });
         
-        // Attempt to log in the user immediately
-        try {
-          console.log("Attempting automatic login after registration");
-          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-            email: formData.email,
-            password: formData.password
-          });
-          
-          if (loginError) {
-            console.error("Auto-login failed:", loginError);
-            // Redirect to login page if auto-login fails
+        // Attempt to log in the user immediately if the user isn't required to confirm email
+        if (data.session) {
+          console.log("User logged in automatically:", data.session);
+          setTimeout(() => {
+            navigate("/battle");
+          }, 1500);
+        } else {
+          // If no session was returned, we need to attempt manual login
+          try {
+            console.log("Attempting manual login after registration");
+            const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+              email: formData.email,
+              password: formData.password
+            });
+            
+            if (loginError) {
+              console.error("Manual login failed:", loginError);
+              // If email confirmation is required, show appropriate message
+              if (loginError.message.includes("Email not confirmed")) {
+                setErrorMessage("Please check your email to confirm your account before logging in.");
+              }
+              // Redirect to login page after delay
+              setTimeout(() => {
+                navigate("/login");
+              }, 2500);
+            } else {
+              console.log("Manual login successful:", loginData);
+              // Redirect to battle page if login succeeds
+              setTimeout(() => {
+                navigate("/battle");
+              }, 1500);
+            }
+          } catch (loginErr) {
+            console.error("Unexpected login error:", loginErr);
+            // Fallback to login page
             setTimeout(() => {
               navigate("/login");
             }, 2000);
-          } else {
-            console.log("Auto-login successful:", loginData);
-            // Redirect to battle page if auto-login succeeds
-            setTimeout(() => {
-              navigate("/battle");
-            }, 1500);
           }
-        } catch (loginErr) {
-          console.error("Unexpected auto-login error:", loginErr);
-          // Fallback to login page
-          setTimeout(() => {
-            navigate("/login");
-          }, 2000);
         }
       } else {
         // This should not happen but handle it just in case
@@ -282,7 +293,7 @@ const RegistrationForm = () => {
       
       {registrationSuccess && (
         <div className="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-900 dark:text-green-300">
-          <p>Registration successful! You are being logged in automatically...</p>
+          <p>Registration successful! Redirecting you...</p>
         </div>
       )}
       

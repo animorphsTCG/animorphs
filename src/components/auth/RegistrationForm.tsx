@@ -31,6 +31,7 @@ const RegistrationForm = () => {
   const [passwordStrength, setPasswordStrength] = useState<string | undefined>(undefined);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [vipCodeValidationInProgress, setVipCodeValidationInProgress] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   
   const navigate = useNavigate();
 
@@ -109,6 +110,7 @@ const RegistrationForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setRegistrationSuccess(false);
     
     let formIsValid = true;
     
@@ -213,13 +215,17 @@ const RegistrationForm = () => {
           }
         }
         
+        setRegistrationSuccess(true);
+        
         toast({
           title: "Registration successful!",
-          description: "You can now log in with your credentials.",
+          description: "Please check your email for a confirmation link before logging in.",
         });
         
-        // After successful registration, redirect to login page
-        navigate("/login");
+        // Show success message instead of immediate redirect, to give user a chance to see verification instructions
+        setTimeout(() => {
+          navigate("/login");
+        }, 3000);
       } else {
         // This should not happen but handle it just in case
         console.error("No user data returned but no error either");
@@ -247,26 +253,37 @@ const RegistrationForm = () => {
     <form onSubmit={handleSubmit} className="space-y-4">
       <RegistrationFormHeader errorMessage={errorMessage} />
       
-      <PersonalInfoSection 
-        formData={formData} 
-        handleChange={handleChange} 
-        validations={validations}
-        passwordStrength={passwordStrength}
-      />
+      {registrationSuccess && (
+        <div className="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-900 dark:text-green-300">
+          <p>Registration successful! Please check your email for a verification link.</p>
+          <p className="mt-2">You will be redirected to the login page shortly...</p>
+        </div>
+      )}
       
-      <OptionalInfoSection 
-        formData={formData} 
-        handleChange={handleChange} 
-        validations={validations} 
-      />
-      
-      <RegistrationFormFooter 
-        isLoading={isLoading}
-        vipCodeValidationInProgress={vipCodeValidationInProgress}
-        isFormValid={isFormValid()}
-        agreedToTerms={agreedToTerms}
-        setAgreedToTerms={setAgreedToTerms}
-      />
+      {!registrationSuccess && (
+        <>
+          <PersonalInfoSection 
+            formData={formData} 
+            handleChange={handleChange} 
+            validations={validations}
+            passwordStrength={passwordStrength}
+          />
+          
+          <OptionalInfoSection 
+            formData={formData} 
+            handleChange={handleChange} 
+            validations={validations} 
+          />
+          
+          <RegistrationFormFooter 
+            isLoading={isLoading}
+            vipCodeValidationInProgress={vipCodeValidationInProgress}
+            isFormValid={isFormValid()}
+            agreedToTerms={agreedToTerms}
+            setAgreedToTerms={setAgreedToTerms}
+          />
+        </>
+      )}
     </form>
   );
 };

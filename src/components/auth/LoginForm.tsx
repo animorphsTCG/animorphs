@@ -8,8 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { validateEmail } from "@/lib/validation";
 import { recordAuthAttempt, isAccountLocked, getLockoutTimeRemaining } from "@/lib/authSecurity";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
 
 const LoginForm = () => {
   const [email, setEmail] = useState("");
@@ -18,7 +19,10 @@ const LoginForm = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(0);
+  const [showEmailVerificationReminder, setShowEmailVerificationReminder] = useState(false);
+  
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
 
   // Check for account lockout
   useEffect(() => {
@@ -46,6 +50,7 @@ const LoginForm = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setShowEmailVerificationReminder(false);
     
     // Check for account lockout first
     if (isAccountLocked(email)) {
@@ -85,11 +90,21 @@ const LoginForm = () => {
 
       if (error) {
         console.error("Login error:", error);
-        setErrorMessage(
-          error.message === "Invalid login credentials"
-            ? "Incorrect email or password"
-            : error.message
-        );
+        
+        // Special handling for unverified email
+        if (error.message === "Email not confirmed") {
+          setShowEmailVerificationReminder(true);
+          setErrorMessage("Your email address has not been verified. Please check your inbox for the verification link.");
+        }
+        // Special handling for invalid credentials
+        else if (error.message === "Invalid login credentials") {
+          setErrorMessage("Incorrect email or password");
+        }
+        // Fallback for other errors
+        else {
+          setErrorMessage(error.message);
+        }
+        
         toast({
           title: "Login failed",
           description: "Please check your credentials and try again",
@@ -98,10 +113,15 @@ const LoginForm = () => {
       } else if (data?.user) {
         // Success
         console.log("Login successful, user:", data.user);
+        
+        // Make sure we have the latest user data
+        await refreshUser();
+        
         toast({
           title: "Login successful",
           description: "Welcome back!",
         });
+        
         navigate("/battle");
       } else {
         console.error("No user data returned after successful login");
@@ -128,12 +148,66 @@ const LoginForm = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  const handleResendVerification = async () => {
+    if (!email || !validateEmail(email).valid) {
+      setErrorMessage("Please enter a valid email address");
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email
+      });
+      
+      if (error) {
+        console.error("Error resending verification email:", error);
+        setErrorMessage(error.message);
+        toast({
+          title: "Verification email failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Verification email sent",
+          description: "Please check your inbox for the verification link",
+        });
+      }
+    } catch (err) {
+      console.error("Unexpected error resending verification:", err);
+      setErrorMessage("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <form onSubmit={handleLogin} className="space-y-4">
       {errorMessage && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
+      
+      {showEmailVerificationReminder && (
+        <Alert variant="default" className="bg-amber-900 border-amber-700">
+          <Mail className="h-4 w-4" />
+          <AlertDescription className="flex flex-col space-y-2">
+            <span>Please verify your email address before logging in.</span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleResendVerification}
+              disabled={isLoading}
+              className="mt-2 w-full"
+            >
+              Resend verification email
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
       

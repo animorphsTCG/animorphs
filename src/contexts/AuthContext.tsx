@@ -55,6 +55,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     console.log("Updating user profile for:", authUser.id);
+    console.log("Full auth user object:", authUser);
+    console.log("Email confirmation status:", authUser.email_confirmed_at);
 
     try {
       // Check email verification status
@@ -89,13 +91,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to manually refresh user data
   const refreshUser = async () => {
     try {
+      console.log("Manually refreshing user data");
       const { data } = await supabase.auth.getUser();
+      console.log("Refreshed auth user data:", data?.user);
       if (data?.user) {
-        console.log("Manually refreshing user data");
         await updateUserWithProfile(data.user);
+        return true;
       }
+      return false;
     } catch (error) {
       console.error("Error refreshing user data:", error);
+      return false;
     }
   };
 
@@ -104,14 +110,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log("AuthProvider: Auth state changed", event, session?.user?.id);
+        console.log("Event type:", event);
         setSession(session);
         
         // Defer profile fetching to avoid deadlocks
-        setTimeout(() => {
-          updateUserWithProfile(session?.user ?? null);
-        }, 0);
+        if (session?.user) {
+          setTimeout(() => {
+            console.log("AuthProvider: Updating user profile after auth state change");
+            updateUserWithProfile(session.user);
+          }, 0);
+        } else {
+          setUser(null);
+        }
         
         setIsLoading(false);
       }
@@ -123,9 +135,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       
       // Defer profile fetching to avoid deadlocks
-      setTimeout(() => {
-        updateUserWithProfile(session?.user ?? null);
-      }, 0);
+      if (session?.user) {
+        setTimeout(() => {
+          console.log("AuthProvider: Updating user profile after initial session check");
+          updateUserWithProfile(session.user);
+        }, 0);
+      }
       
       setIsLoading(false);
     });

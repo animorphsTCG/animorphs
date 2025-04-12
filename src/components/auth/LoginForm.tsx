@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,13 +73,12 @@ const LoginForm = () => {
     try {
       console.log("Attempting login with:", { email });
       
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
+      // Record login attempt success/failure
       const success = !error && data?.user != null;
       recordAuthAttempt(email, success);
       
@@ -86,25 +86,29 @@ const LoginForm = () => {
         console.error("Login error:", error);
         
         if (error.message.includes("Invalid login credentials")) {
-          const { data: checkUserData } = await supabase.auth.admin.listUsers();
-          const userExists = checkUserData?.users?.some(u => u.email === email);
+          // Check if the user exists in the auth system
+          const { data: userResponse, error: userError } = await supabase.auth.getUser();
           
-          if (userExists) {
-            setErrorMessage("Incorrect password. Please try again.");
-          } else {
-            setErrorMessage("No account found with this email. Please register first.");
-          }
+          // Instead of trying to check if the user exists (which we can't do easily),
+          // provide a more general error message
+          setErrorMessage("Incorrect email or password. Please try again.");
+          
+          toast({
+            title: "Login failed",
+            description: "Please check your credentials and try again",
+            variant: "destructive",
+          });
         } else if (error.message.includes("Email not confirmed")) {
           setErrorMessage("Your email is not confirmed. Please check your inbox for a confirmation email.");
         } else {
           setErrorMessage(error.message || "Login failed");
+          
+          toast({
+            title: "Login failed",
+            description: "Please check your credentials and try again",
+            variant: "destructive",
+          });
         }
-        
-        toast({
-          title: "Login failed",
-          description: "Please check your credentials and try again",
-          variant: "destructive",
-        });
       } else if (data?.user) {
         console.log("Login successful, user:", data.user);
         

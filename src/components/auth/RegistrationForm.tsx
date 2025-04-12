@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +10,7 @@ import RegistrationFormHeader from "./RegistrationFormHeader";
 import PersonalInfoSection from "./PersonalInfoSection";
 import OptionalInfoSection from "./OptionalInfoSection";
 import RegistrationFormFooter from "./RegistrationFormFooter";
+import { useAuth } from "@/contexts/AuthContext";
 
 const RegistrationForm = () => {
   const [formData, setFormData] = useState({
@@ -33,6 +35,7 @@ const RegistrationForm = () => {
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
 
   const validateField = (name: string, value: any) => {
     let result: ValidationResult = { valid: true };
@@ -171,6 +174,26 @@ const RegistrationForm = () => {
       // Convert age to integer
       const ageInt = parseInt(formData.age);
       
+      // Check if the user already exists
+      const { data: existingUser, error: checkError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password
+      });
+
+      if (existingUser?.user) {
+        // User already exists and password is correct
+        console.log("User already exists and credentials are correct");
+        setErrorMessage("Account already exists. You've been logged in.");
+        toast({
+          title: "Account exists",
+          description: "Your account already exists and you're now logged in.",
+        });
+        
+        await refreshUser();
+        navigate("/battle");
+        return;
+      }
+      
       // Register the user with their profile data
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
@@ -231,12 +254,13 @@ const RegistrationForm = () => {
         
         toast({
           title: "Registration successful!",
-          description: "You have been automatically logged in.",
+          description: "You are now registered and logged in.",
         });
         
         // If the user is already logged in (created and confirmed in one step)
         if (data.session) {
           console.log("User is already logged in with session:", data.session);
+          await refreshUser();
           navigate("/battle");
           return;
         }
@@ -251,25 +275,16 @@ const RegistrationForm = () => {
         if (signInError) {
           console.error("Auto-login error:", signInError);
           
-          // Special case for email confirmation required
-          if (signInError.message.includes("Email not confirmed")) {
-            setErrorMessage("Registration successful! Please check your email to confirm your account before logging in.");
-            toast({
-              title: "Email confirmation required",
-              description: "Please check your email to confirm your account before logging in.",
-            });
-            navigate("/login");
-          } else {
-            // For any other login error, take them to login page with message
-            setErrorMessage("Registration successful, but automatic login failed. Please log in manually.");
-            toast({
-              title: "Registration successful",
-              description: "Please log in with your new account.",
-            });
-            navigate("/login");
-          }
+          // For any login error, take them to login page with message
+          setErrorMessage("Registration successful, but automatic login failed. Please log in manually.");
+          toast({
+            title: "Registration successful",
+            description: "Please log in with your new account.",
+          });
+          navigate("/login");
         } else if (signInData?.user) {
           console.log("Auto-login successful after registration:", signInData.user);
+          await refreshUser();
           toast({
             title: "Welcome to Animorph Battle!",
             description: "Your account has been created and you're now logged in.",

@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,10 +21,10 @@ import FourPlayerUserLobby from "./pages/FourPlayerUserLobby";
 import Leaderboard from "./pages/Leaderboard";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import { ClerkAuthProvider, useAuth } from "./contexts/ClerkAuthContext";
+import { ClerkAuthProvider } from "./contexts/ClerkAuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { checkDatabaseHealth, ensureVipCodesExist } from "./lib/db";
-import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {

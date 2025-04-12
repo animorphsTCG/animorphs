@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import RegistrationForm from "@/components/auth/RegistrationForm";
+import ClerkRegistrationForm from "@/components/auth/ClerkRegistrationForm";
 
 const Register = () => {
   return (
@@ -14,7 +14,7 @@ const Register = () => {
         </CardHeader>
         
         <CardContent>
-          <RegistrationForm />
+          <ClerkRegistrationForm />
         </CardContent>
         
         <CardFooter className="flex flex-col space-y-4">

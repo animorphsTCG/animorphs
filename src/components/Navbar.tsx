@@ -3,11 +3,12 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, User } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/ClerkAuthContext";
+import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, signOut, isLoading } = useAuth();
+  const { signOut, isLoading } = useAuth();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -34,32 +35,25 @@ const Navbar = () => {
             <Link to="/battle" className="text-white hover:text-fantasy-accent transition-colors font-medium">
               Battle
             </Link>
-            {!isLoading && user ? (
-              <>
-                <Link to="/profile" className="text-white hover:text-fantasy-accent">
-                  <User className="h-5 w-5" />
-                </Link>
-                <Button 
-                  className="fantasy-button"
-                  onClick={signOut}
-                >
-                  Logout
+            
+            <SignedIn>
+              <Link to="/profile" className="text-white hover:text-fantasy-accent">
+                <UserButton afterSignOutUrl="/" />
+              </Link>
+            </SignedIn>
+            
+            <SignedOut>
+              <Link to="/register">
+                <Button className="fantasy-button mr-2">
+                  Register
                 </Button>
-              </>
-            ) : (
-              <>
-                <Link to="/register">
-                  <Button className="fantasy-button mr-2">
-                    Register
-                  </Button>
-                </Link>
-                <Link to="/login">
-                  <Button className="fantasy-button-secondary">
-                    Login
-                  </Button>
-                </Link>
-              </>
-            )}
+              </Link>
+              <Link to="/login">
+                <Button className="fantasy-button-secondary">
+                  Login
+                </Button>
+              </Link>
+            </SignedOut>
           </div>
 
           {/* Mobile menu button */}
@@ -85,19 +79,15 @@ const Navbar = () => {
             <Link to="/battle" className="text-white hover:text-fantasy-accent text-lg font-medium">
               Battle
             </Link>
-            {!isLoading && user ? (
-              <>
-                <Link to="/profile" className="text-white hover:text-fantasy-accent text-lg font-medium">
-                  Profile
-                </Link>
-                <Button 
-                  className="fantasy-button w-full"
-                  onClick={signOut}
-                >
-                  Logout
-                </Button>
-              </>
-            ) : (
+            
+            <SignedIn>
+              <Link to="/profile" className="text-white hover:text-fantasy-accent text-lg font-medium">
+                Profile
+              </Link>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
+            
+            <SignedOut>
               <div className="flex flex-col space-y-2">
                 <Link to="/register" className="w-full">
                   <Button className="fantasy-button w-full">
@@ -110,7 +100,7 @@ const Navbar = () => {
                   </Button>
                 </Link>
               </div>
-            )}
+            </SignedOut>
           </div>
         )}
       </div>

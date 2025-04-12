@@ -20,9 +20,10 @@ import FourPlayerUserLobby from "./pages/FourPlayerUserLobby";
 import Leaderboard from "./pages/Leaderboard";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ClerkAuthProvider, useAuth } from "./contexts/ClerkAuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { checkDatabaseHealth, ensureVipCodesExist } from "./lib/db";
+import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,33 +37,28 @@ const queryClient = new QueryClient({
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, session } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    if (!isLoading && !session && !location.pathname.includes("/login") && !location.pathname.includes("/register")) {
-      console.log("User not authenticated, redirecting to login");
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to access this page",
-      });
-      navigate("/login");
-    }
-  }, [user, session, isLoading, navigate, location.pathname]);
-
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-fantasy-primary"></div>
-    </div>;
-  }
-
-  return <>{children}</>;
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <div className="flex items-center justify-center min-h-screen flex-col gap-4">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
+            <p className="mb-4">Please log in to access this page</p>
+            <div className="flex justify-center">
+              <a href="/login" className="fantasy-button px-4 py-2 rounded">
+                Go to Login
+              </a>
+            </div>
+          </div>
+        </div>
+      </SignedOut>
+    </>
+  );
 };
 
 // Main app component
 const AppContent = () => {
-  const { session, user } = useAuth(); // Add session here
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -84,14 +80,6 @@ const AppContent = () => {
     
     initializeApp();
   }, []);
-  
-  // Redirect logged in users to battle page if they're on login or register page
-  useEffect(() => {
-    if (session && (location.pathname === "/login" || location.pathname === "/register")) {
-      console.log("User already authenticated, redirecting from auth page to battle");
-      navigate("/battle");
-    }
-  }, [session, location.pathname, navigate]);
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -121,13 +109,13 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
+      <ClerkAuthProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
           <AppContent />
         </BrowserRouter>
-      </AuthProvider>
+      </ClerkAuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

@@ -1,21 +1,10 @@
 
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import React from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { validateEmail } from "@/lib/validation";
-import { recordAuthAttempt, isAccountLocked, getLockoutTimeRemaining } from "@/lib/authSecurity";
-import { AlertCircle, Loader2 } from "lucide-react";
-import LoginForm from "@/components/auth/LoginForm";
+import ClerkLoginForm from "@/components/auth/ClerkLoginForm";
 
 const Login = () => {
-  const [isLoading, setIsLoading] = useState(false);
-
   return (
     <div className="container flex items-center justify-center min-h-[80vh] py-12 px-4">
       <Card className="w-full max-w-md border-2 border-fantasy-primary bg-black/70">
@@ -25,7 +14,7 @@ const Login = () => {
         </CardHeader>
         
         <CardContent>
-          <LoginForm />
+          <ClerkLoginForm />
         </CardContent>
         
         <CardFooter className="flex flex-col space-y-4">

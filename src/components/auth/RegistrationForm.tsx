@@ -184,8 +184,8 @@ const RegistrationForm = () => {
             age: ageInt,
             gender: formData.gender || null,
             country: formData.country || null
-          },
-          emailRedirectTo: window.location.origin
+          }
+          // Remove emailRedirectTo to bypass email verification in development
         }
       });
       
@@ -224,8 +224,7 @@ const RegistrationForm = () => {
           description: "You will be automatically logged in.",
         });
         
-        // There's a delay between registration and when the account is ready to be used
-        // Wait a moment before attempting to log in
+        // Wait for the profile trigger to execute
         setTimeout(async () => {
           try {
             console.log("Attempting login after registration");
@@ -237,28 +236,27 @@ const RegistrationForm = () => {
             if (loginError) {
               console.error("Auto-login after registration failed:", loginError);
               
-              // Show appropriate message and redirect to login page
-              if (loginError.message.includes("Email not confirmed")) {
-                // Email confirmation required
-                setErrorMessage("Please check your email to confirm your account before logging in.");
-                toast({
-                  title: "Email verification required",
-                  description: "Please check your inbox for a confirmation email.",
+              // Try again once more after a slightly longer delay
+              setTimeout(async () => {
+                const { data: retryLoginData, error: retryLoginError } = await supabase.auth.signInWithPassword({
+                  email: formData.email,
+                  password: formData.password
                 });
                 
-                // Redirect to login page after delay
-                setTimeout(() => {
+                if (retryLoginError) {
+                  console.error("Retry login failed:", retryLoginError);
+                  setErrorMessage("Registration successful, but automatic login failed. Please try logging in manually.");
                   navigate("/login");
-                }, 5000);
-              } else {
-                // Generic login error
-                setErrorMessage(`Login failed: ${loginError.message}`);
-                
-                // Redirect to login page after delay
-                setTimeout(() => {
-                  navigate("/login");
-                }, 3000);
-              }
+                } else if (retryLoginData?.user) {
+                  console.log("Retry login successful:", retryLoginData.user);
+                  toast({
+                    title: "Login successful!",
+                    description: "Welcome to the game!",
+                  });
+                  navigate("/battle");
+                }
+              }, 3000); // Wait longer for the second attempt
+              
             } else if (loginData?.user) {
               console.log("Auto-login successful after registration:", loginData.user);
               
@@ -272,20 +270,12 @@ const RegistrationForm = () => {
             } else {
               console.error("No user data returned from auto-login");
               setErrorMessage("Registration successful, but automatic login failed. Please try logging in manually.");
-              
-              // Redirect to login page after delay
-              setTimeout(() => {
-                navigate("/login");
-              }, 3000);
+              navigate("/login");
             }
           } catch (loginErr) {
             console.error("Exception during auto-login:", loginErr);
             setErrorMessage("Registration successful, but automatic login failed. Please try logging in manually.");
-            
-            // Redirect to login page after delay
-            setTimeout(() => {
-              navigate("/login");
-            }, 3000);
+            navigate("/login");
           }
         }, 2000);  // Wait 2 seconds before attempting auto-login
       } else {

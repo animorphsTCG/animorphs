@@ -131,15 +131,18 @@ const LoginForm = () => {
       } else if (data?.user) {
         console.log("Login successful, user:", data.user);
         
-        // Refresh user data to ensure profile is loaded
-        await refreshUser();
-        
-        toast({
-          title: "Login successful",
-          description: "Welcome back!",
-        });
-        
-        navigate("/battle");
+        // Wait a moment before refreshing to ensure Supabase trigger has run
+        setTimeout(async () => {
+          // Refresh user data to ensure profile is loaded
+          await refreshUser();
+          
+          toast({
+            title: "Login successful",
+            description: "Welcome back!",
+          });
+          
+          navigate("/battle");
+        }, 1000);
       } else {
         console.error("No user data returned after successful login");
         setErrorMessage("An unexpected error occurred. Please try again.");

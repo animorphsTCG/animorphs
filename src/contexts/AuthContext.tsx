@@ -133,18 +133,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Fallback if profile doesn't exist yet or creation failed
         console.log("Using fallback username from email");
-        setUser({
-          ...authUser,
+        const fallbackUser = Object.assign({}, authUser, {
           username: authUser.email?.split('@')[0] || 'User'
-        } as (SupabaseUser & Partial<User>));
+        }) as (SupabaseUser & Partial<User>);
+        setUser(fallbackUser);
       }
     } catch (error) {
       console.error('Error updating user with profile:', error);
       // Fallback username from email
-      setUser({
-        ...authUser,
+      const fallbackUser = Object.assign({}, authUser, {
         username: authUser.email?.split('@')[0] || 'User'
-      } as (SupabaseUser & Partial<User>));
+      }) as (SupabaseUser & Partial<User>);
+      setUser(fallbackUser);
     }
   };
   

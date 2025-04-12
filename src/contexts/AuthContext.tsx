@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User as SupabaseUser, Session } from "@supabase/supabase-js";
 import { User } from "@/types";
+import { toast } from "@/components/ui/use-toast";
 
 type AuthContextType = {
   user: (SupabaseUser & Partial<User>) | null;
@@ -35,6 +36,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
       if (error) {
         console.error('Error fetching user profile:', error);
+        
+        // If the profile doesn't exist, it might be because the database trigger hasn't run yet
+        // Let's check if this is a new registration and retry after a delay
+        if (error.code === 'PGRST116') { // Record not found
+          console.log("Profile not found, will retry in 2 seconds");
+          return new Promise((resolve) => {
+            setTimeout(async () => {
+              const retryResult = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+                
+              if (retryResult.error) {
+                console.error('Error in retry fetch of user profile:', retryResult.error);
+                resolve(null);
+              } else {
+                console.log("Profile found on retry:", retryResult.data);
+                resolve(retryResult.data);
+              }
+            }, 2000);
+          });
+        }
         return null;
       }
       
@@ -70,8 +94,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...profileData
         });
       } else {
-        // Fallback if profile doesn't exist yet
-        console.log("No profile found, using fallback username");
+        // If profile doesn't exist yet, we might need to create it
+        console.log("No profile found, checking if we need to create one");
+        
+        // Check if we have user metadata to create a profile with
+        if (authUser.user_metadata && Object.keys(authUser.user_metadata).length > 0) {
+          console.log("Have user metadata, attempting to create profile", authUser.user_metadata);
+          
+          // Try to create profile with metadata
+          try {
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: authUser.id,
+                username: authUser.user_metadata.username || authUser.email?.split('@')[0] || 'User',
+                name: authUser.user_metadata.name || '',
+                surname: authUser.user_metadata.surname || '',
+                age: authUser.user_metadata.age || 18,
+                gender: authUser.user_metadata.gender,
+                country: authUser.user_metadata.country
+              });
+              
+            if (insertError) {
+              console.error("Error creating profile:", insertError);
+            } else {
+              console.log("Successfully created user profile");
+              // Fetch the newly created profile
+              const newProfile = await fetchUserProfile(authUser.id);
+              if (newProfile) {
+                setUser({
+                  ...authUser,
+                  ...newProfile
+                });
+                return;
+              }
+            }
+          } catch (insertErr) {
+            console.error("Exception creating profile:", insertErr);
+          }
+        }
+        
+        // Fallback if profile doesn't exist yet or creation failed
+        console.log("Using fallback username from email");
         setUser({
           ...authUser,
           username: authUser.email?.split('@')[0] || 'User'
@@ -95,9 +159,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("Refreshed auth user data:", data?.user);
       if (data?.user) {
         await updateUserWithProfile(data.user);
+        return true;
       }
+      return false;
     } catch (error) {
       console.error("Error refreshing user data:", error);
+      return false;
     }
   };
 
@@ -119,6 +186,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }, 0);
         } else {
           setUser(null);
+        }
+        
+        // Show toast for certain events
+        if (event === 'SIGNED_IN') {
+          toast({
+            title: "Signed in",
+            description: "You are now signed in.",
+          });
+        } else if (event === 'SIGNED_OUT') {
+          toast({
+            title: "Signed out",
+            description: "You have been signed out.",
+          });
+        } else if (event === 'USER_UPDATED') {
+          toast({
+            title: "Profile updated",
+            description: "Your profile has been updated.",
+          });
         }
         
         setIsLoading(false);
@@ -148,7 +233,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     console.log("Signing out user");
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully.",
+      });
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast({
+        title: "Sign out failed",
+        description: "There was an error signing out. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

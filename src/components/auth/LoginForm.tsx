@@ -19,6 +19,7 @@ const LoginForm = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
@@ -44,9 +45,25 @@ const LoginForm = () => {
     }
   }, [email]);
 
+  // Debug function to check if user exists
+  const checkUserExists = async (email: string) => {
+    try {
+      const { data, error } = await supabase.auth.admin.getUserByEmail(email);
+      if (error) {
+        console.error("Error checking if user exists:", error);
+        return `Error checking user: ${error.message}`;
+      }
+      return data ? `User exists with ID: ${data.id}` : "User not found";
+    } catch (err) {
+      console.error("Exception checking if user exists:", err);
+      return "Admin API not available in client";
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setDebugInfo(null);
     
     if (isAccountLocked(email)) {
       setIsLocked(true);
@@ -83,8 +100,15 @@ const LoginForm = () => {
       if (error) {
         console.error("Login error:", error);
         
+        // Provide more helpful error messages
         if (error.message === "Invalid login credentials") {
           setErrorMessage("Incorrect email or password");
+          
+          // Debug information for development
+          const userCheck = await checkUserExists(email);
+          setDebugInfo(`Debug info: ${userCheck}`);
+        } else if (error.message.includes("Email not confirmed")) {
+          setErrorMessage("Your email is not confirmed. However, this application doesn't require email verification. Please try registering again.");
         } else {
           setErrorMessage(error.message);
         }
@@ -97,6 +121,7 @@ const LoginForm = () => {
       } else if (data?.user) {
         console.log("Login successful, user:", data.user);
         
+        // Refresh user data to ensure profile is loaded
         await refreshUser();
         
         toast({
@@ -135,6 +160,12 @@ const LoginForm = () => {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
+      
+      {debugInfo && process.env.NODE_ENV === "development" && (
+        <Alert variant="default" className="bg-gray-800 border-gray-700">
+          <AlertDescription>{debugInfo}</AlertDescription>
         </Alert>
       )}
       
@@ -196,6 +227,15 @@ const LoginForm = () => {
           "Login"
         )}
       </Button>
+      
+      <div className="text-center mt-4">
+        <p className="text-sm text-gray-400">
+          Don't have an account?{" "}
+          <Link to="/register" className="text-fantasy-accent hover:underline">
+            Register here
+          </Link>
+        </p>
+      </div>
     </form>
   );
 };

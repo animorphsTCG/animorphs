@@ -21,15 +21,15 @@ const RegistrationFormHeader = ({ errorMessage }: RegistrationFormHeaderProps) =
         <Info className="h-4 w-4" />
         <AlertDescription className="text-xs">
           <p>
-            After registration, you'll be able to immediately log in to your account.
+            After registration, you will be automatically logged in and redirected to the game.
             No email verification is required.
           </p>
           <p className="mt-1">
-            <strong>Important:</strong> Please remember your login credentials:
+            <strong>Important:</strong> Remember your login credentials for future sessions:
           </p>
           <ul className="list-disc ml-4 mt-1">
-            <li>Use your registered email address</li>
-            <li>Enter the password you created during registration</li>
+            <li>Your registered email address</li>
+            <li>The password you created during registration</li>
           </ul>
         </AlertDescription>
       </Alert>

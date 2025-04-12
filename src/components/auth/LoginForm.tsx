@@ -19,7 +19,6 @@ const LoginForm = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(0);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
@@ -48,7 +47,6 @@ const LoginForm = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    setDebugInfo(null);
     
     if (isAccountLocked(email)) {
       setIsLocked(true);
@@ -73,55 +71,58 @@ const LoginForm = () => {
     try {
       console.log("Attempting login with:", { email });
       
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // First, check if the email exists in the auth system
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: window.location.origin
+        }
       });
       
-      // Record login attempt success/failure
-      const success = !error && data?.user != null;
-      recordAuthAttempt(email, success);
-      
-      if (error) {
-        console.error("Login error:", error);
-        
-        if (error.message.includes("Invalid login credentials")) {
-          // Check if the user exists in the auth system
-          const { data: userResponse, error: userError } = await supabase.auth.getUser();
-          
-          // Instead of trying to check if the user exists (which we can't do easily),
-          // provide a more general error message
-          setErrorMessage("Incorrect email or password. Please try again.");
-          
-          toast({
-            title: "Login failed",
-            description: "Please check your credentials and try again",
-            variant: "destructive",
+      if (signUpError) {
+        if (signUpError.message.includes("User already registered")) {
+          // User exists, now try to sign in
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
           });
-        } else if (error.message.includes("Email not confirmed")) {
-          setErrorMessage("Your email is not confirmed. Please check your inbox for a confirmation email.");
+          
+          // Record login attempt success/failure
+          const success = !error && data?.user != null;
+          recordAuthAttempt(email, success);
+          
+          if (error) {
+            console.error("Login error:", error);
+            setErrorMessage("Incorrect email or password. Please try again.");
+            toast({
+              title: "Login failed",
+              description: "Please check your credentials and try again",
+              variant: "destructive",
+            });
+          } else if (data?.user) {
+            console.log("Login successful, user:", data.user);
+            toast({
+              title: "Login successful",
+              description: "Welcome back!",
+            });
+            await refreshUser();
+            navigate("/battle");
+          }
         } else {
-          setErrorMessage(error.message || "Login failed");
-          
-          toast({
-            title: "Login failed",
-            description: "Please check your credentials and try again",
-            variant: "destructive",
-          });
+          console.error("Sign up check error:", signUpError);
+          setErrorMessage(signUpError.message);
+          recordAuthAttempt(email, false);
         }
-      } else if (data?.user) {
-        console.log("Login successful, user:", data.user);
-        
+      } else if (signUpData?.user) {
+        // This is a new registration
+        console.log("New registration successful:", signUpData.user);
         toast({
-          title: "Login successful",
-          description: "Welcome back!",
+          title: "Registration successful",
+          description: "Your account has been created! You are now logged in.",
         });
-        
         await refreshUser();
         navigate("/battle");
-      } else {
-        console.error("No user data returned after successful login");
-        setErrorMessage("An unexpected error occurred. Please try again.");
       }
     } catch (err) {
       console.error("Unexpected login error:", err);
@@ -149,12 +150,6 @@ const LoginForm = () => {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
-      )}
-      
-      {debugInfo && process.env.NODE_ENV === "development" && (
-        <Alert variant="default" className="bg-gray-800 border-gray-700">
-          <AlertDescription>{debugInfo}</AlertDescription>
         </Alert>
       )}
       

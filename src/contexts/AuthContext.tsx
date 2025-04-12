@@ -88,12 +88,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profileData = await fetchUserProfile(authUser.id);
       if (profileData) {
         console.log("Merging auth user with profile data:", profileData);
-        // Merge auth user with profile data
-        const combinedData = {
-          ...authUser,
-          ...profileData
-        };
-        setUser(combinedData as (SupabaseUser & Partial<User>));
+        // Merge auth user with profile data - fixed spread operator usage
+        const combinedData = Object.assign({}, authUser, profileData) as (SupabaseUser & Partial<User>);
+        setUser(combinedData);
       } else {
         // If profile doesn't exist yet, we might need to create it
         console.log("No profile found, checking if we need to create one");
@@ -123,11 +120,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Fetch the newly created profile
               const newProfile = await fetchUserProfile(authUser.id);
               if (newProfile) {
-                const combinedData = {
-                  ...authUser,
-                  ...newProfile
-                };
-                setUser(combinedData as (SupabaseUser & Partial<User>));
+                // Fixed spread operator usage
+                const combinedData = Object.assign({}, authUser, newProfile) as (SupabaseUser & Partial<User>);
+                setUser(combinedData);
                 return;
               }
             }
@@ -230,7 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     console.log("Signing out user");
     try {
       await supabase.auth.signOut();

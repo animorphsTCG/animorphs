@@ -35,15 +35,6 @@ const RegistrationForm = () => {
   
   const navigate = useNavigate();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    setErrorMessage(null);
-    
-    validateField(name, value);
-  };
-  
   const validateField = (name: string, value: any) => {
     let result: ValidationResult = { valid: true };
     
@@ -78,6 +69,15 @@ const RegistrationForm = () => {
     
     setValidations(prev => ({ ...prev, [name]: result }));
     return result.valid;
+  };
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    setErrorMessage(null);
+    
+    validateField(name, value);
   };
   
   const isFormValid = () => {
@@ -248,51 +248,6 @@ const RegistrationForm = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const validateField = (name: string, value: any) => {
-    let result: ValidationResult = { valid: true };
-    
-    switch (name) {
-      case "username":
-        result = validateUsername(value);
-        break;
-      case "email":
-        result = validateEmail(value);
-        break;
-      case "password":
-        result = validatePassword(value);
-        setPasswordStrength(result.strength);
-        break;
-      case "confirmPassword":
-        result = {
-          valid: value === formData.password,
-          message: value === formData.password ? undefined : "Passwords do not match"
-        };
-        break;
-      case "name":
-      case "surname":
-        result = validateName(value);
-        break;
-      case "age":
-        result = validateAge(value);
-        break;
-      case "vipCode":
-        result = validateVipCode(value);
-        break;
-    }
-    
-    setValidations(prev => ({ ...prev, [name]: result }));
-    return result.valid;
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    setErrorMessage(null);
-    
-    validateField(name, value);
   };
 
   return (

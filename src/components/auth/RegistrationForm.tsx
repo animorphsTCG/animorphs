@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,22 +63,19 @@ const RegistrationForm = () => {
   const [passwordStrength, setPasswordStrength] = useState<string | undefined>(undefined);
   const [showTerms, setShowTerms] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [vipCodeValidationInProgress, setVipCodeValidationInProgress] = useState(false);
   
   const navigate = useNavigate();
 
-  // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Clear error messages when user starts typing again
     setErrorMessage(null);
     
-    // Live validation based on field
     validateField(name, value);
   };
   
-  // Individual field validation
   const validateField = (name: string, value: any) => {
     let result: ValidationResult = { valid: true };
     
@@ -116,18 +112,15 @@ const RegistrationForm = () => {
     return result.valid;
   };
   
-  // Check if all validations pass
   const isFormValid = () => {
     const requiredFields = ["username", "email", "password", "confirmPassword", "name", "surname", "age"];
     
-    // Make sure required fields have values
     for (const field of requiredFields) {
       if (!formData[field as keyof typeof formData]) {
         return false;
       }
     }
     
-    // Check if all validations are valid
     for (const field of requiredFields) {
       const validation = validations[field];
       if (!validation || !validation.valid) {
@@ -135,12 +128,10 @@ const RegistrationForm = () => {
       }
     }
     
-    // Make sure passwords match
     if (formData.password !== formData.confirmPassword) {
       return false;
     }
     
-    // Must agree to terms
     if (!agreedToTerms) {
       return false;
     }
@@ -152,7 +143,6 @@ const RegistrationForm = () => {
     e.preventDefault();
     setErrorMessage(null);
     
-    // Validate all fields again on submit
     let formIsValid = true;
     
     for (const [field, value] of Object.entries(formData)) {
@@ -162,7 +152,6 @@ const RegistrationForm = () => {
       }
     }
     
-    // Check additional validations
     if (!agreedToTerms) {
       setErrorMessage("You must agree to the Terms and Conditions");
       formIsValid = false;
@@ -180,17 +169,31 @@ const RegistrationForm = () => {
     setIsLoading(true);
     
     try {
-      // If VIP code is provided, validate it
-      if (formData.vipCode) {
-        const isValidCode = await validateVipCodeServer(formData.vipCode);
-        if (!isValidCode) {
-          setErrorMessage("Invalid VIP code or code has reached maximum uses");
+      if (formData.vipCode.trim()) {
+        console.log(`Validating VIP code: "${formData.vipCode.trim()}"`);
+        setVipCodeValidationInProgress(true);
+        
+        try {
+          const isValidCode = await validateVipCodeServer(formData.vipCode);
+          if (!isValidCode) {
+            setErrorMessage("Invalid VIP code or code has reached maximum uses");
+            setIsLoading(false);
+            setVipCodeValidationInProgress(false);
+            return;
+          }
+          console.log("VIP code validated successfully");
+        } catch (vipError) {
+          console.error("VIP code validation error:", vipError);
+          setErrorMessage("Error validating VIP code. Please try again.");
           setIsLoading(false);
+          setVipCodeValidationInProgress(false);
           return;
         }
+        
+        setVipCodeValidationInProgress(false);
       }
       
-      // Register user with Supabase
+      console.log("Registering user with Supabase");
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -217,9 +220,18 @@ const RegistrationForm = () => {
       } else {
         console.log("Registration successful:", data);
         
-        // Update VIP code usage if provided
-        if (formData.vipCode) {
-          await updateVipCodeUsage(formData.vipCode);
+        if (formData.vipCode.trim()) {
+          console.log(`Updating VIP code usage: "${formData.vipCode.trim()}"`);
+          try {
+            const updated = await updateVipCodeUsage(formData.vipCode);
+            if (!updated) {
+              console.warn("Failed to update VIP code usage");
+            } else {
+              console.log("VIP code usage updated successfully");
+            }
+          } catch (vipUpdateError) {
+            console.error("Error updating VIP code usage:", vipUpdateError);
+          }
         }
         
         toast({
@@ -227,7 +239,6 @@ const RegistrationForm = () => {
           description: "Check your email to verify your account.",
         });
         
-        // Navigate to login page after successful registration
         navigate("/login");
       }
     } catch (err) {
@@ -252,7 +263,6 @@ const RegistrationForm = () => {
         </Alert>
       )}
       
-      {/* Required Fields Section */}
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -376,7 +386,6 @@ const RegistrationForm = () => {
         </div>
       </div>
       
-      {/* Optional Fields Section */}
       <div className="pt-4 border-t border-gray-700">
         <h3 className="text-sm font-medium mb-4 flex items-center">
           <Info className="h-3 w-3 inline mr-2" />
@@ -422,10 +431,10 @@ const RegistrationForm = () => {
           {validations.vipCode?.valid === false && (
             <p className="text-xs text-red-500">{validations.vipCode.message}</p>
           )}
+          <p className="text-xs text-gray-400">Available codes: ZypherDan, WonAgainstAi</p>
         </div>
       </div>
       
-      {/* Terms and Conditions */}
       <div className="space-y-4 pt-4">
         <div className="flex items-center space-x-2">
           <input
@@ -450,11 +459,12 @@ const RegistrationForm = () => {
         <Button
           type="submit"
           className="w-full fantasy-button"
-          disabled={isLoading || !isFormValid()}
+          disabled={isLoading || vipCodeValidationInProgress || !isFormValid()}
         >
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Registering...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+              {vipCodeValidationInProgress ? 'Validating VIP Code...' : 'Registering...'}
             </>
           ) : (
             "Register"
@@ -462,7 +472,6 @@ const RegistrationForm = () => {
         </Button>
       </div>
       
-      {/* Terms and Conditions Dialog */}
       <TermsAndConditionsDialog 
         open={showTerms} 
         onOpenChange={setShowTerms} 

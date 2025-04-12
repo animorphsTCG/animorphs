@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { AnimorphCard, VipCode } from "@/types";
 
@@ -8,24 +7,18 @@ const cache = {
   cardById: new Map<number, { data: AnimorphCard | null, timestamp: number }>(),
   vipCodes: new Map<string, { data: VipCode, timestamp: number }>(),
   
-  // Cache expiration in milliseconds (5 minutes)
   EXPIRATION: 5 * 60 * 1000,
-  
-  // Maximum number of entries per cache to prevent memory bloat
   MAX_ENTRIES: {
     animorphCards: 100,
     cardById: 500,
     vipCodes: 50
   },
   
-  // Check if cached data is still valid
   isValid(timestamp: number): boolean {
     return Date.now() - timestamp < this.EXPIRATION;
   },
   
-  // Add item to cache with entry limit enforcement
   addToCache<T>(map: Map<any, { data: T, timestamp: number }>, key: any, data: T, maxEntries: number): void {
-    // If cache is at capacity, remove oldest entry
     if (map.size >= maxEntries) {
       const oldestKey = this.getOldestEntry(map);
       if (oldestKey) {
@@ -35,7 +28,6 @@ const cache = {
     map.set(key, { data, timestamp: Date.now() });
   },
   
-  // Get oldest entry in cache (by timestamp)
   getOldestEntry<T>(map: Map<any, { data: T, timestamp: number }>): any {
     let oldestKey = null;
     let oldestTime = Infinity;
@@ -50,7 +42,6 @@ const cache = {
     return oldestKey;
   },
   
-  // Clear all caches (useful for testing or when data changes)
   clear(): void {
     this.animorphCards.clear();
     this.cardById.clear();
@@ -63,22 +54,15 @@ const cache = {
 const rateLimiter = {
   requests: new Map<string, { count: number, timestamp: number, backoffMultiplier: number }>(),
   
-  // Reset period in milliseconds (1 minute)
   RESET_PERIOD: 60 * 1000,
-  
-  // Base maximum requests per period 
   BASE_MAX_REQUESTS: 100,
-  
-  // Maximum backoff multiplier
   MAX_BACKOFF: 8,
   
-  // Check if request should be rate limited
   shouldLimit(key: string, maxRequests?: number): boolean {
     const now = Date.now();
     const actualMax = maxRequests || this.BASE_MAX_REQUESTS;
     const record = this.requests.get(key);
     
-    // If no record or expired record, create new record
     if (!record || (now - record.timestamp > this.RESET_PERIOD)) {
       this.requests.set(key, { 
         count: 1, 
@@ -88,15 +72,11 @@ const rateLimiter = {
       return false;
     }
     
-    // Increment count
     record.count++;
     
-    // Calculate current limit with backoff applied
     const effectiveLimit = Math.floor(actualMax / record.backoffMultiplier);
     
-    // If over limit, increase backoff for next window
     if (record.count > effectiveLimit) {
-      // Apply exponential backoff for the next window
       if (record.backoffMultiplier < this.MAX_BACKOFF) {
         record.backoffMultiplier = Math.min(record.backoffMultiplier * 2, this.MAX_BACKOFF);
       }
@@ -106,12 +86,10 @@ const rateLimiter = {
     return false;
   },
   
-  // Reset the rate limiter for a specific key
   reset(key: string): void {
     this.requests.delete(key);
   },
   
-  // Clear all rate limiting data
   clear(): void {
     this.requests.clear();
   }
@@ -119,43 +97,33 @@ const rateLimiter = {
 
 // Database connection pooling and retry mechanism
 const dbConnection = {
-  // Maximum number of retries for database operations
   MAX_RETRIES: 3,
-  
-  // Base delay in milliseconds before retry
   BASE_RETRY_DELAY: 300,
   
-  // Exponential backoff for retries
   async retry<T>(operation: () => Promise<T>, retries = 0): Promise<T> {
     try {
       return await operation();
     } catch (error: any) {
-      // Don't retry if max retries reached or if error is not retryable
       if (retries >= this.MAX_RETRIES || !this.isRetryableError(error)) {
         throw error;
       }
       
-      // Calculate delay with exponential backoff and jitter
       const delay = this.BASE_RETRY_DELAY * Math.pow(2, retries) * (0.5 + Math.random() * 0.5);
       
       console.log(`Database operation failed. Retrying in ${Math.round(delay)}ms... (${retries + 1}/${this.MAX_RETRIES})`);
       
-      // Wait and retry
       await new Promise(resolve => setTimeout(resolve, delay));
       return this.retry(operation, retries + 1);
     }
   },
   
-  // Check if an error is retryable
   isRetryableError(error: any): boolean {
-    // Network errors, connection timeouts, and specific Postgres errors are retryable
     const retryableCodes = ['08006', '08001', '08004', '57P01', '40001'];
     
     if (error?.code && retryableCodes.includes(error.code)) {
       return true;
     }
     
-    // Check for network connectivity issues
     if (error?.message && (
       error.message.includes('network') || 
       error.message.includes('timeout') || 
@@ -177,7 +145,6 @@ const dbConnection = {
 export async function fetchAnimorphCards(limit: number = 1000, offset: number = 0): Promise<AnimorphCard[]> {
   const cacheKey = `cards_${limit}_${offset}`;
   
-  // Check cache first
   const cached = cache.animorphCards.get(cacheKey);
   if (cached && cache.isValid(cached.timestamp)) {
     console.log("Using cached animorph cards");
@@ -205,7 +172,6 @@ export async function fetchAnimorphCards(limit: number = 1000, offset: number = 
     
     const result = data as AnimorphCard[];
     
-    // Store in cache with size limit
     cache.addToCache(
       cache.animorphCards, 
       cacheKey, 
@@ -228,16 +194,15 @@ export async function fetchAnimorphCards(limit: number = 1000, offset: number = 
  */
 export async function getRandomDeck(size: number = 10, excludeCardIds: number[] = []): Promise<AnimorphCard[]> {
   try {
-    // For random deck, we don't use cache as it should be random each time
-    const { data, error } = await dbConnection.retry(async () => {
-      let query = supabase
-        .from("animorph_cards")
-        .select("*");
-        
-      if (excludeCardIds.length > 0) {
-        query = query.not('id', 'in', `(${excludeCardIds.join(',')})`);
-      }
+    let query = supabase
+      .from("animorph_cards")
+      .select("*");
       
+    if (excludeCardIds.length > 0) {
+      query = query.not('id', 'in', `(${excludeCardIds.join(',')})`);
+    }
+    
+    const { data, error } = await dbConnection.retry(async () => {
       return query;
     });
     
@@ -269,7 +234,6 @@ export async function getRandomDeck(size: number = 10, excludeCardIds: number[] 
 export async function fetchCardsByType(type: string, limit: number = 5): Promise<AnimorphCard[]> {
   const cacheKey = `cards_type_${type}_${limit}`;
   
-  // Check cache first
   const cached = cache.animorphCards.get(cacheKey);
   if (cached && cache.isValid(cached.timestamp)) {
     console.log(`Using cached ${type} cards`);
@@ -292,7 +256,6 @@ export async function fetchCardsByType(type: string, limit: number = 5): Promise
     
     const result = data as AnimorphCard[] || [];
     
-    // Store in cache with size limit
     cache.addToCache(
       cache.animorphCards, 
       cacheKey, 
@@ -313,7 +276,6 @@ export async function fetchCardsByType(type: string, limit: number = 5): Promise
  * @returns Promise resolving to an AnimorphCard object or null if not found
  */
 export async function fetchCardById(id: number): Promise<AnimorphCard | null> {
-  // Check cache first
   const cached = cache.cardById.get(id);
   if (cached && cache.isValid(cached.timestamp)) {
     console.log(`Using cached card with id ${id}`);
@@ -336,7 +298,6 @@ export async function fetchCardById(id: number): Promise<AnimorphCard | null> {
     
     const result = data as AnimorphCard || null;
     
-    // Store in cache with size limit
     cache.addToCache(
       cache.cardById, 
       id, 
@@ -356,7 +317,6 @@ export async function fetchCardById(id: number): Promise<AnimorphCard | null> {
  * @returns Promise resolving to boolean indicating success
  */
 export async function ensureVipCodesExist(): Promise<boolean> {
-  // Don't rate limit this admin function
   try {
     const vipCodes = [
       { code: "ZypherDan", max_uses: 51, description: "Promotional code for early supporters" },
@@ -364,7 +324,6 @@ export async function ensureVipCodesExist(): Promise<boolean> {
     ];
     
     for (const codeData of vipCodes) {
-      // Check if code exists - case insensitive
       const { data } = await dbConnection.retry(async () => {
         return supabase
           .from("vip_codes")
@@ -373,7 +332,6 @@ export async function ensureVipCodesExist(): Promise<boolean> {
       });
       
       if (!data || data.length === 0) {
-        // Create new code
         await dbConnection.retry(async () => {
           return supabase
             .from("vip_codes")
@@ -388,7 +346,6 @@ export async function ensureVipCodesExist(): Promise<boolean> {
       }
     }
     
-    // Clear the VIP code cache after updates
     cache.vipCodes.clear();
     
     return true;
@@ -404,7 +361,6 @@ export async function ensureVipCodesExist(): Promise<boolean> {
  */
 export async function checkDatabaseHealth(): Promise<boolean> {
   try {
-    // Check VIP codes table
     const { error: vipError } = await dbConnection.retry(async () => {
       return supabase
         .from('vip_codes')
@@ -417,7 +373,6 @@ export async function checkDatabaseHealth(): Promise<boolean> {
       return false;
     }
     
-    // Check animorph_cards table
     const { error: cardsError } = await dbConnection.retry(async () => {
       return supabase
         .from('animorph_cards')
@@ -437,33 +392,35 @@ export async function checkDatabaseHealth(): Promise<boolean> {
   }
 }
 
-// Enhanced VIP code validation with distributed rate limiting 
-// to prevent brute force attacks
+/**
+ * Enhanced VIP code validation with case-insensitive matching and improved error handling
+ * @param vipCode The VIP code to validate
+ * @returns Promise resolving to boolean indicating validation result
+ */
 export async function validateVipCode(vipCode: string): Promise<boolean> {
   if (!vipCode || vipCode.trim() === "") {
     return true; // Empty code is valid (optional)
   }
 
-  const trimmedCode = vipCode.trim().toLowerCase(); // Normalize to lowercase
+  const trimmedCode = vipCode.trim();
   
   try {
-    console.log("Validating VIP code:", trimmedCode);
+    console.log(`Attempting to validate VIP code: "${trimmedCode}"`);
     
-    // Apply more restrictive rate limiting for validation attempts
-    // This helps prevent brute force attacks
-    if (rateLimiter.shouldLimit(`validate_vip_${trimmedCode}`, 20)) {
+    if (rateLimiter.shouldLimit(`validate_vip_${trimmedCode.toLowerCase()}`, 20)) {
       console.warn("Rate limit exceeded for VIP code validation");
       throw new Error("Too many validation attempts. Please try again later.");
     }
     
-    // Check cache first
-    const cached = cache.vipCodes.get(trimmedCode);
+    const cacheKey = trimmedCode.toLowerCase();
+    const cached = cache.vipCodes.get(cacheKey);
     if (cached && cache.isValid(cached.timestamp)) {
       console.log("Using cached VIP code data");
-      return cached.data.current_uses < cached.data.max_uses;
+      const isValid = cached.data.current_uses < cached.data.max_uses;
+      console.log(`VIP code validation from cache: ${isValid ? 'valid' : 'invalid'}`);
+      return isValid;
     }
     
-    // Use explicit LOWER function to ensure case insensitivity
     const { data, error } = await dbConnection.retry(async () => {
       return supabase
         .from("vip_codes")
@@ -476,23 +433,26 @@ export async function validateVipCode(vipCode: string): Promise<boolean> {
       return false;
     }
     
+    console.log(`VIP code database query for "${trimmedCode}" returned:`, data);
+    
     if (!data || data.length === 0) {
       console.log("VIP code not found in database");
       return false;
     }
     
     const vipCodeData = data[0] as VipCode;
+    console.log(`Found VIP code in database: ${vipCodeData.code} (uses: ${vipCodeData.current_uses}/${vipCodeData.max_uses})`);
     
-    // Store in cache with size limit
     cache.addToCache(
       cache.vipCodes, 
-      trimmedCode, 
+      cacheKey, 
       vipCodeData, 
       cache.MAX_ENTRIES.vipCodes
     );
     
-    // Check if the code has remaining uses
-    return vipCodeData.current_uses < vipCodeData.max_uses;
+    const isValid = vipCodeData.current_uses < vipCodeData.max_uses;
+    console.log(`VIP code validation result: ${isValid ? 'valid' : 'invalid'}`);
+    return isValid;
   } catch (err) {
     console.error("Error validating VIP code:", err);
     return false;
@@ -500,7 +460,7 @@ export async function validateVipCode(vipCode: string): Promise<boolean> {
 }
 
 /**
- * Update VIP code usage count
+ * Update VIP code usage count with transaction support
  * @param vipCode The VIP code to update
  * @returns Promise resolving to boolean indicating success
  */
@@ -509,18 +469,16 @@ export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
     return true; // No code to update
   }
 
-  const trimmedCode = vipCode.trim().toLowerCase(); // Normalize to lowercase
+  const trimmedCode = vipCode.trim();
   
   try {
-    console.log("Updating usage for VIP code:", trimmedCode);
+    console.log(`Attempting to update usage for VIP code: "${trimmedCode}"`);
     
-    // Apply rate limiting for update operations
-    if (rateLimiter.shouldLimit(`update_vip_${trimmedCode}`, 10)) {
+    if (rateLimiter.shouldLimit(`update_vip_${trimmedCode.toLowerCase()}`, 10)) {
       console.warn("Rate limit exceeded for VIP code updates");
       throw new Error("Too many update attempts. Please try again later.");
     }
     
-    // Use transaction to ensure atomicity
     const { data, error } = await dbConnection.retry(async () => {
       return supabase
         .from("vip_codes")
@@ -528,21 +486,24 @@ export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
         .ilike("code", trimmedCode);
     });
       
-    if (error || !data || data.length === 0) {
-      console.error("Error getting VIP code for update:", error || "No data found");
+    if (error) {
+      console.error("Error getting VIP code for update:", error);
+      return false;
+    }
+    
+    if (!data || data.length === 0) {
+      console.log(`VIP code "${trimmedCode}" not found in database for update`);
       return false;
     }
     
     const vipCodeData = data[0] as VipCode;
-    console.log("Current usage:", vipCodeData.current_uses, "Max uses:", vipCodeData.max_uses);
+    console.log(`Found VIP code in database for update: ${vipCodeData.code} (current uses: ${vipCodeData.current_uses}/${vipCodeData.max_uses})`);
     
-    // Check if code has remaining uses
     if (vipCodeData.current_uses >= vipCodeData.max_uses) {
-      console.warn("VIP code has reached maximum uses");
+      console.warn(`VIP code "${trimmedCode}" has reached maximum uses (${vipCodeData.max_uses})`);
       return false;
     }
     
-    // Update the usage count
     const { error: updateError } = await dbConnection.retry(async () => {
       return supabase
         .from("vip_codes")
@@ -557,18 +518,21 @@ export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
       return false;
     }
     
-    // Update the cache with the new value
-    vipCodeData.current_uses += 1;
+    const updatedData = {
+      ...vipCodeData,
+      current_uses: vipCodeData.current_uses + 1
+    };
     
-    // Update cache with size limit
+    const cacheKey = trimmedCode.toLowerCase(); 
+    
     cache.addToCache(
       cache.vipCodes, 
-      trimmedCode, 
-      vipCodeData, 
+      cacheKey, 
+      updatedData, 
       cache.MAX_ENTRIES.vipCodes
     );
     
-    console.log("VIP code usage updated successfully");
+    console.log(`VIP code "${trimmedCode}" usage updated successfully (new uses: ${updatedData.current_uses}/${updatedData.max_uses})`);
     return true;
   } catch (err) {
     console.error("Error updating VIP code usage:", err);
@@ -599,19 +563,16 @@ export async function fetchCardsByIds(ids: number[]): Promise<AnimorphCard[]> {
   if (!ids || ids.length === 0) return [];
   
   try {
-    // Check if all cards are in cache first
     const cachedCards = ids.map(id => {
       const cached = cache.cardById.get(id);
       return cached && cache.isValid(cached.timestamp) ? cached.data : null;
     });
     
-    // If all cards are cached, return them
     if (cachedCards.every(card => card !== null)) {
       console.log("Using all cached cards for batch fetch");
       return cachedCards.filter(Boolean) as AnimorphCard[];
     }
     
-    // Fetch cards that aren't in cache
     const { data, error } = await dbConnection.retry(async () => {
       return supabase
         .from("animorph_cards")
@@ -626,7 +587,6 @@ export async function fetchCardsByIds(ids: number[]): Promise<AnimorphCard[]> {
     
     const fetchedCards = data as AnimorphCard[] || [];
     
-    // Update cache for each fetched card
     fetchedCards.forEach(card => {
       cache.addToCache(
         cache.cardById, 

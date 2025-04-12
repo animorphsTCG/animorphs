@@ -7,16 +7,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 interface TermsAndConditionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAccept: () => void;
+  onAgree: () => void;
 }
 
 const TermsAndConditionsDialog = ({
   open,
   onOpenChange,
-  onAccept
+  onAgree
 }: TermsAndConditionsDialogProps) => {
   const handleAccept = () => {
-    onAccept();
+    onAgree();
     onOpenChange(false);
   };
 

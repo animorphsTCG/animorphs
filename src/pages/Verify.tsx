@@ -24,7 +24,7 @@ const Verify = () => {
 
   useEffect(() => {
     // If no sign up attempt is in progress and no state was passed
-    if ((!signUp || !signUp.pendingVerification) && !email) {
+    if (!email) {
       toast({
         title: "No verification in progress",
         description: "Please register or login first",
@@ -32,7 +32,7 @@ const Verify = () => {
       });
       navigate("/register");
     }
-  }, [signUp, navigate, email]);
+  }, [navigate, email]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();

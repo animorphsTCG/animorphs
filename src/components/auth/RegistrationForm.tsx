@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -138,7 +137,7 @@ const RegistrationForm = () => {
     setIsLoading(true);
     
     try {
-      // Handle VIP code validation first
+      // VIP code validation logic 
       let vipCodeValid = true;
       if (formData.vipCode.trim()) {
         console.log(`Validating VIP code: "${formData.vipCode.trim()}"`);
@@ -184,8 +183,8 @@ const RegistrationForm = () => {
             age: ageInt,
             gender: formData.gender || null,
             country: formData.country || null
-          }
-          // Remove emailRedirectTo to bypass email verification in development
+          },
+          emailRedirectTo: window.location.origin + '/battle'
         }
       });
       
@@ -193,12 +192,23 @@ const RegistrationForm = () => {
       
       if (error) {
         console.error("Registration error:", error);
-        setErrorMessage(error.message);
-        toast({
-          title: "Registration failed",
-          description: error.message,
-          variant: "destructive",
-        });
+        
+        // Check if the error is because the user already exists
+        if (error.message.includes("User already registered")) {
+          setErrorMessage("This email is already registered. Please try logging in instead.");
+          toast({
+            title: "Account already exists",
+            description: "This email is already registered. Please use the login page.",
+            variant: "destructive",
+          });
+        } else {
+          setErrorMessage(error.message);
+          toast({
+            title: "Registration failed",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
       } else if (data?.user) {
         console.log("Registration successful:", data.user);
         
@@ -221,63 +231,51 @@ const RegistrationForm = () => {
         
         toast({
           title: "Registration successful!",
-          description: "You will be automatically logged in.",
+          description: "You have been automatically logged in.",
         });
         
-        // Wait for the profile trigger to execute
-        setTimeout(async () => {
-          try {
-            console.log("Attempting login after registration");
-            const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-              email: formData.email,
-              password: formData.password
+        // If the user is already logged in (created and confirmed in one step)
+        if (data.session) {
+          console.log("User is already logged in with session:", data.session);
+          navigate("/battle");
+          return;
+        }
+        
+        // Otherwise attempt immediate login
+        console.log("Attempting immediate login after registration");
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password
+        });
+        
+        if (signInError) {
+          console.error("Auto-login error:", signInError);
+          
+          // Special case for email confirmation required
+          if (signInError.message.includes("Email not confirmed")) {
+            setErrorMessage("Registration successful! Please check your email to confirm your account before logging in.");
+            toast({
+              title: "Email confirmation required",
+              description: "Please check your email to confirm your account before logging in.",
             });
-            
-            if (loginError) {
-              console.error("Auto-login after registration failed:", loginError);
-              
-              // Try again once more after a slightly longer delay
-              setTimeout(async () => {
-                const { data: retryLoginData, error: retryLoginError } = await supabase.auth.signInWithPassword({
-                  email: formData.email,
-                  password: formData.password
-                });
-                
-                if (retryLoginError) {
-                  console.error("Retry login failed:", retryLoginError);
-                  setErrorMessage("Registration successful, but automatic login failed. Please try logging in manually.");
-                  navigate("/login");
-                } else if (retryLoginData?.user) {
-                  console.log("Retry login successful:", retryLoginData.user);
-                  toast({
-                    title: "Login successful!",
-                    description: "Welcome to the game!",
-                  });
-                  navigate("/battle");
-                }
-              }, 3000); // Wait longer for the second attempt
-              
-            } else if (loginData?.user) {
-              console.log("Auto-login successful after registration:", loginData.user);
-              
-              toast({
-                title: "Login successful!",
-                description: "Welcome to the game!",
-              });
-              
-              // Redirect to battle page
-              navigate("/battle");
-            } else {
-              console.error("No user data returned from auto-login");
-              setErrorMessage("Registration successful, but automatic login failed. Please try logging in manually.");
-              navigate("/login");
-            }
-          } catch (loginErr) {
-            console.error("Exception during auto-login:", loginErr);
-            setErrorMessage("Registration successful, but automatic login failed. Please try logging in manually.");
+            navigate("/login");
+          } else {
+            // For any other login error, take them to login page with message
+            setErrorMessage("Registration successful, but automatic login failed. Please log in manually.");
+            toast({
+              title: "Registration successful",
+              description: "Please log in with your new account.",
+            });
             navigate("/login");
           }
-        }, 2000);  // Wait 2 seconds before attempting auto-login
+        } else if (signInData?.user) {
+          console.log("Auto-login successful after registration:", signInData.user);
+          toast({
+            title: "Welcome to Animorph Battle!",
+            description: "Your account has been created and you're now logged in.",
+          });
+          navigate("/battle");
+        }
       } else {
         // This should not happen but handle it just in case
         console.error("No user data returned but no error either");

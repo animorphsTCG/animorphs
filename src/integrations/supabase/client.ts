@@ -16,8 +16,9 @@ export const supabase = createClient<Database>(
     auth: {
       autoRefreshToken: true,
       persistSession: true,
-      storage: localStorage,
       detectSessionInUrl: true,
+      storageKey: 'animorphs_auth_token',
+      storage: localStorage,
       flowType: 'implicit'
     }
   }

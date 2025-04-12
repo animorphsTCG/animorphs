@@ -38,7 +38,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Error fetching user profile:', error);
         
         // If the profile doesn't exist, it might be because the database trigger hasn't run yet
-        // Let's check if this is a new registration and retry after a delay
         if (error.code === 'PGRST116') { // Record not found
           console.log("Profile not found, will retry in 2 seconds");
           return new Promise((resolve) => {
@@ -79,7 +78,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     console.log("Updating user profile for:", authUser.id);
-    console.log("Full auth user object:", authUser);
     
     // Always consider email as verified
     setIsEmailVerified(true);
@@ -88,52 +86,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profileData = await fetchUserProfile(authUser.id);
       if (profileData) {
         console.log("Merging auth user with profile data:", profileData);
-        // Fix: Replace spread operator with Object.assign
         const combinedData = Object.assign({}, authUser, profileData) as (SupabaseUser & Partial<User>);
         setUser(combinedData);
       } else {
-        // If profile doesn't exist yet, we might need to create it
-        console.log("No profile found, checking if we need to create one");
+        // If profile doesn't exist yet, attempt to create it
+        console.log("No profile found, attempting to create one");
         
-        // Check if we have user metadata to create a profile with
-        if (authUser.user_metadata && Object.keys(authUser.user_metadata).length > 0) {
-          console.log("Have user metadata, attempting to create profile", authUser.user_metadata);
-          
-          // Try to create profile with metadata
-          try {
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert({
-                id: authUser.id,
-                username: authUser.user_metadata.username || authUser.email?.split('@')[0] || 'User',
-                name: authUser.user_metadata.name || '',
-                surname: authUser.user_metadata.surname || '',
-                age: authUser.user_metadata.age || 18,
-                gender: authUser.user_metadata.gender,
-                country: authUser.user_metadata.country
-              });
-              
-            if (insertError) {
-              console.error("Error creating profile:", insertError);
-            } else {
-              console.log("Successfully created user profile");
-              // Fetch the newly created profile
-              const newProfile = await fetchUserProfile(authUser.id);
-              if (newProfile) {
-                // Fix: Replace spread operator with Object.assign
-                const combinedData = Object.assign({}, authUser, newProfile) as (SupabaseUser & Partial<User>);
-                setUser(combinedData);
-                return;
-              }
+        try {
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: authUser.id,
+              username: authUser.user_metadata.username || authUser.email?.split('@')[0] || 'User',
+              name: authUser.user_metadata.name || '',
+              surname: authUser.user_metadata.surname || '',
+              age: authUser.user_metadata.age || 18,
+              gender: authUser.user_metadata.gender,
+              country: authUser.user_metadata.country
+            });
+            
+          if (insertError) {
+            console.error("Error creating profile:", insertError);
+          } else {
+            console.log("Successfully created user profile");
+            // Fetch the newly created profile
+            const newProfile = await fetchUserProfile(authUser.id);
+            if (newProfile) {
+              const combinedData = Object.assign({}, authUser, newProfile) as (SupabaseUser & Partial<User>);
+              setUser(combinedData);
+              return;
             }
-          } catch (insertErr) {
-            console.error("Exception creating profile:", insertErr);
           }
+        } catch (insertErr) {
+          console.error("Exception creating profile:", insertErr);
         }
         
-        // Fallback if profile doesn't exist yet or creation failed
+        // Fallback if profile creation failed
         console.log("Using fallback username from email");
-        // Fix: Replace spread operator with Object.assign
         const fallbackUser = Object.assign({}, authUser, {
           username: authUser.email?.split('@')[0] || 'User'
         }) as (SupabaseUser & Partial<User>);
@@ -142,7 +131,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error updating user with profile:', error);
       // Fallback username from email
-      // Fix: Replace spread operator with Object.assign
       const fallbackUser = Object.assign({}, authUser, {
         username: authUser.email?.split('@')[0] || 'User'
       }) as (SupabaseUser & Partial<User>);
@@ -169,17 +157,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("AuthProvider: Auth state changed", event, session?.user?.id);
+      async (event, newSession) => {
+        console.log("AuthProvider: Auth state changed", event, newSession?.user?.id);
         console.log("Event type:", event);
-        setSession(session);
+        setSession(newSession);
         
-        // Defer profile fetching to avoid deadlocks
-        if (session?.user) {
-          setTimeout(() => {
-            console.log("AuthProvider: Updating user profile after auth state change");
-            updateUserWithProfile(session.user);
-          }, 0);
+        if (newSession?.user) {
+          console.log("User is authenticated, updating profile");
+          // Wait for the profile to be created by the DB trigger
+          setTimeout(async () => {
+            await updateUserWithProfile(newSession.user);
+          }, 500);
         } else {
           setUser(null);
         }
@@ -206,17 +194,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("AuthProvider: Initial session check", session?.user?.id);
-      setSession(session);
+    // Check for existing session
+    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+      console.log("AuthProvider: Initial session check", existingSession?.user?.id);
+      setSession(existingSession);
       
-      // Defer profile fetching to avoid deadlocks
-      if (session?.user) {
-        setTimeout(() => {
-          console.log("AuthProvider: Updating user profile after initial session check");
-          updateUserWithProfile(session.user);
-        }, 0);
+      if (existingSession?.user) {
+        await updateUserWithProfile(existingSession.user);
       }
       
       setIsLoading(false);
@@ -231,6 +215,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log("Signing out user");
     try {
       await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
       toast({
         title: "Signed out",
         description: "You have been signed out successfully.",

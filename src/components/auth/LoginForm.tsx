@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,37 +44,11 @@ const LoginForm = () => {
     }
   }, [email]);
 
-  // Debug function to check if user exists
-  const checkUserExists = async (email: string) => {
-    try {
-      // We can't use getUserByEmail directly, so we'll check by attempting a passwordless login
-      const { data, error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false // This checks if the user exists without sending an email
-        }
-      });
-      
-      if (error && error.message.includes("User not found")) {
-        return "User not found";
-      } else if (error) {
-        console.error("Error checking if user exists:", error);
-        return `Error checking user: ${error.message}`;
-      }
-      
-      return "User exists";
-    } catch (err) {
-      console.error("Exception checking if user exists:", err);
-      return "Error checking user";
-    }
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setDebugInfo(null);
     
-    // Check if account is locked
     if (isAccountLocked(email)) {
       setIsLocked(true);
       setLockoutTime(getLockoutTimeRemaining(email));
@@ -83,14 +56,12 @@ const LoginForm = () => {
       return;
     }
     
-    // Validate email
     const emailValidation = validateEmail(email);
     if (!emailValidation.valid) {
       setErrorMessage(emailValidation.message || "Invalid email");
       return;
     }
     
-    // Validate password
     if (!password || password.length < 6) {
       setErrorMessage("Password must be at least 6 characters");
       return;
@@ -101,54 +72,32 @@ const LoginForm = () => {
     try {
       console.log("Attempting login with:", { email });
       
-      // Improved login logic with retries
-      let loginAttempt = 1;
-      const maxAttempts = 2;
-      let success = false;
-      let loginError = null;
-      let userData = null;
-
-      while (loginAttempt <= maxAttempts && !success) {
-        console.log(`Login attempt ${loginAttempt}/${maxAttempts}`);
-        
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        
-        if (error) {
-          console.error(`Login error (attempt ${loginAttempt}/${maxAttempts}):`, error);
-          loginError = error;
-          loginAttempt++;
-          
-          // Short delay before retry
-          if (loginAttempt <= maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        } else {
-          success = true;
-          userData = data;
-          break;
-        }
-      }
-
-      // Record the auth attempt result
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      const success = !error && data?.user != null;
       recordAuthAttempt(email, success);
       
-      if (!success) {
-        console.error("Login failed after all attempts:", loginError);
+      if (error) {
+        console.error("Login error:", error);
         
-        // Provide more helpful error messages
-        if (loginError?.message === "Invalid login credentials") {
-          setErrorMessage("Incorrect email or password");
+        if (error.message.includes("Invalid login credentials")) {
+          const { data: checkUserData } = await supabase.auth.admin.listUsers();
+          const userExists = checkUserData?.users?.some(u => u.email === email);
           
-          // Add debug information for development
-          const userCheck = await checkUserExists(email);
-          setDebugInfo(`Debug info: ${userCheck}`);
-        } else if (loginError?.message.includes("Email not confirmed")) {
+          if (userExists) {
+            setErrorMessage("Incorrect password. Please try again.");
+          } else {
+            setErrorMessage("No account found with this email. Please register first.");
+          }
+        } else if (error.message.includes("Email not confirmed")) {
           setErrorMessage("Your email is not confirmed. Please check your inbox for a confirmation email.");
         } else {
-          setErrorMessage(loginError?.message || "Login failed");
+          setErrorMessage(error.message || "Login failed");
         }
         
         toast({
@@ -156,21 +105,16 @@ const LoginForm = () => {
           description: "Please check your credentials and try again",
           variant: "destructive",
         });
-      } else if (userData?.user) {
-        console.log("Login successful, user:", userData.user);
+      } else if (data?.user) {
+        console.log("Login successful, user:", data.user);
         
-        // Wait a moment before refreshing to ensure Supabase trigger has run
-        setTimeout(async () => {
-          // Refresh user data to ensure profile is loaded
-          await refreshUser();
-          
-          toast({
-            title: "Login successful",
-            description: "Welcome back!",
-          });
-          
-          navigate("/battle");
-        }, 1000);
+        toast({
+          title: "Login successful",
+          description: "Welcome back!",
+        });
+        
+        await refreshUser();
+        navigate("/battle");
       } else {
         console.error("No user data returned after successful login");
         setErrorMessage("An unexpected error occurred. Please try again.");

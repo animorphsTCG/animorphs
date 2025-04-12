@@ -31,7 +31,7 @@ const RegistrationFormHeader = ({ errorMessage }: RegistrationFormHeaderProps) =
             <li>The password you created during registration</li>
           </ul>
           <p className="mt-1">
-            <strong>Note:</strong> Registration is completely free. You can upgrade your account later to unlock all 200 cards.
+            <strong>Note:</strong> If you've already registered with this email before, please use the login page instead.
           </p>
         </AlertDescription>
       </Alert>

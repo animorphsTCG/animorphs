@@ -19,7 +19,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<(SupabaseUser & Partial<User>) | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  // Always set isEmailVerified to true to bypass email verification
+  const [isEmailVerified, setIsEmailVerified] = useState(true);
 
   // Function to fetch user profile data
   const fetchUserProfile = async (userId: string) => {
@@ -50,18 +51,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authUser) {
       console.log("No auth user to update profile for");
       setUser(null);
-      setIsEmailVerified(false);
       return;
     }
 
     console.log("Updating user profile for:", authUser.id);
     console.log("Full auth user object:", authUser);
-    console.log("Email confirmation status:", authUser.email_confirmed_at);
+    
+    // Always consider email as verified
+    setIsEmailVerified(true);
 
     try {
-      // Check email verification status
-      setIsEmailVerified(authUser.email_confirmed_at !== null);
-
       const profileData = await fetchUserProfile(authUser.id);
       if (profileData) {
         console.log("Merging auth user with profile data:", profileData);
@@ -97,11 +96,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data?.user) {
         await updateUserWithProfile(data.user);
       }
-      // Remove the boolean return
     } catch (error) {
       console.error("Error refreshing user data:", error);
     }
-    // The function now implicitly returns Promise<void>
   };
 
   useEffect(() => {

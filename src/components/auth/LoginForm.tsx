@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { validateEmail } from "@/lib/validation";
 import { recordAuthAttempt, isAccountLocked, getLockoutTimeRemaining } from "@/lib/authSecurity";
-import { AlertCircle, Loader2, Mail } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -18,7 +19,6 @@ const LoginForm = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(0);
-  const [showEmailVerificationReminder, setShowEmailVerificationReminder] = useState(false);
   
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
@@ -47,7 +47,6 @@ const LoginForm = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    setShowEmailVerificationReminder(false);
     
     if (isAccountLocked(email)) {
       setIsLocked(true);
@@ -84,10 +83,7 @@ const LoginForm = () => {
       if (error) {
         console.error("Login error:", error);
         
-        if (error.message === "Email not confirmed") {
-          setShowEmailVerificationReminder(true);
-          setErrorMessage("Your email address has not been verified. Please check your inbox for the verification link.");
-        } else if (error.message === "Invalid login credentials") {
+        if (error.message === "Invalid login credentials") {
           setErrorMessage("Incorrect email or password");
         } else {
           setErrorMessage(error.message);
@@ -133,74 +129,12 @@ const LoginForm = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleResendVerification = async () => {
-    if (!email || !validateEmail(email).valid) {
-      setErrorMessage("Please enter a valid email address");
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
-        options: {
-          emailRedirectTo: window.location.origin + '/login'
-        }
-      });
-      
-      if (error) {
-        console.error("Error resending verification email:", error);
-        setErrorMessage(error.message);
-        toast({
-          title: "Verification email failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        setShowEmailVerificationReminder(true);
-        toast({
-          title: "Verification email sent",
-          description: "Please check your inbox and spam folder for the verification link",
-        });
-      }
-    } catch (err) {
-      console.error("Unexpected error resending verification:", err);
-      setErrorMessage("An unexpected error occurred. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <form onSubmit={handleLogin} className="space-y-4">
       {errorMessage && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
-      )}
-      
-      {showEmailVerificationReminder && (
-        <Alert variant="default" className="bg-amber-900 border-amber-700">
-          <Mail className="h-4 w-4" />
-          <AlertDescription className="flex flex-col space-y-2">
-            <span>Please verify your email address before logging in.</span>
-            <p className="text-xs mt-1">
-              If you can't find the email in your inbox, please check your spam folder.
-              Verification emails typically arrive within a few minutes.
-            </p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleResendVerification}
-              disabled={isLoading}
-              className="mt-2 w-full"
-            >
-              Resend verification email
-            </Button>
-          </AlertDescription>
         </Alert>
       )}
       

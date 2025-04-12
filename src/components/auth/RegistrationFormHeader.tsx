@@ -21,16 +21,15 @@ const RegistrationFormHeader = ({ errorMessage }: RegistrationFormHeaderProps) =
         <Info className="h-4 w-4" />
         <AlertDescription className="text-xs">
           <p>
-            After registration, you'll need to verify your email before logging in.
-            Please check your inbox and spam folder for the verification link.
+            After registration, you'll be able to immediately log in to your account.
+            No email verification is required.
           </p>
           <p className="mt-1">
-            <strong>Important:</strong> If you don't receive the verification email within a few minutes:
+            <strong>Important:</strong> Please remember your login credentials:
           </p>
           <ul className="list-disc ml-4 mt-1">
-            <li>Check your spam/junk folder</li>
-            <li>Try registering with a different email provider (Gmail, Outlook, etc.)</li>
-            <li>You can request another verification email from the login page</li>
+            <li>Use your registered email address</li>
+            <li>Enter the password you created during registration</li>
           </ul>
         </AlertDescription>
       </Alert>

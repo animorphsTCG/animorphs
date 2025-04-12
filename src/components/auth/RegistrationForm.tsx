@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -171,6 +172,7 @@ const RegistrationForm = () => {
       // Convert age to integer
       const ageInt = parseInt(formData.age);
       
+      // Changed: Removed emailRedirectTo option to avoid email verification
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -182,8 +184,7 @@ const RegistrationForm = () => {
             age: ageInt,
             gender: formData.gender || null,
             country: formData.country || null
-          },
-          emailRedirectTo: window.location.origin + '/login'
+          }
         }
       });
       
@@ -219,13 +220,13 @@ const RegistrationForm = () => {
         
         toast({
           title: "Registration successful!",
-          description: "Please check your email for a confirmation link before logging in.",
+          description: "You can now login with your email and password.",
         });
         
-        // Show success message instead of immediate redirect, to give user a chance to see verification instructions
+        // Redirect to login page after registration
         setTimeout(() => {
           navigate("/login");
-        }, 3000);
+        }, 2000);
       } else {
         // This should not happen but handle it just in case
         console.error("No user data returned but no error either");
@@ -249,13 +250,58 @@ const RegistrationForm = () => {
     }
   };
 
+  const validateField = (name: string, value: any) => {
+    let result: ValidationResult = { valid: true };
+    
+    switch (name) {
+      case "username":
+        result = validateUsername(value);
+        break;
+      case "email":
+        result = validateEmail(value);
+        break;
+      case "password":
+        result = validatePassword(value);
+        setPasswordStrength(result.strength);
+        break;
+      case "confirmPassword":
+        result = {
+          valid: value === formData.password,
+          message: value === formData.password ? undefined : "Passwords do not match"
+        };
+        break;
+      case "name":
+      case "surname":
+        result = validateName(value);
+        break;
+      case "age":
+        result = validateAge(value);
+        break;
+      case "vipCode":
+        result = validateVipCode(value);
+        break;
+    }
+    
+    setValidations(prev => ({ ...prev, [name]: result }));
+    return result.valid;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    setErrorMessage(null);
+    
+    validateField(name, value);
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <RegistrationFormHeader errorMessage={errorMessage} />
       
       {registrationSuccess && (
         <div className="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-900 dark:text-green-300">
-          <p>Registration successful! Please check your email for a verification link.</p>
+          <p>Registration successful! You can now login with your email and password.</p>
           <p className="mt-2">You will be redirected to the login page shortly...</p>
         </div>
       )}

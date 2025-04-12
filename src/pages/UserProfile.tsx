@@ -63,6 +63,41 @@ const UserProfile = () => {
         setIsLoading(true);
         setError(null);
         
+        // First try to create a profile if it doesn't exist yet for this user
+        if (isOwnProfile && user) {
+          // Check if profile exists
+          const { data: existingProfile, error: checkError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+            
+          if (checkError) {
+            console.log("Error checking for profile:", checkError);
+          }
+            
+          if (!existingProfile) {
+            console.log("Profile not found, creating one");
+            // Create a basic profile based on Clerk user data
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                username: user.username || user.id,
+                name: user.firstName || "User",
+                surname: user.lastName || "",
+                age: 18
+              });
+                
+            if (insertError) {
+              console.error("Error creating profile:", insertError);
+              setError("Could not create user profile");
+              setIsLoading(false);
+              return;
+            }
+          }
+        }
+        
         let query;
         if (isOwnProfile && user) {
           // Fetch own profile
@@ -70,14 +105,14 @@ const UserProfile = () => {
             .from('profiles')
             .select('*')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
         } else if (username) {
           // Try to fetch by username
           query = supabase
             .from('profiles')
             .select('*')
             .eq('username', username)
-            .single();
+            .maybeSingle();
         } else {
           throw new Error("No username provided");
         }
@@ -108,10 +143,12 @@ const UserProfile = () => {
           const { data: paymentData, error: paymentError } = await supabase
             .from('payment_status')
             .select('has_paid, payment_date, payment_method')
-            .eq('id', profile.id)
-            .single();
+            .eq('id', user.id)
+            .maybeSingle();
 
-          if (!paymentError && paymentData) {
+          if (paymentError) {
+            console.error("Error fetching payment status:", paymentError);
+          } else if (paymentData) {
             setPaymentStatus(paymentData);
           }
         }

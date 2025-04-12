@@ -21,6 +21,41 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
   
   const isLoading = !isClerkLoaded || !isUserLoaded;
 
+  // Ensure user data is synced with Supabase profiles
+  useEffect(() => {
+    const syncUserProfile = async () => {
+      if (user && isClerkLoaded && isUserLoaded) {
+        try {
+          // Check if profile exists
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+            
+          if (!profile) {
+            // Create a profile if it doesn't exist
+            await supabase
+              .from('profiles')
+              .insert({
+                id: user.id,
+                username: user.username || user.id,
+                name: user.firstName || "User",
+                surname: user.lastName || "",
+                age: 18
+              });
+              
+            console.log("Created profile for user", user.id);
+          }
+        } catch (err) {
+          console.error("Error syncing user profile:", err);
+        }
+      }
+    };
+    
+    syncUserProfile();
+  }, [user, isClerkLoaded, isUserLoaded]);
+
   useEffect(() => {
     // If user is logged in and not on the profile page, redirect them there
     if (user && !redirected && !window.location.pathname.startsWith('/profile')) {

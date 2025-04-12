@@ -48,8 +48,7 @@ const LoginForm = () => {
   // Debug function to check if user exists
   const checkUserExists = async (email: string) => {
     try {
-      // Note: getUserByEmail is not available in the client SDK
-      // We'll use a different approach to check if the user exists
+      // We can't use getUserByEmail directly, so we'll check by attempting a passwordless login
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {

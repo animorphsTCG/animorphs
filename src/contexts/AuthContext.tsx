@@ -89,10 +89,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileData) {
         console.log("Merging auth user with profile data:", profileData);
         // Merge auth user with profile data
-        setUser({
+        const combinedData = {
           ...authUser,
-          ...(profileData as object)
-        });
+          ...profileData
+        };
+        setUser(combinedData as (SupabaseUser & Partial<User>));
       } else {
         // If profile doesn't exist yet, we might need to create it
         console.log("No profile found, checking if we need to create one");
@@ -122,10 +123,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Fetch the newly created profile
               const newProfile = await fetchUserProfile(authUser.id);
               if (newProfile) {
-                setUser({
+                const combinedData = {
                   ...authUser,
-                  ...(newProfile as object)
-                });
+                  ...newProfile
+                };
+                setUser(combinedData as (SupabaseUser & Partial<User>));
                 return;
               }
             }
@@ -139,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({
           ...authUser,
           username: authUser.email?.split('@')[0] || 'User'
-        });
+        } as (SupabaseUser & Partial<User>));
       }
     } catch (error) {
       console.error('Error updating user with profile:', error);
@@ -147,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser({
         ...authUser,
         username: authUser.email?.split('@')[0] || 'User'
-      });
+      } as (SupabaseUser & Partial<User>));
     }
   };
   

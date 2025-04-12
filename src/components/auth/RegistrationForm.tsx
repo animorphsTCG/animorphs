@@ -221,49 +221,73 @@ const RegistrationForm = () => {
         
         toast({
           title: "Registration successful!",
-          description: "You can now log in with your email and password.",
+          description: "You will be automatically logged in.",
         });
         
-        // Attempt to log in the user immediately if the user isn't required to confirm email
-        if (data.session) {
-          console.log("User logged in automatically:", data.session);
-          setTimeout(() => {
-            navigate("/battle");
-          }, 1500);
-        } else {
-          // If no session was returned, we need to attempt manual login
+        // There's a delay between registration and when the account is ready to be used
+        // Wait a moment before attempting to log in
+        setTimeout(async () => {
           try {
-            console.log("Attempting manual login after registration");
+            console.log("Attempting login after registration");
             const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
               email: formData.email,
               password: formData.password
             });
             
             if (loginError) {
-              console.error("Manual login failed:", loginError);
-              // If email confirmation is required, show appropriate message
+              console.error("Auto-login after registration failed:", loginError);
+              
+              // Show appropriate message and redirect to login page
               if (loginError.message.includes("Email not confirmed")) {
+                // Email confirmation required
                 setErrorMessage("Please check your email to confirm your account before logging in.");
+                toast({
+                  title: "Email verification required",
+                  description: "Please check your inbox for a confirmation email.",
+                });
+                
+                // Redirect to login page after delay
+                setTimeout(() => {
+                  navigate("/login");
+                }, 5000);
+              } else {
+                // Generic login error
+                setErrorMessage(`Login failed: ${loginError.message}`);
+                
+                // Redirect to login page after delay
+                setTimeout(() => {
+                  navigate("/login");
+                }, 3000);
               }
+            } else if (loginData?.user) {
+              console.log("Auto-login successful after registration:", loginData.user);
+              
+              toast({
+                title: "Login successful!",
+                description: "Welcome to the game!",
+              });
+              
+              // Redirect to battle page
+              navigate("/battle");
+            } else {
+              console.error("No user data returned from auto-login");
+              setErrorMessage("Registration successful, but automatic login failed. Please try logging in manually.");
+              
               // Redirect to login page after delay
               setTimeout(() => {
                 navigate("/login");
-              }, 2500);
-            } else {
-              console.log("Manual login successful:", loginData);
-              // Redirect to battle page if login succeeds
-              setTimeout(() => {
-                navigate("/battle");
-              }, 1500);
+              }, 3000);
             }
           } catch (loginErr) {
-            console.error("Unexpected login error:", loginErr);
-            // Fallback to login page
+            console.error("Exception during auto-login:", loginErr);
+            setErrorMessage("Registration successful, but automatic login failed. Please try logging in manually.");
+            
+            // Redirect to login page after delay
             setTimeout(() => {
               navigate("/login");
-            }, 2000);
+            }, 3000);
           }
-        }
+        }, 2000);  // Wait 2 seconds before attempting auto-login
       } else {
         // This should not happen but handle it just in case
         console.error("No user data returned but no error either");
@@ -293,7 +317,7 @@ const RegistrationForm = () => {
       
       {registrationSuccess && (
         <div className="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-900 dark:text-green-300">
-          <p>Registration successful! Redirecting you...</p>
+          <p>Registration successful! Logging you in...</p>
         </div>
       )}
       

@@ -31,7 +31,7 @@ const RegistrationFormHeader = ({ errorMessage }: RegistrationFormHeaderProps) =
             <li>The password you created during registration</li>
           </ul>
           <p className="mt-1">
-            <strong>Note:</strong> If email verification is enabled, you'll need to verify your email before logging in.
+            <strong>Note:</strong> If you don't see the login success message after registration, please try logging in manually with your new credentials.
           </p>
         </AlertDescription>
       </Alert>

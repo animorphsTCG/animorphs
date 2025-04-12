@@ -1,10 +1,10 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
 import CardGallery from "./pages/CardGallery";
 import Register from "./pages/Register";
@@ -27,6 +27,7 @@ import { ClerkAuthProvider } from "./contexts/ClerkAuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { checkDatabaseHealth, ensureVipCodesExist } from "./lib/db";
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { supabase } from "./integrations/supabase/client";
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -15,7 +15,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
-  const { isLoaded: isClerkLoaded, userId, sessionId, signOut: clerkSignOut, signIn } = useClerkAuth();
+  const { isLoaded: isClerkLoaded, userId, sessionId, signOut: clerkSignOut } = useClerkAuth();
   const { user, isLoaded: isUserLoaded } = useUser();
   const [redirected, setRedirected] = useState(false);
   

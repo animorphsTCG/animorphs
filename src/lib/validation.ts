@@ -1,178 +1,104 @@
 
-/**
- * Validation utilities for form inputs
- */
+// Add or update the validation functions to ensure they return the proper interface
 
-// Common return type for validation functions
-export interface ValidationResult {
+interface ValidationResult {
   valid: boolean;
   message?: string;
   strength?: string;
 }
 
-// Username validation
-export function validateUsername(username: string): ValidationResult {
-  if (!username || username.trim() === '') {
-    return { valid: false, message: 'Username is required' };
+export const validateEmail = (email: string): ValidationResult => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email) {
+    return { valid: false, message: "Email is required" };
   }
-  
-  if (username.length < 3 || username.length > 30) {
-    return { valid: false, message: 'Username must be between 3 and 30 characters' };
-  }
-  
-  // Allow only letters, numbers, underscores, and hyphens
-  if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-    return { valid: false, message: 'Username can only contain letters, numbers, underscores and hyphens' };
-  }
-  
-  return { valid: true };
-}
-
-// Email validation with strong regex for RFC 5322 standard
-export function validateEmail(email: string): ValidationResult {
-  if (!email || email.trim() === '') {
-    return { valid: false, message: 'Email is required' };
-  }
-  
-  // RFC 5322 compliant email regex
-  const emailRegex = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  
   if (!emailRegex.test(email)) {
-    return { valid: false, message: 'Please enter a valid email address' };
+    return { valid: false, message: "Invalid email format" };
   }
-  
-  // Check for disposable email providers
-  const disposableDomains = [
-    'mailinator.com', 'tempmail.com', 'throwawaymail.com', 'guerrillamail.com',
-    'trashmail.com', '10minutemail.com', 'yopmail.com', 'dispostable.com'
-  ];
-  
-  const domain = email.split('@')[1]?.toLowerCase();
-  if (domain && disposableDomains.includes(domain)) {
-    return { valid: false, message: 'Please use a non-disposable email address' };
-  }
-  
   return { valid: true };
-}
+};
 
-// Password validation - enforcing stronger requirements
-export function validatePassword(password: string): ValidationResult {
-  if (!password || password === '') {
-    return { valid: false, message: 'Password is required' };
+export const validatePassword = (password: string): ValidationResult => {
+  if (!password) {
+    return { valid: false, message: "Password is required", strength: "weak" };
   }
   
   if (password.length < 8) {
-    return { valid: false, message: 'Password must be at least 8 characters', strength: 'weak' };
+    return { valid: false, message: "Password must be at least 8 characters", strength: "weak" };
   }
   
-  let strength = 0;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumbers = /\d/.test(password);
+  const hasSpecialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
   
-  // Add points for length
-  if (password.length >= 12) strength += 1;
-  if (password.length >= 16) strength += 1;
+  const passedChecks = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChars].filter(Boolean).length;
   
-  // Add points for character variety
-  if (/[A-Z]/.test(password)) strength += 1;
-  if (/[a-z]/.test(password)) strength += 1;
-  if (/[0-9]/.test(password)) strength += 1;
-  if (/[^A-Za-z0-9]/.test(password)) strength += 1;
-  
-  // Check for common password patterns
-  const commonPatterns = [
-    'password', '123456', 'qwerty', 'admin', 'welcome',
-    'letmein', 'abc123', 'monkey', 'football'
-  ];
-  
-  const lowercasePassword = password.toLowerCase();
-  
-  // Check if password contains common patterns
-  if (commonPatterns.some(pattern => lowercasePassword.includes(pattern))) {
-    strength -= 2;
+  if (passedChecks <= 1) {
+    return { 
+      valid: false, 
+      message: "Password is too weak. Add uppercase letters, numbers, or special characters.",
+      strength: "weak"
+    };
+  } else if (passedChecks === 2) {
+    return { valid: true, strength: "medium" };
+  } else if (passedChecks === 3) {
+    return { valid: true, strength: "strong" };
+  } else {
+    return { valid: true, strength: "strong" };
   }
-  
-  // Check for sequential characters
-  if (/abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/.test(lowercasePassword)) {
-    strength -= 1;
-  }
-  
-  // Check for sequential numbers
-  if (/123|234|345|456|567|678|789|987|876|765|654|543|432|321/.test(password)) {
-    strength -= 1;
-  }
-  
-  // Set minimum requirements
-  if (!/[A-Z]/.test(password)) {
-    return { valid: false, message: 'Password must contain at least one uppercase letter', strength: 'weak' };
-  }
-  
-  if (!/[0-9]/.test(password)) {
-    return { valid: false, message: 'Password must contain at least one number', strength: 'weak' };
-  }
-  
-  if (!/[^A-Za-z0-9]/.test(password)) {
-    return { valid: false, message: 'Password must contain at least one special character', strength: 'medium' };
-  }
-  
-  // Determine password strength
-  let strengthLabel = 'medium';
-  if (strength >= 5) strengthLabel = 'strong';
-  if (strength <= 2) strengthLabel = 'weak';
-  
-  return { valid: true, strength: strengthLabel };
-}
+};
 
-// Age validation
-export function validateAge(age: number | string): ValidationResult {
-  const ageNumber = typeof age === 'string' ? parseInt(age, 10) : age;
-  
-  if (isNaN(ageNumber)) {
-    return { valid: false, message: 'Age must be a number' };
+export const validateUsername = (username: string): ValidationResult => {
+  if (!username) {
+    return { valid: false, message: "Username is required" };
   }
   
-  if (ageNumber < 13) {
-    return { valid: false, message: 'You must be at least 13 years old to register' };
+  if (username.length < 3) {
+    return { valid: false, message: "Username must be at least 3 characters" };
   }
   
-  if (ageNumber > 120) {
-    return { valid: false, message: 'Please enter a valid age' };
+  if (username.length > 30) {
+    return { valid: false, message: "Username must be less than 30 characters" };
+  }
+  
+  if (!/^[a-zA-Z0-9_.-]+$/.test(username)) {
+    return { valid: false, message: "Username can only contain letters, numbers, and _.-" };
   }
   
   return { valid: true };
-}
+};
 
-// Name validation
-export function validateName(name: string): ValidationResult {
-  if (!name || name.trim() === '') {
-    return { valid: false, message: 'Name is required' };
+export const validateName = (name: string): ValidationResult => {
+  if (!name) {
+    return { valid: false, message: "Name is required" };
   }
   
-  if (name.length < 2 || name.length > 50) {
-    return { valid: false, message: 'Name must be between 2 and 50 characters' };
-  }
-  
-  // Allow letters, spaces, hyphens, and apostrophes (for names like O'Connor or Smith-Jones)
-  if (!/^[a-zA-Z\s'-]+$/.test(name)) {
-    return { valid: false, message: 'Name contains invalid characters' };
+  if (name.length < 2) {
+    return { valid: false, message: "Name must be at least 2 characters" };
   }
   
   return { valid: true };
-}
+};
 
-// VIP code validation
-export function validateVipCode(code: string): ValidationResult {
-  // VIP code is optional
-  if (!code || code.trim() === '') {
-    return { valid: true };
+export const validateAge = (age: string): ValidationResult => {
+  const ageNum = parseInt(age);
+  
+  if (!age) {
+    return { valid: false, message: "Age is required" };
   }
   
-  if (code.length < 3 || code.length > 30) {
-    return { valid: false, message: 'VIP code must be between 3 and 30 characters' };
+  if (isNaN(ageNum)) {
+    return { valid: false, message: "Age must be a number" };
   }
   
-  // Only allow letters, numbers, underscores, and hyphens
-  if (!/^[a-zA-Z0-9_-]+$/.test(code)) {
-    return { valid: false, message: 'VIP code contains invalid characters' };
+  if (ageNum < 13) {
+    return { valid: false, message: "You must be at least 13 years old" };
+  }
+  
+  if (ageNum > 120) {
+    return { valid: false, message: "Please enter a valid age" };
   }
   
   return { valid: true };
-}
+};

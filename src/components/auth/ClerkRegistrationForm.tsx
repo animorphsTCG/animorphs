@@ -12,6 +12,13 @@ import { validateEmail, validatePassword, validateUsername, validateName, valida
 import PasswordStrengthIndicator from "./PasswordStrengthIndicator";
 import TermsAndConditionsDialog from "@/components/TermsAndConditionsDialog";
 
+// Define the type for validation results including optional strength
+interface ValidationResult {
+  valid: boolean;
+  message?: string;
+  strength?: string;
+}
+
 const ClerkRegistrationForm = () => {
   const [formData, setFormData] = useState({
     username: "",
@@ -25,9 +32,7 @@ const ClerkRegistrationForm = () => {
     country: "",
   });
 
-  const [validations, setValidations] = useState<Record<string, { valid: boolean; message?: string; strength?: string }>>(
-    {}
-  );
+  const [validations, setValidations] = useState<Record<string, ValidationResult>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [passwordStrength, setPasswordStrength] = useState<string | undefined>(undefined);
@@ -46,19 +51,21 @@ const ClerkRegistrationForm = () => {
     );
   }
 
-  const validateField = (name: string, value: any) => {
-    let result = { valid: true };
+  const validateField = (name: string, value: any): boolean => {
+    let result: ValidationResult = { valid: true };
 
     switch (name) {
       case "username":
-        result = validateUsername(value);
+        result = validateUsername(value) as ValidationResult;
         break;
       case "email":
-        result = validateEmail(value);
+        result = validateEmail(value) as ValidationResult;
         break;
       case "password":
-        result = validatePassword(value);
-        setPasswordStrength(result.strength);
+        result = validatePassword(value) as ValidationResult;
+        if (result.strength) {
+          setPasswordStrength(result.strength);
+        }
         break;
       case "confirmPassword":
         result = {
@@ -68,10 +75,10 @@ const ClerkRegistrationForm = () => {
         break;
       case "name":
       case "surname":
-        result = validateName(value);
+        result = validateName(value) as ValidationResult;
         break;
       case "age":
-        result = validateAge(value);
+        result = validateAge(value) as ValidationResult;
         break;
     }
 

@@ -5,8 +5,8 @@ import { ClerkProvider } from "@clerk/clerk-react";
 import App from "./App";
 import "./index.css";
 
-// Use a temporary publishable key (user will need to replace this with their own)
-const CLERK_PUBLISHABLE_KEY = "pk_test_replace-with-your-actual-clerk-key";
+// Use the provided publishable key from Clerk
+const CLERK_PUBLISHABLE_KEY = "pk_test_Z2xhZC10aXRtb3VzZS0zMi5jbGVyay5hY2NvdW50cy5kZXYk";
 
 if (!CLERK_PUBLISHABLE_KEY) {
   throw new Error("Missing Clerk Publishable Key");

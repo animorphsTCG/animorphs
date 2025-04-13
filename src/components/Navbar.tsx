@@ -2,13 +2,20 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, Users } from "lucide-react";
-import { useAuth } from "@/contexts/ClerkAuthContext";
-import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
+import { Menu, X, User, Users, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { signOut, isLoading, user } = useAuth();
+  const { user, signOut, isLoading } = useAuth();
   const navigate = useNavigate();
 
   const toggleMenu = () => {
@@ -38,37 +45,47 @@ const Navbar = () => {
             <Link to="/card-gallery" className="text-white hover:text-fantasy-accent transition-colors font-medium">
               Cards
             </Link>
-            <SignedIn>
+            
+            {user && (
               <Link to="/battle" className="text-white hover:text-fantasy-accent transition-colors font-medium">
                 Battle
               </Link>
-              <Link to="/search-users" className="text-white hover:text-fantasy-accent transition-colors font-medium">
-                <Users className="h-4 w-4 inline mr-1" /> Players
-              </Link>
-            </SignedIn>
+            )}
             
-            <SignedIn>
-              <div 
-                onClick={handleProfileClick}
-                className="text-white hover:text-fantasy-accent flex items-center gap-1 cursor-pointer"
-              >
-                <UserButton afterSignOutUrl="/" />
-                <span className="ml-2">Profile</span>
-              </div>
-            </SignedIn>
-            
-            <SignedOut>
-              <Link to="/register">
-                <Button className="fantasy-button mr-2">
-                  Register
-                </Button>
-              </Link>
-              <Link to="/login">
-                <Button className="fantasy-button-secondary">
-                  Login
-                </Button>
-              </Link>
-            </SignedOut>
+            {!isLoading && (
+              <>
+                {user ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                        <User className="h-4 w-4 text-white" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleProfileClick}>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => signOut()}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Link to="/register">
+                      <Button className="fantasy-button">Register</Button>
+                    </Link>
+                    <Link to="/login">
+                      <Button className="fantasy-button-secondary">Login</Button>
+                    </Link>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -92,23 +109,27 @@ const Navbar = () => {
               Cards
             </Link>
             
-            <SignedIn>
-              <Link to="/battle" className="text-white hover:text-fantasy-accent text-lg font-medium">
-                Battle
-              </Link>
-              <Link to="/search-users" className="text-white hover:text-fantasy-accent text-lg font-medium">
-                <Users className="h-4 w-4 inline mr-1" /> Players
-              </Link>
-              <div 
-                onClick={handleProfileClick} 
-                className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer"
-              >
-                Profile
-              </div>
-              <UserButton afterSignOutUrl="/" />
-            </SignedIn>
+            {user && (
+              <>
+                <Link to="/battle" className="text-white hover:text-fantasy-accent text-lg font-medium">
+                  Battle
+                </Link>
+                <div 
+                  onClick={handleProfileClick} 
+                  className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer"
+                >
+                  Profile
+                </div>
+                <div 
+                  onClick={() => signOut()} 
+                  className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer"
+                >
+                  Log out
+                </div>
+              </>
+            )}
             
-            <SignedOut>
+            {!user && !isLoading && (
               <div className="flex flex-col space-y-2">
                 <Link to="/register" className="w-full">
                   <Button className="fantasy-button w-full">
@@ -121,7 +142,7 @@ const Navbar = () => {
                   </Button>
                 </Link>
               </div>
-            </SignedOut>
+            )}
           </div>
         )}
       </div>

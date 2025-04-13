@@ -1,31 +1,17 @@
 
-import React from "react";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Link } from "react-router-dom";
-import ClerkRegistrationForm from "@/components/auth/ClerkRegistrationForm";
+import React from 'react';
+import RegistrationForm from '@/components/auth/RegistrationForm';
 
 const Register = () => {
   return (
-    <div className="container flex items-center justify-center py-12 px-4">
-      <Card className="w-full max-w-md border-2 border-fantasy-primary bg-black/70">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-fantasy font-bold text-fantasy-accent">Register</CardTitle>
-          <CardDescription>Create your account to start playing</CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <ClerkRegistrationForm />
-        </CardContent>
-        
-        <CardFooter className="flex flex-col space-y-4">
-          <div className="text-sm text-gray-400 text-center">
-            Already have an account?{" "}
-            <Link to="/login" className="text-fantasy-accent hover:underline">
-              Login here
-            </Link>
-          </div>
-        </CardFooter>
-      </Card>
+    <div className="container mx-auto py-12 px-4">
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-center">Create Your Account</h1>
+        <p className="text-gray-500 mb-8 text-center">
+          Join our gaming community and start your adventure
+        </p>
+        <RegistrationForm />
+      </div>
     </div>
   );
 };

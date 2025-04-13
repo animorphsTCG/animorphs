@@ -1,92 +1,37 @@
 
-export interface User {
+export interface UserProfile {
   id: string;
-  username: string;
-  email: string;
   name: string;
   surname: string;
-  age: number;
-  gender?: string;
-  country?: string;
-  bio?: string;
-  playing_times?: string;
-  profile_image_url?: string;
-  mp: number;
-  ai_points: number;
-  lbp: number;
-  digi: number;
-  gold: number;
-  music_unlocked: boolean;
-  favorite_battle_mode?: string;
-  favorite_animorph?: string;
-  online_times_gmt2?: string;
+  date_of_birth: string;
+  gender: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
+  country: string;
+  email: string;
+  has_paid: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Card {
   id: number;
-  card_number: number;
-  image_url: string;
-  nft_name?: string;
-  animorph_type?: string;
-  power?: number;
-  health?: number;
-  attack?: number;
-  sats?: number;
-  size?: number;
-}
-
-export interface AnimorphCard {
-  id: number;
-  card_number: number;
-  image_url: string;
-  nft_name: string;
-  animorph_type: string;
+  name: string;
+  type: string;
   power: number;
   health: number;
   attack: number;
   sats: number;
   size: number;
-  created_at?: string;
-}
-
-export interface DisplayCard {
-  id: number;
-  card_number: number;
-  image_url: string;
-}
-
-export interface VipCode {
-  id: number;
-  code: string;
-  max_uses: number;
-  current_uses: number;
-  description?: string;
-  created_at?: string;
-}
-
-export interface Song {
-  id: number;
-  title: string;
-  youtube_url: string;
-}
-
-export interface Game {
-  id: number;
-  game_type: string;
-  status: string;
-  players: any;
-  game_state: any;
-  round: number;
+  image_url: string | null;
   created_at: string;
 }
 
-export interface PaymentStatus {
+export interface PaymentRecord {
   id: string;
-  has_paid: boolean;
-  payment_date: string | null;
-  payment_method: string | null;
-  transaction_id: string | null;
+  user_id: string;
+  amount: number;
+  currency: string;
+  payment_method: string;
+  stripe_session_id: string | null;
   created_at: string;
   updated_at: string;
 }

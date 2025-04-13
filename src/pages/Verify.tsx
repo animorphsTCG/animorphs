@@ -8,6 +8,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { trackAuthAttempt } from "@/lib/clerkMonitoring";
+import { logAuthEvent } from "@/utils/clerkAuth";
 
 const Verify = () => {
   const [verificationCode, setVerificationCode] = useState("");
@@ -32,7 +34,9 @@ const Verify = () => {
       });
       navigate("/register");
     }
-  }, [navigate, email]);
+    
+    logAuthEvent('verify_page_loaded', { email, verifyingSignUp });
+  }, [navigate, email, verifyingSignUp]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +47,8 @@ const Verify = () => {
 
     setIsLoading(true);
     setErrorMessage(null);
+    
+    const startTime = performance.now();
 
     try {
       if (verifyingSignUp && signUp) {
@@ -52,6 +58,8 @@ const Verify = () => {
         });
 
         if (completeSignUp.status === "complete") {
+          trackAuthAttempt('verify', true, performance.now() - startTime, { email });
+          
           toast({
             title: "Verification successful",
             description: "Your account has been verified. You can now log in.",
@@ -68,6 +76,8 @@ const Verify = () => {
         });
 
         if (completeSignIn.status === "complete") {
+          trackAuthAttempt('verify', true, performance.now() - startTime, { email });
+          
           toast({
             title: "Verification successful",
             description: "You're now logged in.",
@@ -77,6 +87,12 @@ const Verify = () => {
       }
     } catch (err: any) {
       console.error("Verification error:", err);
+      
+      trackAuthAttempt('verify', false, performance.now() - startTime, { 
+        email, 
+        error: err.message || "Unknown error"
+      });
+      
       setErrorMessage(err.message || "Verification failed. Please try again.");
       toast({
         title: "Verification failed",
@@ -158,6 +174,7 @@ const Verify = () => {
                 if (verifyingSignUp && signUp) {
                   try {
                     await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+                    logAuthEvent('resend_verification', { email });
                     toast({
                       title: "Code resent",
                       description: "Please check your email for a new verification code",

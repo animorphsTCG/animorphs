@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSignIn } from "@clerk/clerk-react";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { trackAuthAttempt } from "@/lib/clerkMonitoring";
 
 const ClerkLoginForm = () => {
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -24,6 +26,8 @@ const ClerkLoginForm = () => {
     setError(null);
     setIsLoading(true);
     
+    const startTime = performance.now(); 
+    
     try {
       // Track login attempts for rate limiting
       setAttemptCount(prev => prev + 1);
@@ -40,10 +44,21 @@ const ClerkLoginForm = () => {
       const result = await signIn.create({
         identifier: emailAddress,
         password,
+        // Add OIDC parameters
+        authFlow: {
+          strategy: "oauth",
+          redirectUrl: window.location.origin + "/profile",
+        }
       });
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
+        
+        trackAuthAttempt('login', true, performance.now() - startTime, { 
+          email: emailAddress,
+          strategy: "password"
+        });
+        
         toast({
           title: "Login successful",
           description: "Welcome back!",
@@ -53,6 +68,11 @@ const ClerkLoginForm = () => {
       } else {
         // Handle multi-factor authentication or other flows
         if (result.status === "needs_second_factor") {
+          trackAuthAttempt('login', false, performance.now() - startTime, { 
+            email: emailAddress,
+            status: "needs_second_factor"
+          });
+          
           toast({
             title: "Additional verification needed",
             description: "Please complete the second factor authentication",
@@ -67,6 +87,11 @@ const ClerkLoginForm = () => {
       }
     } catch (err: any) {
       console.error("Login error:", err);
+      
+      trackAuthAttempt('login', false, performance.now() - startTime, { 
+        email: emailAddress,
+        error: err.message || "Unknown error"
+      });
       
       // Implement exponential backoff for repeated failed attempts
       if (attemptCount > 5) {

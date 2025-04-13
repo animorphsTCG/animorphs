@@ -35,9 +35,14 @@ const InputOTPSlot = React.forwardRef<
 >(({ index, className, ...props }, ref) => {
   const inputOTPContext = React.useContext(OTPInputContext)
   
-  // Check if inputOTPContext and slots exist before trying to access them
-  const slot = inputOTPContext?.slots?.[index] || { char: '', hasFakeCaret: false, isActive: false }
-  const { char, hasFakeCaret, isActive } = slot
+  // Ensure slots exist and index is valid before accessing
+  const slots = inputOTPContext?.slots || []
+  const slot = (slots.length > index && index >= 0) ? slots[index] : null
+  
+  // Provide safe defaults if no slot is found
+  const char = slot?.char || ''
+  const hasFakeCaret = slot?.hasFakeCaret || false
+  const isActive = slot?.isActive || false
 
   return (
     <div

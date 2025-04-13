@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useSignUp, useSignIn } from "@clerk/clerk-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,7 @@ const Verify = () => {
   const { signIn, isLoaded: isSignInLoaded } = useSignIn();
 
   const email = location.state?.email || "";
-  const verifyingSignUp = location.state?.verifyingSignUp || true;
+  const verifyingSignUp = location.state?.verifyingSignUp !== undefined ? location.state.verifyingSignUp : true;
 
   useEffect(() => {
     if (!email) {
@@ -57,8 +58,8 @@ const Verify = () => {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verificationCode.trim()) {
-      setErrorMessage("Please enter the verification code from your email");
+    if (!verificationCode || verificationCode.length < 6) {
+      setErrorMessage("Please enter the complete 6-digit verification code from your email");
       return;
     }
 
@@ -69,10 +70,13 @@ const Verify = () => {
 
     try {
       if (verifyingSignUp && signUp) {
-        console.log("Attempting email verification for signup", { email, retries });
+        console.log("Attempting email verification for signup", { email, retries, code: verificationCode });
+        
+        // Make sure we have the latest verification attempt
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
         
         const completeSignUp = await signUp.attemptEmailAddressVerification({
-          code: verificationCode,
+          code: verificationCode.trim(),
         });
 
         console.log("Verification result:", completeSignUp);
@@ -95,14 +99,14 @@ const Verify = () => {
             navigate("/login");
           }
         } else {
-          throw new Error("Verification failed. Please try again.");
+          throw new Error(`Verification incomplete. Status: ${completeSignUp.status}`);
         }
       } else if (signIn) {
-        console.log("Attempting email verification for signin", { email });
+        console.log("Attempting email verification for signin", { email, code: verificationCode });
         
         const completeSignIn = await signIn.attemptFirstFactor({
           strategy: "email_code",
-          code: verificationCode,
+          code: verificationCode.trim(),
         });
 
         console.log("Sign-in verification result:", completeSignIn);
@@ -117,6 +121,8 @@ const Verify = () => {
           setTimeout(() => {
             navigate("/profile");
           }, 500);
+        } else {
+          throw new Error(`Sign-in verification incomplete. Status: ${completeSignIn.status}`);
         }
       }
     } catch (err: any) {
@@ -130,10 +136,18 @@ const Verify = () => {
         error: err.message || "Unknown error"
       });
       
-      setErrorMessage(err.message || "Verification failed. Please try again.");
+      // Provide more user-friendly error messages
+      let friendlyErrorMessage = "Verification failed. Please check your code and try again.";
+      if (err.message?.includes("expired")) {
+        friendlyErrorMessage = "Verification code has expired. Please request a new code.";
+      } else if (err.message?.includes("invalid") || err.message?.includes("incorrect")) {
+        friendlyErrorMessage = "Invalid verification code. Please check and try again.";
+      }
+      
+      setErrorMessage(friendlyErrorMessage);
       toast({
         title: "Verification failed",
-        description: err.message || "Please check your code and try again",
+        description: friendlyErrorMessage,
         variant: "destructive",
       });
     } finally {
@@ -146,10 +160,23 @@ const Verify = () => {
     
     setResendDisabled(true);
     setResendCountdown(60);
+    setErrorMessage(null);
+    setVerificationCode("");
     
     try {
       if (verifyingSignUp && signUp) {
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        logAuthEvent('resend_verification', { email });
+        toast({
+          title: "Code resent",
+          description: "Please check your email for a new verification code",
+        });
+      } else if (signIn) {
+        // For sign-in flow
+        await signIn.prepareFirstFactor({
+          strategy: "email_code",
+          identifier: email
+        });
         logAuthEvent('resend_verification', { email });
         toast({
           title: "Code resent",
@@ -208,9 +235,23 @@ const Verify = () => {
                   disabled={isLoading}
                   render={({ slots }) => (
                     <InputOTPGroup>
-                      {slots && slots.map((slot, i) => (
-                        <InputOTPSlot key={i} {...slot} index={i} className="bg-gray-800" />
-                      ))}
+                      {(Array.isArray(slots) && slots.length > 0) ? 
+                        slots.map((slot, i) => (
+                          <InputOTPSlot key={i} {...slot} index={i} className="bg-gray-800" />
+                        ))
+                        :
+                        // Fallback when slots aren't available
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <InputOTPSlot 
+                            key={i} 
+                            index={i} 
+                            className="bg-gray-800"
+                            char=""
+                            hasFakeCaret={false}
+                            isActive={false}
+                          />
+                        ))
+                      }
                     </InputOTPGroup>
                   )}
                 />
@@ -225,13 +266,14 @@ const Verify = () => {
                 className="bg-gray-800"
                 autoComplete="one-time-code"
                 disabled={isLoading}
+                maxLength={6}
               />
             </div>
 
             <Button
               type="submit"
               className="w-full fantasy-button"
-              disabled={isLoading || !verificationCode}
+              disabled={isLoading || !verificationCode || verificationCode.length < 6}
             >
               {isLoading ? (
                 <>

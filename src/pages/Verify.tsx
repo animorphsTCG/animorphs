@@ -172,11 +172,13 @@ const Verify = () => {
           description: "Please check your email for a new verification code",
         });
       } else if (signIn) {
-        // For sign-in flow
-        await signIn.prepareFirstFactor({
+        // For sign-in flow, we need to provide the email again to prepare
+        // But we don't use the identifier property as it doesn't exist in EmailCodeConfig
+        await signIn.create({
           strategy: "email_code",
-          identifier: email
+          emailAddress: email,
         });
+        
         logAuthEvent('resend_verification', { email });
         toast({
           title: "Code resent",
@@ -235,23 +237,9 @@ const Verify = () => {
                   disabled={isLoading}
                   render={({ slots }) => (
                     <InputOTPGroup>
-                      {(Array.isArray(slots) && slots.length > 0) ? 
-                        slots.map((slot, i) => (
-                          <InputOTPSlot key={i} {...slot} index={i} className="bg-gray-800" />
-                        ))
-                        :
-                        // Fallback when slots aren't available
-                        Array.from({ length: 6 }).map((_, i) => (
-                          <InputOTPSlot 
-                            key={i} 
-                            index={i} 
-                            className="bg-gray-800"
-                            char=""
-                            hasFakeCaret={false}
-                            isActive={false}
-                          />
-                        ))
-                      }
+                      {slots.map((slot, i) => (
+                        <InputOTPSlot key={i} {...slot} index={i} className="bg-gray-800" />
+                      ))}
                     </InputOTPGroup>
                   )}
                 />

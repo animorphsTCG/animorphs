@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +9,7 @@ import RegistrationFormHeader from "./RegistrationFormHeader";
 import PersonalInfoSection from "./PersonalInfoSection";
 import OptionalInfoSection from "./OptionalInfoSection";
 import RegistrationFormFooter from "./RegistrationFormFooter";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/ClerkAuthContext";
 
 const RegistrationForm = () => {
   const [formData, setFormData] = useState({

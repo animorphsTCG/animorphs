@@ -25,9 +25,15 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       appearance={{
         elements: {
           formButtonPrimary: "fantasy-button",
-          card: "border-2 border-fantasy-primary bg-black/70"
+          card: "border-2 border-fantasy-primary bg-black/70",
+          rootBox: "w-full",
+          card: {
+            boxShadow: "none",
+            borderRadius: "8px"
+          }
         }
       }}
+      navigate={(to) => window.location.href = to}
     >
       <BrowserRouter>
         <App />

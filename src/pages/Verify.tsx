@@ -7,19 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { trackAuthAttempt } from "@/lib/clerkMonitoring";
 import { logAuthEvent } from "@/utils/clerkAuth";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const Verify = () => {
   const [verificationCode, setVerificationCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retries, setRetries] = useState(0);
+  const [resendDisabled, setResendDisabled] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
   const { signIn, isLoaded: isSignInLoaded } = useSignIn();
-  
+
   // Get the email from URL state if available (passed from registration page)
   const email = location.state?.email || "";
   const verifyingSignUp = location.state?.verifyingSignUp || true;
@@ -33,10 +37,27 @@ const Verify = () => {
         variant: "destructive",
       });
       navigate("/register");
+      return;
     }
     
     logAuthEvent('verify_page_loaded', { email, verifyingSignUp });
   }, [navigate, email, verifyingSignUp]);
+
+  // Handle resend cooldown timer
+  useEffect(() => {
+    let interval: number | undefined;
+    if (resendCountdown > 0) {
+      interval = window.setInterval(() => {
+        setResendCountdown(prev => prev - 1);
+      }, 1000);
+    } else if (resendCountdown === 0) {
+      setResendDisabled(false);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [resendCountdown]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +73,7 @@ const Verify = () => {
 
     try {
       if (verifyingSignUp && signUp) {
-        console.log("Attempting email verification for signup", { email });
+        console.log("Attempting email verification for signup", { email, retries });
         
         // Complete the sign-up process with the verification code
         const completeSignUp = await signUp.attemptEmailAddressVerification({
@@ -69,11 +90,13 @@ const Verify = () => {
             description: "Your account has been created successfully.",
           });
           
-          // Use the correct method to handle the session after verification
+          // User is now verified and session should be created automatically
           if (completeSignUp.createdSessionId) {
             console.log("Session created, redirecting to profile");
             // We don't need to explicitly set the session as Clerk handles this internally
-            navigate("/profile");
+            setTimeout(() => {
+              navigate("/profile");
+            }, 500);
           } else {
             console.log("No session ID created, redirecting to login");
             navigate("/login");
@@ -99,14 +122,20 @@ const Verify = () => {
             title: "Verification successful",
             description: "You're now logged in.",
           });
-          navigate("/profile");
+          setTimeout(() => {
+            navigate("/profile");
+          }, 500);
         }
       }
     } catch (err: any) {
       console.error("Verification error:", err);
       
+      // Increment retry counter
+      setRetries(prev => prev + 1);
+      
       trackAuthAttempt('verify', false, performance.now() - startTime, { 
         email, 
+        retries,
         error: err.message || "Unknown error"
       });
       
@@ -118,6 +147,31 @@ const Verify = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (resendDisabled) return;
+    
+    setResendDisabled(true);
+    setResendCountdown(60); // 60 second cooldown
+    
+    try {
+      if (verifyingSignUp && signUp) {
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        logAuthEvent('resend_verification', { email });
+        toast({
+          title: "Code resent",
+          description: "Please check your email for a new verification code",
+        });
+      }
+    } catch (err: any) {
+      console.error("Error resending code:", err);
+      toast({
+        title: "Failed to resend code",
+        description: err.message || "Please try again later",
+        variant: "destructive",
+      });
     }
   };
 
@@ -150,18 +204,38 @@ const Verify = () => {
               </Alert>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-4">
               <label htmlFor="verificationCode" className="block text-sm font-medium">
                 Verification Code
               </label>
+              
+              {/* OTP Input for better UX */}
+              <div className="flex justify-center mb-4">
+                <InputOTP
+                  maxLength={6}
+                  value={verificationCode}
+                  onChange={(value) => setVerificationCode(value)}
+                  disabled={isLoading}
+                  render={({ slots }) => (
+                    <InputOTPGroup>
+                      {slots.map((slot, index) => (
+                        <InputOTPSlot key={index} {...slot} className="bg-gray-800" />
+                      ))}
+                    </InputOTPGroup>
+                  )}
+                />
+              </div>
+              
+              {/* Fallback regular input */}
               <Input
                 id="verificationCode"
                 type="text"
-                placeholder="Enter your verification code"
+                placeholder="Or type your verification code here"
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value)}
                 className="bg-gray-800"
-                autoComplete="off"
+                autoComplete="one-time-code"
+                disabled={isLoading}
               />
             </div>
 
@@ -187,26 +261,18 @@ const Verify = () => {
             <Button
               variant="link"
               className="text-fantasy-accent p-0 h-auto"
-              onClick={async () => {
-                if (verifyingSignUp && signUp) {
-                  try {
-                    await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-                    logAuthEvent('resend_verification', { email });
-                    toast({
-                      title: "Code resent",
-                      description: "Please check your email for a new verification code",
-                    });
-                  } catch (err: any) {
-                    toast({
-                      title: "Failed to resend code",
-                      description: err.message || "Please try again",
-                      variant: "destructive",
-                    });
-                  }
-                }
-              }}
+              onClick={handleResendCode}
+              disabled={resendDisabled || isLoading}
             >
-              Resend code
+              {resendDisabled ? (
+                <>
+                  Resend code in {resendCountdown}s
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-1 h-3 w-3" /> Resend code
+                </>
+              )}
             </Button>
           </div>
           <div className="text-sm text-gray-400 text-center">

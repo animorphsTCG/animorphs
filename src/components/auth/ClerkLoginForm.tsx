@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSignIn } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
@@ -16,21 +17,86 @@ const ClerkLoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attemptCount, setAttemptCount] = useState(0);
+  const [cooldownEndTime, setCooldownEndTime] = useState<number | null>(null);
+  const [remainingCooldown, setRemainingCooldown] = useState(0);
   const navigate = useNavigate();
+
+  // Check for existing cooldown from localStorage
+  useEffect(() => {
+    const storedCooldownEnd = localStorage.getItem("auth_cooldown_end");
+    if (storedCooldownEnd) {
+      const cooldownEnd = parseInt(storedCooldownEnd);
+      if (cooldownEnd > Date.now()) {
+        setCooldownEndTime(cooldownEnd);
+        setRemainingCooldown(Math.ceil((cooldownEnd - Date.now()) / 1000));
+      } else {
+        localStorage.removeItem("auth_cooldown_end");
+      }
+    }
+  }, []);
+
+  // Countdown timer for cooldown
+  useEffect(() => {
+    if (remainingCooldown <= 0) return;
+    
+    const interval = setInterval(() => {
+      const newRemaining = cooldownEndTime ? Math.ceil((cooldownEndTime - Date.now()) / 1000) : 0;
+      
+      if (newRemaining <= 0) {
+        setCooldownEndTime(null);
+        setRemainingCooldown(0);
+        localStorage.removeItem("auth_cooldown_end");
+        clearInterval(interval);
+      } else {
+        setRemainingCooldown(newRemaining);
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [cooldownEndTime, remainingCooldown]);
+
+  // Enforce rate limiting for login attempts
+  const enforceRateLimit = () => {
+    const newAttemptCount = attemptCount + 1;
+    setAttemptCount(newAttemptCount);
+    
+    if (newAttemptCount >= 5) {
+      const cooldownSeconds = Math.min(30 * Math.pow(2, Math.floor(newAttemptCount / 5) - 1), 300);
+      const endTime = Date.now() + (cooldownSeconds * 1000);
+      
+      setCooldownEndTime(endTime);
+      setRemainingCooldown(cooldownSeconds);
+      localStorage.setItem("auth_cooldown_end", endTime.toString());
+      
+      setError(`Too many login attempts. Please try again in ${cooldownSeconds} seconds.`);
+      return false;
+    }
+    
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoaded) return;
+    
+    // Check if we're in a cooldown period
+    if (remainingCooldown > 0) {
+      setError(`Please wait ${remainingCooldown} seconds before trying again.`);
+      return;
+    }
 
     setError(null);
     setIsLoading(true);
     
+    // Check rate limiting
+    if (!enforceRateLimit()) {
+      setIsLoading(false);
+      return;
+    }
+    
     const startTime = performance.now(); 
     
     try {
-      // Track login attempts for rate limiting
-      setAttemptCount(prev => prev + 1);
-      
       // Add basic input validation
       if (!emailAddress || !emailAddress.includes('@')) {
         throw new Error("Please enter a valid email address");
@@ -43,8 +109,9 @@ const ClerkLoginForm = () => {
       const result = await signIn.create({
         identifier: emailAddress,
         password,
-        // Removing the unsupported authFlow property
       });
+
+      console.log("Sign in result:", result);
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
@@ -53,6 +120,10 @@ const ClerkLoginForm = () => {
           email: emailAddress,
           strategy: "password"
         });
+        
+        // Reset attempt count on success
+        setAttemptCount(0);
+        localStorage.removeItem("auth_cooldown_end");
         
         toast({
           title: "Login successful",
@@ -66,6 +137,13 @@ const ClerkLoginForm = () => {
           trackAuthAttempt('login', false, performance.now() - startTime, { 
             email: emailAddress,
             status: "needs_second_factor"
+          });
+          
+          navigate("/verify", {
+            state: {
+              email: emailAddress,
+              verifyingSignUp: false
+            }
           });
           
           toast({
@@ -88,14 +166,10 @@ const ClerkLoginForm = () => {
         error: err.message || "Unknown error"
       });
       
-      // Implement exponential backoff for repeated failed attempts
-      if (attemptCount > 5) {
-        setError("Too many login attempts. Please try again later.");
-        
-        // Reset attempt count after 30 seconds
-        setTimeout(() => {
-          setAttemptCount(0);
-        }, 30000);
+      if (err.message?.includes("network") || err.message?.includes("timeout")) {
+        setError("Network error. Please check your internet connection and try again.");
+      } else if (err.message?.includes("identifier") || err.message?.includes("password")) {
+        setError("Invalid email or password. Please check your credentials.");
       } else {
         setError(err.errors?.[0]?.message || "Login failed. Please check your credentials and try again");
       }
@@ -119,6 +193,15 @@ const ClerkLoginForm = () => {
         </Alert>
       )}
       
+      {remainingCooldown > 0 && (
+        <Alert variant="destructive" className="bg-red-900/50 border-red-700">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Too many login attempts. Please try again in {remainingCooldown} seconds.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -129,9 +212,12 @@ const ClerkLoginForm = () => {
           autoComplete="email"
           autoCorrect="off"
           value={emailAddress}
-          onChange={(e) => setEmailAddress(e.target.value)}
+          onChange={(e) => {
+            setEmailAddress(e.target.value);
+            setError(null);
+          }}
           required
-          disabled={isLoading || attemptCount > 5}
+          disabled={isLoading || remainingCooldown > 0}
           className="bg-gray-800"
         />
       </div>
@@ -143,21 +229,26 @@ const ClerkLoginForm = () => {
           type="password"
           autoComplete="current-password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setError(null);
+          }}
           required
-          disabled={isLoading || attemptCount > 5}
+          disabled={isLoading || remainingCooldown > 0}
           className="bg-gray-800"
         />
       </div>
       <Button 
         type="submit" 
         className="w-full fantasy-button" 
-        disabled={isLoading || attemptCount > 5}
+        disabled={isLoading || remainingCooldown > 0 || !emailAddress || !password}
       >
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Logging in...
           </>
+        ) : remainingCooldown > 0 ? (
+          `Try again in ${remainingCooldown}s`
         ) : (
           "Login"
         )}

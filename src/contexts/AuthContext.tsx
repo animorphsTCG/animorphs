@@ -46,9 +46,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', userId)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        throw error;
+      }
       
       if (data) {
+        console.log("Fetched user profile:", data);
         setUserProfile(data as unknown as UserProfile);
       }
     } catch (error) {
@@ -97,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log("Retrieved session:", currentSession);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -116,16 +121,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, metadata: any) => {
     try {
-      const { error } = await supabase.auth.signUp({ 
+      console.log("Signing up with:", email, "and metadata:", metadata);
+      const { error, data } = await supabase.auth.signUp({ 
         email, 
         password, 
         options: { 
-          data: metadata
+          data: metadata,
+          emailRedirectTo: `${window.location.origin}/login`
         }
       });
       
       if (error) throw error;
 
+      console.log("Sign up response:", data);
       navigate('/login');
       toast({
         title: 'Registration successful',
@@ -144,13 +152,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log("Signing in with:", email);
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
       if (error) throw error;
 
+      console.log("Sign in successful:", data);
       navigate('/profile');
     } catch (error: any) {
       console.error('Error signing in:', error);

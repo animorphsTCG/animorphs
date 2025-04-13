@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import CardGallery from "./pages/CardGallery";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
+import Verify from "./pages/Verify";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
@@ -49,6 +50,7 @@ const AppContent = () => {
           <Route path="/card-gallery" element={<CardGallery />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/verify" element={<Verify />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/payment-cancelled" element={<PaymentCancelled />} />

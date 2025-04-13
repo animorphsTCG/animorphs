@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -37,9 +38,28 @@ export const LoginForm = () => {
     setError(null);
 
     try {
+      // Check if the user exists first
+      const { data: userExists, error: checkError } = await supabase.auth.admin
+        .getUserByEmail(data.email)
+        .catch(() => ({ data: null, error: null }));
+
+      if (checkError) {
+        console.log("Error checking user:", checkError);
+      }
+
+      console.log("Attempting to sign in with:", data.email);
       await signIn(data.email, data.password);
     } catch (err: any) {
-      setError(err.message || "Login failed. Please check your email and password.");
+      console.error("Error signing in:", err);
+      
+      // More descriptive error message
+      if (err.message?.includes("Invalid login credentials")) {
+        setError(
+          "Login failed. Please check your email and password. If you just registered, make sure your email is verified."
+        );
+      } else {
+        setError(err.message || "Login failed. Please check your email and password.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -99,11 +119,16 @@ export const LoginForm = () => {
             )}
           </Button>
           
-          <div className="text-center mt-4">
+          <div className="text-center mt-4 space-y-2">
             <p>
               Don't have an account?{" "}
               <Link to="/register" className="text-blue-600 hover:underline">
                 Register
+              </Link>
+            </p>
+            <p className="text-sm">
+              <Link to="/verify" className="text-blue-600 hover:underline">
+                Resend verification email
               </Link>
             </p>
           </div>

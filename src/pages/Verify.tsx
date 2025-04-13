@@ -69,19 +69,13 @@ const Verify = () => {
             description: "Your account has been created successfully.",
           });
           
-          // Set the session after successful verification using the correct method
-          try {
-            if (completeSignUp.createdSessionId) {
-              // Using setSession instead of setActive (which doesn't exist)
-              await signUp.setSession(completeSignUp.createdSessionId);
-              console.log("Session set active after verification");
-              navigate("/profile");
-            } else {
-              console.log("No session ID created, redirecting to login");
-              navigate("/login");
-            }
-          } catch (sessionError) {
-            console.error("Error setting active session:", sessionError);
+          // Use the correct method to handle the session after verification
+          if (completeSignUp.createdSessionId) {
+            console.log("Session created, redirecting to profile");
+            // We don't need to explicitly set the session as Clerk handles this internally
+            navigate("/profile");
+          } else {
+            console.log("No session ID created, redirecting to login");
             navigate("/login");
           }
         } else {

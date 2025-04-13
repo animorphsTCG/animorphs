@@ -52,28 +52,49 @@ const Verify = () => {
 
     try {
       if (verifyingSignUp && signUp) {
+        console.log("Attempting email verification for signup", { email });
+        
         // Complete the sign-up process with the verification code
         const completeSignUp = await signUp.attemptEmailAddressVerification({
           code: verificationCode,
         });
+
+        console.log("Verification result:", completeSignUp);
 
         if (completeSignUp.status === "complete") {
           trackAuthAttempt('verify', true, performance.now() - startTime, { email });
           
           toast({
             title: "Verification successful",
-            description: "Your account has been verified. You can now log in.",
+            description: "Your account has been created successfully.",
           });
-          navigate("/login");
+          
+          // Set the active session after successful verification
+          try {
+            if (completeSignUp.createdSessionId) {
+              await signUp.setActive({ session: completeSignUp.createdSessionId });
+              console.log("Session set active after verification");
+              navigate("/profile");
+            } else {
+              navigate("/login");
+            }
+          } catch (sessionError) {
+            console.error("Error setting active session:", sessionError);
+            navigate("/login");
+          }
         } else {
           throw new Error("Verification failed. Please try again.");
         }
       } else if (signIn) {
+        console.log("Attempting email verification for signin", { email });
+        
         // Handle sign-in verification if ever needed
         const completeSignIn = await signIn.attemptFirstFactor({
           strategy: "email_code",
           code: verificationCode,
         });
+
+        console.log("Sign-in verification result:", completeSignIn);
 
         if (completeSignIn.status === "complete") {
           trackAuthAttempt('verify', true, performance.now() - startTime, { email });
@@ -82,7 +103,7 @@ const Verify = () => {
             title: "Verification successful",
             description: "You're now logged in.",
           });
-          navigate("/battle");
+          navigate("/profile");
         }
       }
     } catch (err: any) {

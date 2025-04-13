@@ -69,13 +69,15 @@ const Verify = () => {
             description: "Your account has been created successfully.",
           });
           
-          // Set the active session after successful verification
+          // Set the session after successful verification using the correct method
           try {
             if (completeSignUp.createdSessionId) {
-              await signUp.setActive({ session: completeSignUp.createdSessionId });
+              // Using setSession instead of setActive (which doesn't exist)
+              await signUp.setSession(completeSignUp.createdSessionId);
               console.log("Session set active after verification");
               navigate("/profile");
             } else {
+              console.log("No session ID created, redirecting to login");
               navigate("/login");
             }
           } catch (sessionError) {

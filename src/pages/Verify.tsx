@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useSignUp, useSignIn } from "@clerk/clerk-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -172,11 +171,10 @@ const Verify = () => {
           description: "Please check your email for a new verification code",
         });
       } else if (signIn) {
-        // For sign-in flow, we need to provide the email again to prepare
-        // But we don't use the identifier property as it doesn't exist in EmailCodeConfig
-        await signIn.create({
+        // For sign-in flow, we need to prepare first factor
+        await signIn.prepareFirstFactor({
           strategy: "email_code",
-          emailAddress: email,
+          identifier: email
         });
         
         logAuthEvent('resend_verification', { email });
@@ -238,7 +236,7 @@ const Verify = () => {
                   render={({ slots }) => (
                     <InputOTPGroup>
                       {slots.map((slot, i) => (
-                        <InputOTPSlot key={i} {...slot} index={i} className="bg-gray-800" />
+                        <InputOTPSlot key={i} index={i} className="bg-gray-800" />
                       ))}
                     </InputOTPGroup>
                   )}

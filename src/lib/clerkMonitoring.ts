@@ -7,7 +7,7 @@ import { metrics } from "./monitoring";
 
 // Track authentication attempts
 export function trackAuthAttempt(
-  authType: 'login' | 'signup' | 'verify' | 'signout',
+  authType: 'login' | 'signup' | 'verify' | 'signout' | 'token_validation',
   success: boolean,
   duration: number,
   metadata?: Record<string, any>

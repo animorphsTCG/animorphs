@@ -44,11 +44,8 @@ const ClerkLoginForm = () => {
       const result = await signIn.create({
         identifier: emailAddress,
         password,
-        // Add OIDC parameters
-        authFlow: {
-          strategy: "oauth",
-          redirectUrl: window.location.origin + "/profile",
-        }
+        // Removing the unsupported authFlow property
+        // We'll handle redirects separately
       });
 
       if (result.status === "complete") {

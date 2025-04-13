@@ -146,7 +146,7 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
     return Promise.resolve();
   };
   
-  // New: Token validation function that would check with Clerk's token introspection endpoint
+  // Token validation function that would check with Clerk's token introspection endpoint
   const validateToken = async (): Promise<boolean> => {
     if (!sessionId) return false;
     
@@ -160,10 +160,12 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
       // Simulate successful validation
       const valid = !!sessionId;
       
+      // Now using the updated function signature
       trackAuthAttempt('token_validation', valid, performance.now() - startTime, { userId });
       return valid;
     } catch (error) {
       console.error("Token validation error:", error);
+      // Now using the updated function signature
       trackAuthAttempt('token_validation', false, performance.now() - startTime, { userId, error });
       return false;
     }

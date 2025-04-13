@@ -30,9 +30,7 @@ const Hero = () => {
               </Button>
             </Link>
             <Link to="/card-gallery">
-              <Button className="fantasy-button-secondary text-lg px-8 py-6">
-                View Battle Cards
-              </Button>
+              <Button className="fantasy-button-secondary text-lg px-8 py-6">Animorph Cards</Button>
             </Link>
           </div>
         </div>

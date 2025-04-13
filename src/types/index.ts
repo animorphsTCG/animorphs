@@ -46,6 +46,13 @@ export interface UserProfile {
   role?: string;
   country?: string;
   bio?: string;
+  // Add the missing properties
+  name?: string;
+  surname?: string;
+  email?: string;
+  date_of_birth?: string;
+  gender?: string;
+  has_paid?: boolean;
 }
 
 // Import types from index.d.ts file (without using "export *")

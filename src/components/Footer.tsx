@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Link } from "react-router-dom";
 const Footer = () => {
@@ -51,7 +52,11 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-bold mb-4">Support</h3>
             <ul className="space-y-2">
-              
+              <li>
+                <Link to="/terms-and-conditions" className="text-gray-400 hover:text-fantasy-accent">
+                  Terms & Conditions
+                </Link>
+              </li>
               <li>
                 <Link to="#" className="text-gray-400 hover:text-fantasy-accent">Rules</Link>
               </li>

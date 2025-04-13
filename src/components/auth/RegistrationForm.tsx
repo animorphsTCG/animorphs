@@ -11,10 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileText, HelpCircle } from 'lucide-react';
 import { countries } from '@/lib/countries';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import TermsAndConditionsDialog from '@/components/TermsAndConditionsDialog';
 
 const registrationSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -28,7 +35,7 @@ const registrationSchema = z.object({
       return age - 1 >= 18;
     }
     return age >= 18;
-  }, { message: "You must be at least 18 years old" }),
+  }, { message: "You must be at least 18 years old to register" }),
   gender: z.enum(['Male', 'Female', 'Other', 'Prefer not to say']),
   country: z.string().min(1, { message: "Please select your country" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -48,6 +55,7 @@ export const RegistrationForm = () => {
   const { signUp } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
 
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(registrationSchema),
@@ -132,7 +140,19 @@ export const RegistrationForm = () => {
               name="dateOfBirth"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date of Birth (yyyy/mm/dd)</FormLabel>
+                  <div className="flex items-center gap-2">
+                    <FormLabel>Date of Birth</FormLabel>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="w-[200px] text-xs">You must be at least 18 years old to register for an account with full features.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
@@ -242,8 +262,19 @@ export const RegistrationForm = () => {
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      I accept the <Link to="/terms-and-conditions" className="text-blue-600 hover:underline">terms and conditions</Link>
+                    <FormLabel className="flex items-center gap-1">
+                      I accept the 
+                      <Button 
+                        type="button" 
+                        variant="link" 
+                        className="h-auto p-0 text-fantasy-accent"
+                        onClick={() => setShowTermsDialog(true)}
+                      >
+                        <span className="flex items-center">
+                          terms and conditions
+                          <FileText className="ml-1 h-3 w-3" />
+                        </span>
+                      </Button>
                     </FormLabel>
                     <FormMessage />
                   </div>
@@ -253,7 +284,7 @@ export const RegistrationForm = () => {
             
             <Button 
               type="submit" 
-              className="w-full" 
+              className="w-full fantasy-button" 
               disabled={isSubmitting}
             >
               {isSubmitting ? (
@@ -269,13 +300,22 @@ export const RegistrationForm = () => {
             <div className="text-center mt-4">
               <p>
                 Already have an account?{" "}
-                <Link to="/login" className="text-blue-600 hover:underline">
+                <Link to="/login" className="text-fantasy-accent hover:underline">
                   Log in
                 </Link>
               </p>
             </div>
           </form>
         </Form>
+        
+        <TermsAndConditionsDialog 
+          open={showTermsDialog} 
+          onOpenChange={setShowTermsDialog} 
+          onAgree={() => {
+            form.setValue('termsAccepted', true);
+            setShowTermsDialog(false);
+          }} 
+        />
       </CardContent>
     </Card>
   );

@@ -34,5 +34,21 @@ export interface PaymentStatus {
   id?: string;
 }
 
-// Re-export types from other files to maintain compatibility
-export * from './index.d.ts';
+// Define UserProfile type needed by other components
+export interface UserProfile {
+  id: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
+  website?: string;
+  created_at?: string;
+  updated_at?: string;
+  role?: string;
+  country?: string;
+  bio?: string;
+}
+
+// Import types from index.d.ts file (without using "export *")
+import type * as Types from './index.d.ts';
+// Re-export specific types from index.d.ts
+export type { Types as TypeDefinitions };

@@ -1,6 +1,9 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { FileText } from "lucide-react";
+
 const Hero = () => {
   return <section className="min-h-[600px] flex items-center justify-center relative overflow-hidden py-20">
       <div className="absolute inset-0 z-0">
@@ -21,7 +24,12 @@ const Hero = () => {
           </h1>
           <p className="text-xl md:text-2xl mb-8 text-gray-200">Transforming play into purpose by investing in a brighter future for everyone!</p>
           
-          
+          <div className="mb-8">
+            <Link to="/terms-and-conditions" className="text-fantasy-accent hover:underline inline-flex items-center">
+              <FileText className="mr-2 h-4 w-4" />
+              Read our Terms and Conditions
+            </Link>
+          </div>
           
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link to="/register">

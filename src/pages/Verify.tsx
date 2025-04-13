@@ -11,6 +11,7 @@ import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { trackAuthAttempt } from "@/lib/clerkMonitoring";
 import { logAuthEvent } from "@/utils/clerkAuth";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { validateOTPCode, formatVerificationCode, getOTPErrorMessage } from "@/utils/otpUtils";
 
 const Verify = () => {
   const [verificationCode, setVerificationCode] = useState("");
@@ -58,7 +59,10 @@ const Verify = () => {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verificationCode || verificationCode.length < 6) {
+    
+    // Format and validate the verification code
+    const formattedCode = formatVerificationCode(verificationCode);
+    if (!validateOTPCode(formattedCode)) {
       setErrorMessage("Please enter the complete 6-digit verification code from your email");
       return;
     }
@@ -70,13 +74,13 @@ const Verify = () => {
 
     try {
       if (verifyingSignUp && signUp) {
-        console.log("Attempting email verification for signup", { email, retries, code: verificationCode });
+        console.log("Attempting email verification for signup", { email, retries, code: formattedCode });
         
         // Make sure we have the latest verification attempt
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
         
         const completeSignUp = await signUp.attemptEmailAddressVerification({
-          code: verificationCode.trim(),
+          code: formattedCode,
         });
 
         console.log("Verification result:", completeSignUp);
@@ -102,11 +106,11 @@ const Verify = () => {
           throw new Error(`Verification incomplete. Status: ${completeSignUp.status}`);
         }
       } else if (signIn) {
-        console.log("Attempting email verification for signin", { email, code: verificationCode });
+        console.log("Attempting email verification for signin", { email, code: formattedCode });
         
         const completeSignIn = await signIn.attemptFirstFactor({
           strategy: "email_code",
-          code: verificationCode.trim(),
+          code: formattedCode,
         });
 
         console.log("Sign-in verification result:", completeSignIn);
@@ -136,18 +140,11 @@ const Verify = () => {
         error: err.message || "Unknown error"
       });
       
-      // Provide more user-friendly error messages
-      let friendlyErrorMessage = "Verification failed. Please check your code and try again.";
-      if (err.message?.includes("expired")) {
-        friendlyErrorMessage = "Verification code has expired. Please request a new code.";
-      } else if (err.message?.includes("invalid") || err.message?.includes("incorrect")) {
-        friendlyErrorMessage = "Invalid verification code. Please check and try again.";
-      }
+      setErrorMessage(getOTPErrorMessage(err.message || ""));
       
-      setErrorMessage(friendlyErrorMessage);
       toast({
         title: "Verification failed",
-        description: friendlyErrorMessage,
+        description: getOTPErrorMessage(err.message || ""),
         variant: "destructive",
       });
     } finally {
@@ -176,7 +173,7 @@ const Verify = () => {
         // Using the correct property name based on Clerk's API
         const newSignIn = await signIn.create({
           strategy: "email_code",
-          emailAddress: email
+          identifier: email // Changed from emailAddress to identifier
         });
         
         if (newSignIn) {

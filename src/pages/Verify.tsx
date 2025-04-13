@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useSignUp, useSignIn } from "@clerk/clerk-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -171,17 +172,20 @@ const Verify = () => {
           description: "Please check your email for a new verification code",
         });
       } else if (signIn) {
-        // For sign-in flow, we need to prepare first factor
-        await signIn.prepareFirstFactor({
+        // For sign-in flow, we need to recreate the sign-in and prepare again
+        // Using the correct property name based on Clerk's API
+        const newSignIn = await signIn.create({
           strategy: "email_code",
-          identifier: email
+          emailAddress: email
         });
         
-        logAuthEvent('resend_verification', { email });
-        toast({
-          title: "Code resent",
-          description: "Please check your email for a new verification code",
-        });
+        if (newSignIn) {
+          logAuthEvent('resend_verification', { email });
+          toast({
+            title: "Code resent",
+            description: "Please check your email for a new verification code",
+          });
+        }
       }
     } catch (err: any) {
       console.error("Error resending code:", err);

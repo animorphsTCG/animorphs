@@ -21,21 +21,6 @@ export function trackAuthAttempt(
   });
 }
 
-// Track token validation and health
-export function trackTokenValidation(
-  success: boolean,
-  duration: number,
-  metadata?: Record<string, any>
-) {
-  metrics.record({
-    timestamp: Date.now(),
-    duration,
-    operation: 'token_validation',
-    success,
-    metadata
-  });
-}
-
 // Get authentication-specific metrics
 export function getAuthMetrics() {
   const summary = metrics.getSummary();

@@ -8,7 +8,6 @@ import "./index.css";
 import { logAuthEvent } from "./utils/clerkAuth";
 
 // Use the provided publishable key from Clerk
-// Replace the test key with the production key
 const CLERK_PUBLISHABLE_KEY = "pk_live_Z2xhZC10aXRtb3VzZS0zMi5jbGVyay5hY2NvdW50cy5kZXYk";
 
 if (!CLERK_PUBLISHABLE_KEY) {

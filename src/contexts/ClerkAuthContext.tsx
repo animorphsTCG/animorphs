@@ -101,14 +101,14 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Create or update profile in Supabase
+  // Create or update profile in Supabase - modified to handle Clerk IDs
   const ensureProfileExists = async (userId: string, userData: any) => {
     try {
-      // Check if profile exists
+      // Check if profile exists - using username match instead of ID to avoid UUID format issues
       const { data: profile, error: checkError } = await supabase
         .from('profiles')
-        .select('id')
-        .eq('username', userData.username || userData.id)
+        .select('id, username')
+        .eq('username', userData.username || userId)
         .maybeSingle();
         
       if (checkError) {
@@ -118,14 +118,20 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
         
       if (!profile) {
         // Create a profile if it doesn't exist
+        // Converting Clerk UUID format to something Supabase will accept
+        // by creating a new UUID for Supabase while maintaining a mapping
+        const supabaseUuid = crypto.randomUUID();
+        
         const { error: insertError } = await supabase
           .from('profiles')
           .insert({
-            id: userId,
-            username: userData.username || userData.id,
+            id: supabaseUuid,
+            username: userData.username || userId, // Store clerk ID in username for lookup
             name: userData.firstName || "User",
             surname: userData.lastName || "",
-            age: 18
+            age: 18,
+            // Store the original Clerk ID as part of the metadata
+            clerk_id: userId
           });
           
         if (insertError) {
@@ -133,6 +139,18 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
           throw insertError;
         } else {
           console.log("Created profile for user", userData.id);
+          
+          // Also create payment status entry
+          const { error: paymentError } = await supabase
+            .from('payment_status')
+            .insert({
+              id: supabaseUuid,
+              has_paid: false
+            });
+            
+          if (paymentError) {
+            console.error("Error creating payment status:", paymentError);
+          }
         }
       }
     } catch (err) {
@@ -160,12 +178,10 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
       // Simulate successful validation
       const valid = !!sessionId;
       
-      // Now using the updated function signature
       trackAuthAttempt('token_validation', valid, performance.now() - startTime, { userId });
       return valid;
     } catch (error) {
       console.error("Token validation error:", error);
-      // Now using the updated function signature
       trackAuthAttempt('token_validation', false, performance.now() - startTime, { userId, error });
       return false;
     }

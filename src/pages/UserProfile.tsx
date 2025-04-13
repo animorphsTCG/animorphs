@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/ClerkAuthContext";
@@ -69,27 +68,18 @@ const UserProfile = () => {
           return;
         }
         
-        // Try to fetch the profile
-        let query;
-        if (isOwnProfile && user) {
-          // First try by username
-          query = supabase
-            .from('profiles')
-            .select('*')
-            .eq('username', user.username || user.id)
-            .maybeSingle();
-        } else if (username) {
-          // Try to fetch by username
-          query = supabase
-            .from('profiles')
-            .select('*')
-            .eq('username', username)
-            .maybeSingle();
-        } else {
+        const lookupUsername = isOwnProfile ? (user?.username || user?.id) : username;
+        
+        if (!lookupUsername) {
           throw new Error("No username provided");
         }
-
-        const { data: profile, error: profileError } = await query;
+        
+        // Try to fetch the profile by username (which contains the Clerk ID)
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('username', lookupUsername)
+          .maybeSingle();
         
         if (profileError) {
           console.error("Error fetching profile:", profileError);
@@ -98,66 +88,26 @@ const UserProfile = () => {
           return;
         }
 
-        if (!profile && isOwnProfile && user) {
-          // Create a new profile for the current user if one doesn't exist
-          console.log("Profile not found, creating one");
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              username: user.username || user.id,
-              name: user.firstName || "User",
-              surname: user.lastName || "",
-              age: 18
-            });
-              
-          if (insertError) {
-            console.error("Error creating profile:", insertError);
-            setError("Could not create user profile");
-            setIsLoading(false);
-            return;
-          }
-          
-          // Try fetching the profile again
-          const { data: newProfile, error: newProfileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('username', user.username || user.id)
-            .maybeSingle();
-            
-          if (newProfileError || !newProfile) {
-            setError("Could not load newly created profile");
-            setIsLoading(false);
-            return;
-          }
-          
-          setProfileData(newProfile);
-          setFormData({
-            bio: newProfile.bio || "",
-            playing_times: newProfile.playing_times || "",
-            country: newProfile.country || "",
-            profile_image_url: newProfile.profile_image_url || ""
-          });
-        } else if (profile) {
-          setProfileData(profile);
-          setFormData({
-            bio: profile.bio || "",
-            playing_times: profile.playing_times || "",
-            country: profile.country || "",
-            profile_image_url: profile.profile_image_url || ""
-          });
-        } else {
-          setError("User profile not found");
+        if (!profile) {
+          setError("User profile not found. Please sign out and sign back in to create a profile.");
           setIsLoading(false);
           return;
         }
+        
+        setProfileData(profile);
+        setFormData({
+          bio: profile.bio || "",
+          playing_times: profile.playing_times || "",
+          country: profile.country || "",
+          profile_image_url: profile.profile_image_url || ""
+        });
 
         // Fetch payment status if viewing own profile
-        if (isOwnProfile && user) {
+        if (isOwnProfile && profile) {
           const { data: paymentData, error: paymentError } = await supabase
             .from('payment_status')
             .select('has_paid, payment_date, payment_method')
-            .eq('id', user.id)
+            .eq('id', profile.id)
             .maybeSingle();
 
           if (!paymentError && paymentData) {

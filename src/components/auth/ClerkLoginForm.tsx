@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSignIn } from "@clerk/clerk-react";
@@ -45,7 +44,6 @@ const ClerkLoginForm = () => {
         identifier: emailAddress,
         password,
         // Removing the unsupported authFlow property
-        // We'll handle redirects separately
       });
 
       if (result.status === "complete") {

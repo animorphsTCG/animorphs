@@ -13,13 +13,7 @@ export const supabase = createClient<Database>(
   SUPABASE_URL, 
   SUPABASE_PUBLISHABLE_KEY,
   {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-      storageKey: 'animorphs_auth_token',
-      storage: localStorage,
-      flowType: 'implicit'
-    }
+    // Removed auth configuration to avoid conflicts with Clerk
+    // We only want to use Supabase for database operations, not auth
   }
 );

@@ -4,17 +4,31 @@ import { PaymentStatus } from "@/types";
 
 /**
  * Check if a user has paid for the full access
- * @param userId The user ID to check
+ * Uses the username (which stores the Clerk ID) to find the right user
+ * @param userId The Clerk user ID to check
  * @returns Promise resolving to boolean indicating payment status
  */
 export async function checkUserPaymentStatus(userId: string): Promise<boolean> {
   try {
     if (!userId) return false;
 
+    // First, find the profile by username (which stores the Clerk ID)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', userId)
+      .maybeSingle();
+      
+    if (profileError || !profile) {
+      console.error("Error finding profile:", profileError || "Profile not found");
+      return false;
+    }
+
+    // Then use the Supabase UUID to check payment status
     const { data, error } = await supabase
       .from('payment_status')
       .select('has_paid')
-      .eq('id', userId)
+      .eq('id', profile.id)
       .single();
       
     if (error) {
@@ -31,7 +45,8 @@ export async function checkUserPaymentStatus(userId: string): Promise<boolean> {
 
 /**
  * Update the payment status for a user
- * @param userId The user ID to update
+ * Uses the username (which stores the Clerk ID) to find the right user
+ * @param userId The Clerk user ID to update
  * @param paymentDetails Payment details including method, etc.
  * @returns Promise resolving to boolean indicating success
  */
@@ -45,6 +60,19 @@ export async function updateUserPaymentStatus(
   try {
     if (!userId) return false;
 
+    // First, find the profile by username (which stores the Clerk ID)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', userId)
+      .maybeSingle();
+      
+    if (profileError || !profile) {
+      console.error("Error finding profile:", profileError || "Profile not found");
+      return false;
+    }
+
+    // Then use the Supabase UUID to update payment status
     const { error } = await supabase
       .from('payment_status')
       .update({
@@ -54,7 +82,7 @@ export async function updateUserPaymentStatus(
         transaction_id: paymentDetails.transactionId || null,
         updated_at: new Date().toISOString()
       })
-      .eq('id', userId);
+      .eq('id', profile.id);
       
     if (error) {
       console.error("Error updating payment status:", error);
@@ -70,17 +98,31 @@ export async function updateUserPaymentStatus(
 
 /**
  * Get complete payment status information for a user
- * @param userId The user ID to check
+ * Uses the username (which stores the Clerk ID) to find the right user
+ * @param userId The Clerk user ID to check
  * @returns Promise resolving to PaymentStatus object or null
  */
 export async function getUserPaymentInfo(userId: string): Promise<PaymentStatus | null> {
   try {
     if (!userId) return null;
 
+    // First, find the profile by username (which stores the Clerk ID)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', userId)
+      .maybeSingle();
+      
+    if (profileError || !profile) {
+      console.error("Error finding profile:", profileError || "Profile not found");
+      return null;
+    }
+
+    // Then use the Supabase UUID to get payment info
     const { data, error } = await supabase
       .from('payment_status')
       .select('*')
-      .eq('id', userId)
+      .eq('id', profile.id)
       .single();
       
     if (error) {

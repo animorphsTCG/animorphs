@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Check, CreditCard, Lock } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/ClerkAuthContext";
 
 interface PaymentSectionProps {
   paymentStatus: {
@@ -122,11 +123,29 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   userId 
 }) => {
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const { user } = useAuth();
   
   // Process successful payment
   const handlePaymentSuccess = async (paymentDetails: any) => {
     try {
-      // Update the payment status in the database
+      // First, find the profile by username (which contains the Clerk ID)
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', user?.id || userId)
+        .maybeSingle();
+        
+      if (profileError || !profile) {
+        console.error("Error finding profile:", profileError || "Profile not found");
+        toast({
+          variant: "destructive",
+          title: "Payment confirmation failed",
+          description: "Your payment was processed, but we couldn't update your account. Please contact support."
+        });
+        return;
+      }
+      
+      // Update the payment status in the database using the Supabase UUID
       const { error } = await supabase
         .from('payment_status')
         .update({
@@ -135,7 +154,7 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
           payment_method: paymentDetails.payment_method || 'PayPal',
           transaction_id: paymentDetails.id
         })
-        .eq('id', userId);
+        .eq('id', profile.id);
         
       if (error) {
         console.error("Error updating payment status:", error);

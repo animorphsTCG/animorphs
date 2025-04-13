@@ -22,6 +22,7 @@ import NotFound from "./pages/NotFound";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ClerkAuthProvider } from "./contexts/ClerkAuthContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,11 +68,13 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <AppContent />
-      </AuthProvider>
+      <ClerkAuthProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <AppContent />
+        </AuthProvider>
+      </ClerkAuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

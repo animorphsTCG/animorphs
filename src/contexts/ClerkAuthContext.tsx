@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, ReactNode, useState, useEffect } from "react";
 import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +25,6 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
   
   const isLoading = !isClerkLoaded || !isUserLoaded;
 
-  // Ensure user data is synced with Supabase profiles
   useEffect(() => {
     const syncUserProfile = async () => {
       if (user && isClerkLoaded && isUserLoaded) {
@@ -51,9 +49,7 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, isClerkLoaded, isUserLoaded, userId]);
 
-  // Redirect functionality with error handling
   useEffect(() => {
-    // If user is logged in and not on the profile page, redirect them there
     if (user && !redirected && !window.location.pathname.startsWith('/profile')) {
       const requiresPaymentPages = [
         '/1v1-battle',
@@ -62,22 +58,18 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
         '/4-player-user-lobby'
       ];
 
-      // Only redirect if not trying to access payment-protected routes
-      // Those routes have their own redirect logic in PaidAccessRoute component
       if (!requiresPaymentPages.some(page => window.location.pathname.startsWith(page))) {
         try {
           setRedirected(true);
           navigate('/profile');
         } catch (err) {
           console.error("Navigation error:", err);
-          // Fallback if navigate fails
           window.location.href = '/profile';
         }
       }
     }
   }, [user, redirected, navigate]);
 
-  // Enhanced sign-out with better error handling
   const handleSignOut = async () => {
     const startTime = performance.now();
     try {
@@ -92,7 +84,6 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
         description: "Unable to sign out properly. Please try again.",
         variant: "destructive",
       });
-      // Fallback if sign out fails
       try {
         window.location.href = '/';
       } catch (err) {
@@ -101,10 +92,8 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Create or update profile in Supabase - modified to handle Clerk IDs
   const ensureProfileExists = async (userId: string, userData: any) => {
     try {
-      // Check if profile exists - using username match instead of ID to avoid UUID format issues
       const { data: profile, error: checkError } = await supabase
         .from('profiles')
         .select('id, username')
@@ -117,20 +106,16 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
       }
         
       if (!profile) {
-        // Create a profile if it doesn't exist
-        // Converting Clerk UUID format to something Supabase will accept
-        // by creating a new UUID for Supabase while maintaining a mapping
         const supabaseUuid = crypto.randomUUID();
         
         const { error: insertError } = await supabase
           .from('profiles')
           .insert({
             id: supabaseUuid,
-            username: userData.username || userId, // Store clerk ID in username for lookup
+            username: userData.username || userId,
             name: userData.firstName || "User",
             surname: userData.lastName || "",
             age: 18,
-            // Store the original Clerk ID as part of the metadata
             clerk_id: userId
           });
           
@@ -140,7 +125,6 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           console.log("Created profile for user", userData.id);
           
-          // Also create payment status entry
           const { error: paymentError } = await supabase
             .from('payment_status')
             .insert({
@@ -160,22 +144,17 @@ export const ClerkAuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const refreshUser = async () => {
-    // Clerk automatically manages user data refreshing
     return Promise.resolve();
   };
-  
-  // Token validation function that would check with Clerk's token introspection endpoint
+
   const validateToken = async (): Promise<boolean> => {
     if (!sessionId) return false;
     
     const startTime = performance.now();
     try {
-      // In a real implementation, you would make an actual call to the token introspection endpoint
-      // This is simulated here since we can't make actual calls to the Clerk API from frontend code
       console.log("Would validate token using introspection endpoint: https://glad-titmouse-32.clerk.accounts.dev/oauth/token_info");
       console.log("Would use sessionId:", sessionId);
       
-      // Simulate successful validation
       const valid = !!sessionId;
       
       trackAuthAttempt('token_validation', valid, performance.now() - startTime, { userId });

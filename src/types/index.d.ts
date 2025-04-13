@@ -34,4 +34,3 @@ export interface VipCode {
 }
 
 // Define any other types that might be needed
-

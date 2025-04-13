@@ -1,22 +1,18 @@
-
 import React from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
 export interface TermsAndConditionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAgree?: () => void;
 }
-
 const TermsAndConditionsDialog = ({
   open,
   onOpenChange,
   onAgree
 }: TermsAndConditionsDialogProps) => {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  return <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>Terms and Conditions</DialogTitle>
@@ -78,34 +74,25 @@ const TermsAndConditionsDialog = ({
             </p>
             
             <h3 className="font-bold">9. Contact Us</h3>
-            <p>
-              If you have any questions about these Terms, please contact us at support@animorphs-battle.com.
-            </p>
+            <p className="">If you have any questions about these Terms, please contact us at mythicmastersp2e@gmail.com</p>
           </div>
         </ScrollArea>
         
         <DialogFooter className="flex flex-col sm:flex-row sm:justify-between space-y-4 sm:space-y-0 sm:space-x-4">
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button 
-            onClick={() => {
-              if (onAgree) {
-                onAgree();
-              } else {
-                onOpenChange(false);
-              }
-            }}
-          >
+          <Button onClick={() => {
+          if (onAgree) {
+            onAgree();
+          } else {
+            onOpenChange(false);
+          }
+        }}>
             I Agree
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 };
-
 export default TermsAndConditionsDialog;

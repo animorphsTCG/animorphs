@@ -218,8 +218,8 @@ const Verify = () => {
                   disabled={isLoading}
                   render={({ slots }) => (
                     <InputOTPGroup>
-                      {slots.map((slot, index) => (
-                        <InputOTPSlot key={index} {...slot} className="bg-gray-800" />
+                      {slots.map((slot, i) => (
+                        <InputOTPSlot key={i} {...slot} index={i} className="bg-gray-800" />
                       ))}
                     </InputOTPGroup>
                   )}

@@ -5,8 +5,10 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import TermsAndConditionsDialog from "@/components/TermsAndConditionsDialog";
 
 const ClerkRegistrationForm = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -18,11 +20,26 @@ const ClerkRegistrationForm = () => {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
   const navigate = useNavigate();
+
+  const isFormValid = () => {
+    return emailAddress && username && password && firstName && lastName && agreedToTerms;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoaded) return;
+
+    if (!agreedToTerms) {
+      toast({
+        title: "Terms and Conditions Required",
+        description: "You must agree to the Terms and Conditions to register.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -33,6 +50,11 @@ const ClerkRegistrationForm = () => {
         password,
         firstName,
         lastName,
+        // Include terms acceptance metadata
+        unsafeMetadata: {
+          termsAccepted: true,
+          termsAcceptedAt: new Date().toISOString(),
+        }
       });
 
       // Send email verification code
@@ -162,10 +184,38 @@ const ClerkRegistrationForm = () => {
               className="bg-gray-800"
             />
           </div>
+          
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox 
+              id="terms" 
+              checked={agreedToTerms}
+              onCheckedChange={(checked) => {
+                setAgreedToTerms(checked === true);
+              }}
+              disabled={isLoading}
+            />
+            <Label 
+              htmlFor="terms" 
+              className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              I agree to the{" "}
+              <button
+                type="button"
+                className="text-fantasy-accent hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowTermsDialog(true);
+                }}
+              >
+                Terms and Conditions
+              </button>
+            </Label>
+          </div>
+          
           <Button 
             type="submit" 
-            className="w-full fantasy-button" 
-            disabled={isLoading}
+            className="w-full fantasy-button mt-2" 
+            disabled={isLoading || !isFormValid()}
           >
             {isLoading ? (
               <>
@@ -175,6 +225,15 @@ const ClerkRegistrationForm = () => {
               "Register"
             )}
           </Button>
+          
+          <TermsAndConditionsDialog
+            open={showTermsDialog}
+            onOpenChange={setShowTermsDialog}
+            onAgree={() => {
+              setAgreedToTerms(true);
+              setShowTermsDialog(false);
+            }}
+          />
         </form>
       ) : (
         <form onSubmit={handleVerify} className="space-y-4">

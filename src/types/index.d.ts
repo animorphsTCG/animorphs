@@ -12,4 +12,26 @@ export interface PaymentStatus {
   id?: string;
 }
 
+export interface AnimorphCard {
+  id: number;
+  name: string;
+  type: string;
+  power: number;
+  health: number;
+  attack: number;
+  sats: number;
+  size: number;
+  image_url: string | null;
+  created_at: string;
+}
+
+export interface VipCode {
+  id: number;
+  code: string;
+  max_uses: number;
+  current_uses: number;
+  created_at: string;
+}
+
 // Define any other types that might be needed
+

@@ -1,4 +1,3 @@
-
 // Export all necessary types for the application
 
 export interface AnimorphCard {
@@ -46,13 +45,15 @@ export interface UserProfile {
   role?: string;
   country?: string;
   bio?: string;
-  // Add the missing properties
+  // Add the missing properties from previous updates
   name?: string;
   surname?: string;
   email?: string;
   date_of_birth?: string;
   gender?: string;
   has_paid?: boolean;
+  // Add the age property
+  age?: number;  // Make it optional with '?'
 }
 
 // Import types from index.d.ts file (without using "export *")

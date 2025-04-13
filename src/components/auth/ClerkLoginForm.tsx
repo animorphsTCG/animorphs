@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSignIn } from "@clerk/clerk-react";
@@ -60,7 +59,7 @@ const ClerkLoginForm = () => {
           });
         } else if (result.status === "needs_identifier") {
           setError("Please enter your email address");
-        } else if (result.status === "needs_password") {
+        } else if (result.status === "needs_first_factor") {
           setError("Please enter your password");
         } else {
           setError("Please complete additional steps to login");

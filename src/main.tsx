@@ -16,10 +16,7 @@ if (!CLERK_PUBLISHABLE_KEY) {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ClerkProvider 
-      publishableKey={CLERK_PUBLISHABLE_KEY}
-      navigate={(to) => window.location.href = to}
-    >
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
       <BrowserRouter>
         <App />
       </BrowserRouter>

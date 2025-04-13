@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useSignUp, useSignIn } from "@clerk/clerk-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,12 +23,10 @@ const Verify = () => {
   const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
   const { signIn, isLoaded: isSignInLoaded } = useSignIn();
 
-  // Get the email from URL state if available (passed from registration page)
   const email = location.state?.email || "";
   const verifyingSignUp = location.state?.verifyingSignUp || true;
 
   useEffect(() => {
-    // If no sign up attempt is in progress and no state was passed
     if (!email) {
       toast({
         title: "No verification in progress",
@@ -43,7 +40,6 @@ const Verify = () => {
     logAuthEvent('verify_page_loaded', { email, verifyingSignUp });
   }, [navigate, email, verifyingSignUp]);
 
-  // Handle resend cooldown timer
   useEffect(() => {
     let interval: number | undefined;
     if (resendCountdown > 0) {
@@ -75,7 +71,6 @@ const Verify = () => {
       if (verifyingSignUp && signUp) {
         console.log("Attempting email verification for signup", { email, retries });
         
-        // Complete the sign-up process with the verification code
         const completeSignUp = await signUp.attemptEmailAddressVerification({
           code: verificationCode,
         });
@@ -90,10 +85,8 @@ const Verify = () => {
             description: "Your account has been created successfully.",
           });
           
-          // User is now verified and session should be created automatically
           if (completeSignUp.createdSessionId) {
             console.log("Session created, redirecting to profile");
-            // We don't need to explicitly set the session as Clerk handles this internally
             setTimeout(() => {
               navigate("/profile");
             }, 500);
@@ -107,7 +100,6 @@ const Verify = () => {
       } else if (signIn) {
         console.log("Attempting email verification for signin", { email });
         
-        // Handle sign-in verification if ever needed
         const completeSignIn = await signIn.attemptFirstFactor({
           strategy: "email_code",
           code: verificationCode,
@@ -130,7 +122,6 @@ const Verify = () => {
     } catch (err: any) {
       console.error("Verification error:", err);
       
-      // Increment retry counter
       setRetries(prev => prev + 1);
       
       trackAuthAttempt('verify', false, performance.now() - startTime, { 
@@ -154,7 +145,7 @@ const Verify = () => {
     if (resendDisabled) return;
     
     setResendDisabled(true);
-    setResendCountdown(60); // 60 second cooldown
+    setResendCountdown(60);
     
     try {
       if (verifyingSignUp && signUp) {
@@ -209,7 +200,6 @@ const Verify = () => {
                 Verification Code
               </label>
               
-              {/* OTP Input for better UX */}
               <div className="flex justify-center mb-4">
                 <InputOTP
                   maxLength={6}
@@ -218,7 +208,7 @@ const Verify = () => {
                   disabled={isLoading}
                   render={({ slots }) => (
                     <InputOTPGroup>
-                      {slots.map((slot, i) => (
+                      {slots && slots.map((slot, i) => (
                         <InputOTPSlot key={i} {...slot} index={i} className="bg-gray-800" />
                       ))}
                     </InputOTPGroup>
@@ -226,7 +216,6 @@ const Verify = () => {
                 />
               </div>
               
-              {/* Fallback regular input */}
               <Input
                 id="verificationCode"
                 type="text"

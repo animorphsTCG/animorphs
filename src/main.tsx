@@ -7,7 +7,8 @@ import App from "./App";
 import "./index.css";
 
 // Use the provided publishable key from Clerk
-const CLERK_PUBLISHABLE_KEY = "pk_test_Z2xhZC10aXRtb3VzZS0zMi5jbGVyay5hY2NvdW50cy5kZXYk";
+// Replace the test key with the production key
+const CLERK_PUBLISHABLE_KEY = "pk_live_Z2xhZC10aXRtb3VzZS0zMi5jbGVyay5hY2NvdW50cy5kZXYk";
 
 if (!CLERK_PUBLISHABLE_KEY) {
   throw new Error("Missing Clerk Publishable Key");
@@ -15,7 +16,10 @@ if (!CLERK_PUBLISHABLE_KEY) {
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    <ClerkProvider 
+      publishableKey={CLERK_PUBLISHABLE_KEY}
+      navigate={(to) => window.location.href = to}
+    >
       <BrowserRouter>
         <App />
       </BrowserRouter>

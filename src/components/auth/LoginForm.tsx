@@ -38,15 +38,6 @@ export const LoginForm = () => {
     setError(null);
 
     try {
-      // Check if the user exists first
-      const { data: userExists, error: checkError } = await supabase.auth.admin
-        .getUserByEmail(data.email)
-        .catch(() => ({ data: null, error: null }));
-
-      if (checkError) {
-        console.log("Error checking user:", checkError);
-      }
-
       console.log("Attempting to sign in with:", data.email);
       await signIn(data.email, data.password);
     } catch (err: any) {

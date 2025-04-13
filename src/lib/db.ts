@@ -1,4 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
+
+import { supabase } from "@/lib/supabase";
 import { AnimorphCard, VipCode } from "@/types";
 
 // Cache implementation with improved memory management

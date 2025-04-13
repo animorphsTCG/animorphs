@@ -2,7 +2,7 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect } from "react";
 import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { trackAuthAttempt } from "@/lib/clerkMonitoring";
 

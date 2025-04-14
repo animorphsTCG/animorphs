@@ -21,7 +21,7 @@ const BattleChat: React.FC<BattleChatProps> = ({
   disabled = false,
   disabledMessage = "Chat is disabled during this phase."
 }) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "system-1",
@@ -32,9 +32,20 @@ const BattleChat: React.FC<BattleChatProps> = ({
   ]);
   const [newMessage, setNewMessage] = useState("");
   
-  // Get username safely from user object
+  // Get username safely from user object or userProfile
   const getUsername = () => {
-    return user?.username || user?.email?.split('@')[0] || 'Guest';
+    // First check if there's a username in the userProfile
+    if (userProfile?.username) {
+      return userProfile.username;
+    }
+    
+    // Fallback to email if available, extract username part
+    if (user?.email) {
+      return user.email.split('@')[0];
+    }
+    
+    // Last resort
+    return 'Guest';
   };
   
   const handleSendMessage = () => {

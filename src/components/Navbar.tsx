@@ -15,7 +15,7 @@ import {
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, signOut, isLoading } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
 
   const toggleMenu = () => {
@@ -52,7 +52,7 @@ const Navbar = () => {
               </Link>
             )}
             
-            {!isLoading && (
+            {!loading && (
               <>
                 {user ? (
                   <DropdownMenu>
@@ -129,7 +129,7 @@ const Navbar = () => {
               </>
             )}
             
-            {!user && !isLoading && (
+            {!user && !loading && (
               <div className="flex flex-col space-y-2">
                 <Link to="/register" className="w-full">
                   <Button className="fantasy-button w-full">

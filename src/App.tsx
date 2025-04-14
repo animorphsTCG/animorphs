@@ -18,11 +18,11 @@ import PaymentCancelled from "./pages/PaymentCancelled";
 import Battle from "./pages/Battle";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import OneVOneBattle from "./pages/OneVOneBattle";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { AuthProvider } from "./contexts/AuthContext";
-import { ClerkAuthProvider } from "./contexts/ClerkAuthContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,13 +68,11 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <ClerkAuthProvider>
-        <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <AppContent />
-        </AuthProvider>
-      </ClerkAuthProvider>
+      <AuthProvider>
+        <Toaster />
+        <Sonner />
+        <AppContent />
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

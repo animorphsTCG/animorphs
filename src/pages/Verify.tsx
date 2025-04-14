@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from "react";
-import { useSignUp, useSignIn } from "@clerk/clerk-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,25 +7,20 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
-import { trackAuthAttempt } from "@/lib/clerkMonitoring";
-import { logAuthEvent } from "@/utils/clerkAuth";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { validateOTPCode, formatVerificationCode, getOTPErrorMessage } from "@/utils/otpUtils";
+import { supabase } from "@/lib/supabase";
 
 const Verify = () => {
   const [verificationCode, setVerificationCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [retries, setRetries] = useState(0);
   const [resendDisabled, setResendDisabled] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
-  const { signUp, isLoaded: isSignUpLoaded } = useSignUp();
-  const { signIn, isLoaded: isSignInLoaded } = useSignIn();
 
   const email = location.state?.email || "";
-  const verifyingSignUp = location.state?.verifyingSignUp !== undefined ? location.state.verifyingSignUp : true;
 
   useEffect(() => {
     if (!email) {
@@ -38,9 +32,7 @@ const Verify = () => {
       navigate("/register");
       return;
     }
-    
-    logAuthEvent('verify_page_loaded', { email, verifyingSignUp });
-  }, [navigate, email, verifyingSignUp]);
+  }, [navigate, email]);
 
   useEffect(() => {
     let interval: number | undefined;
@@ -70,76 +62,26 @@ const Verify = () => {
     setIsLoading(true);
     setErrorMessage(null);
     
-    const startTime = performance.now();
-
     try {
-      if (verifyingSignUp && signUp) {
-        console.log("Attempting email verification for signup", { email, retries, code: formattedCode });
-        
-        // Make sure we have the latest verification attempt
-        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-        
-        const completeSignUp = await signUp.attemptEmailAddressVerification({
-          code: formattedCode,
-        });
-
-        console.log("Verification result:", completeSignUp);
-
-        if (completeSignUp.status === "complete") {
-          trackAuthAttempt('verify', true, performance.now() - startTime, { email });
-          
-          toast({
-            title: "Verification successful",
-            description: "Your account has been created successfully.",
-          });
-          
-          if (completeSignUp.createdSessionId) {
-            console.log("Session created, redirecting to profile");
-            setTimeout(() => {
-              navigate("/profile");
-            }, 500);
-          } else {
-            console.log("No session ID created, redirecting to login");
-            navigate("/login");
-          }
-        } else {
-          throw new Error(`Verification incomplete. Status: ${completeSignUp.status}`);
-        }
-      } else if (signIn) {
-        console.log("Attempting email verification for signin", { email, code: formattedCode });
-        
-        const completeSignIn = await signIn.attemptFirstFactor({
-          strategy: "email_code",
-          code: formattedCode,
-        });
-
-        console.log("Sign-in verification result:", completeSignIn);
-
-        if (completeSignIn.status === "complete") {
-          trackAuthAttempt('verify', true, performance.now() - startTime, { email });
-          
-          toast({
-            title: "Verification successful",
-            description: "You're now logged in.",
-          });
-          setTimeout(() => {
-            navigate("/profile");
-          }, 500);
-        } else {
-          throw new Error(`Sign-in verification incomplete. Status: ${completeSignIn.status}`);
-        }
-      }
-    } catch (err: any) {
-      console.error("Verification error:", err);
-      
-      setRetries(prev => prev + 1);
-      
-      trackAuthAttempt('verify', false, performance.now() - startTime, { 
+      // Verify OTP code with Supabase
+      const { error } = await supabase.auth.verifyOtp({ 
         email, 
-        retries,
-        error: err.message || "Unknown error"
+        token: formattedCode, 
+        type: 'email' 
+      });
+
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Verification successful",
+        description: "Your account has been verified successfully.",
       });
       
+      navigate("/profile");
+    } catch (err: any) {
+      console.error("Verification error:", err);
       setErrorMessage(getOTPErrorMessage(err.message || ""));
       
       toast({
@@ -161,29 +103,20 @@ const Verify = () => {
     setVerificationCode("");
     
     try {
-      if (verifyingSignUp && signUp) {
-        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-        logAuthEvent('resend_verification', { email });
-        toast({
-          title: "Code resent",
-          description: "Please check your email for a new verification code",
-        });
-      } else if (signIn) {
-        // For sign-in flow, we need to recreate the sign-in and prepare again
-        // Using the correct property name based on Clerk's API
-        const newSignIn = await signIn.create({
-          strategy: "email_code",
-          identifier: email // Changed from emailAddress to identifier
-        });
-        
-        if (newSignIn) {
-          logAuthEvent('resend_verification', { email });
-          toast({
-            title: "Code resent",
-            description: "Please check your email for a new verification code",
-          });
-        }
+      // Resend OTP code with Supabase
+      const { error } = await supabase.auth.resend({
+        email,
+        type: 'signup'
+      });
+      
+      if (error) {
+        throw error;
       }
+      
+      toast({
+        title: "Code resent",
+        description: "Please check your email for a new verification code",
+      });
     } catch (err: any) {
       console.error("Error resending code:", err);
       toast({
@@ -193,14 +126,6 @@ const Verify = () => {
       });
     }
   };
-
-  if (!isSignUpLoaded || !isSignInLoaded) {
-    return (
-      <div className="container flex items-center justify-center min-h-[80vh]">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="container flex items-center justify-center py-12 px-4 min-h-[80vh]">

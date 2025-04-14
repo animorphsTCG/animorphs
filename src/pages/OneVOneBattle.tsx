@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/ClerkAuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { fetchAnimorphCards } from "@/lib/db";
 import { AnimorphCard } from "@/types";
 import CardSelectionScreen from "@/components/battle/CardSelectionScreen";
@@ -20,7 +20,7 @@ const OneVOneBattle = () => {
 
   // Get username safely from user object
   const getUsername = () => {
-    return user?.username || user?.email?.split('@')[0] || 'Player';
+    return user?.email?.split('@')[0] || 'Player';
   };
 
   // Load all cards for selection

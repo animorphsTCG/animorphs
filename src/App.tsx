@@ -19,6 +19,7 @@ import Battle from "./pages/Battle";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import OneVOneBattle from "./pages/OneVOneBattle";
+import VisitorDemoBattle from "./pages/VisitorDemoBattle";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -57,6 +58,8 @@ const AppContent = () => {
           <Route path="/payment-cancelled" element={<PaymentCancelled />} />
           <Route path="/battle" element={<ProtectedRoute><Battle /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/1v1-battle" element={<ProtectedRoute><OneVOneBattle /></ProtectedRoute>} />
+          <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

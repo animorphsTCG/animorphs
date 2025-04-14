@@ -7,7 +7,7 @@ import { AnimorphCard } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { fetchCardById } from "@/lib/db";
-import { Loader2 } from "lucide-react";
+import { Loader2, Gamepad2 } from "lucide-react";
 
 const Index = () => {
   const [featuredCards, setFeaturedCards] = useState<AnimorphCard[]>([]);
@@ -82,6 +82,25 @@ const Index = () => {
               </Link>
             </div>
           )}
+        </div>
+      </section>
+      
+      {/* Demo Battle Section - New addition */}
+      <section className="py-16 bg-gradient-to-r from-fantasy-primary/30 to-fantasy-secondary/30">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-4xl font-bold mb-4 font-fantasy">
+            Try the <span className="text-fantasy-accent">Demo Battle</span>
+          </h2>
+          <p className="text-lg text-gray-300 mb-8 max-w-3xl mx-auto">
+            No registration required! Experience the excitement of Animorph battles with our free demo mode.
+            Challenge the AI and learn the game mechanics before creating your account.
+          </p>
+          <Link to="/visitor-demo-battle">
+            <Button className="bg-fantasy-accent hover:bg-fantasy-accent/80 text-black font-bold text-lg px-10 py-6">
+              <Gamepad2 className="mr-2 h-6 w-6" />
+              Start Demo Battle Now!
+            </Button>
+          </Link>
         </div>
       </section>
       

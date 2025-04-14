@@ -2,7 +2,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { FileText } from "lucide-react";
+import { FileText, Gamepad2 } from "lucide-react";
 
 const Hero = () => {
   return <section className="min-h-[600px] flex items-center justify-center relative overflow-hidden py-20">
@@ -31,7 +31,7 @@ const Hero = () => {
             </Link>
           </div>
           
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-6">
             <Link to="/register">
               <Button className="fantasy-button text-lg px-8 py-6">
                 Register Now
@@ -40,6 +40,17 @@ const Hero = () => {
             <Link to="/card-gallery">
               <Button className="fantasy-button-secondary text-lg px-8 py-6">Animorph Cards</Button>
             </Link>
+          </div>
+          
+          {/* New Demo Battle Button */}
+          <div className="mt-6">
+            <Link to="/visitor-demo-battle">
+              <Button className="bg-fantasy-accent hover:bg-fantasy-accent/80 text-black font-bold text-lg px-10 py-6 animate-pulse">
+                <Gamepad2 className="mr-2 h-6 w-6" />
+                Try Demo Battle!
+              </Button>
+            </Link>
+            <p className="text-sm text-gray-300 mt-2">No registration required</p>
           </div>
         </div>
       </div>

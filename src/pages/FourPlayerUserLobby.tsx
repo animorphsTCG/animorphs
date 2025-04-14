@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import CardDisplay from "@/components/CardDisplay";
-import { useAuth } from "@/contexts/ClerkAuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { AnimorphCard } from "@/types";
 import { fetchAnimorphCards } from "@/lib/db";

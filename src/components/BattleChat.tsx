@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAuth } from "@/contexts/ClerkAuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Message {
   id: string;

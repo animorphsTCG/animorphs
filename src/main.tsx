@@ -9,12 +9,11 @@ import "./index.css";
 // Log initialization
 console.log("Initializing app");
 
-// Clerk publishable key
-// This should be stored in an environment variable in a production environment
-const CLERK_PUBLISHABLE_KEY = "pk_test_glad-titmouse-32.clerk.accounts.dev";
+// Clerk publishable key from environment variable
+const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 if (!CLERK_PUBLISHABLE_KEY) {
-  throw new Error("Missing Clerk Publishable Key");
+  throw new Error("Missing Clerk Publishable Key. Please set VITE_CLERK_PUBLISHABLE_KEY in your environment.");
 }
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

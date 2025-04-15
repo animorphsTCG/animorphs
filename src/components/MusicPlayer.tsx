@@ -64,54 +64,67 @@ const MusicPlayer: React.FC = () => {
   const fetchMusicData = async () => {
     if (!user) return;
 
-    // Using a properly typed query to fetch songs
-    const { data: userSongSelections, error: selectionsError } = await supabase
-      .from('user_song_selections')
-      .select('song_id, songs:songs(*)')
-      .eq('user_id', user.id);
+    try {
+      // Using a properly typed query to fetch songs
+      const { data: userSongSelections, error: selectionsError } = await supabase
+        .from('user_song_selections')
+        .select('song_id, songs:songs(*)') 
+        .eq('user_id', user.id);
 
-    if (selectionsError) {
-      console.error("Error fetching song selections:", selectionsError);
-      return;
-    }
-
-    if (userSongSelections && userSongSelections.length > 0) {
-      // Extract the songs data from the nested structure
-      const extractedSongs: Song[] = userSongSelections
-        .map(selection => selection.songs)
-        .filter(song => song !== null);
-      
-      setSongs(extractedSongs);
-      
-      if (extractedSongs.length > 0 && !currentSong) {
-        setCurrentSong(extractedSongs[0]);
+      if (selectionsError) {
+        console.error("Error fetching song selections:", selectionsError);
+        return;
       }
-    }
 
-    const { data: settings, error: settingsError } = await supabase
-      .from('user_music_settings')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+      if (userSongSelections && userSongSelections.length > 0) {
+        // Properly extract the nested song objects
+        const extractedSongs: Song[] = userSongSelections
+          .map(selection => selection.songs as Song)
+          .filter((song): song is Song => song !== null);
+        
+        setSongs(extractedSongs);
+        
+        if (extractedSongs.length > 0 && !currentSong) {
+          setCurrentSong(extractedSongs[0]);
+        }
+      } else {
+        console.log("No song selections found for user");
+      }
 
-    if (settings) {
-      setVolume(settings.volume_level * 100);
-      setIsMuted(!settings.music_enabled);
+      const { data: settings, error: settingsError } = await supabase
+        .from('user_music_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (settings) {
+        setVolume(settings.volume_level * 100);
+        setIsMuted(!settings.music_enabled);
+      } else if (settingsError && settingsError.code !== 'PGRST116') {
+        // PGRST116 is 'not found' which is expected for new users
+        console.error("Error fetching music settings:", settingsError);
+      }
+    } catch (error) {
+      console.error("Unexpected error fetching music data:", error);
     }
   };
 
   const checkSubscription = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('music_subscriptions')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('music_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-    const hasActiveSubscription = !!data && new Date(data.end_date) > new Date();
-    setHasSubscription(hasActiveSubscription);
-    setIsPreviewMode(!hasActiveSubscription);
+      const hasActiveSubscription = !!data && new Date(data.end_date) > new Date();
+      setHasSubscription(hasActiveSubscription);
+      setIsPreviewMode(!hasActiveSubscription);
+    } catch (error) {
+      console.error("Error checking subscription:", error);
+    }
   };
   
   const togglePlay = () => {
@@ -120,12 +133,16 @@ const MusicPlayer: React.FC = () => {
   };
   
   const nextSong = () => {
+    if (songs.length === 0) return;
+    
     const currentIndex = songs.findIndex(song => song.id === currentSong?.id);
     const nextIndex = (currentIndex + 1) % songs.length;
     setCurrentSong(songs[nextIndex]);
   };
   
   const prevSong = () => {
+    if (songs.length === 0) return;
+    
     const currentIndex = songs.findIndex(song => song.id === currentSong?.id);
     const prevIndex = (currentIndex - 1 + songs.length) % songs.length;
     setCurrentSong(songs[prevIndex]);
@@ -148,17 +165,21 @@ const MusicPlayer: React.FC = () => {
   const updatePlayerState = async (playing: boolean, volumeLevel?: number) => {
     if (!user) return;
 
-    const volumeToSave = volumeLevel !== undefined 
-      ? volumeLevel / 100 
-      : volume / 100;
+    try {
+      const volumeToSave = volumeLevel !== undefined 
+        ? volumeLevel / 100 
+        : volume / 100;
 
-    await supabase
-      .from('user_music_settings')
-      .update({
-        volume_level: volumeToSave,
-        music_enabled: playing && !isMuted
-      })
-      .eq('user_id', user.id);
+      await supabase
+        .from('user_music_settings')
+        .upsert({ 
+          user_id: user.id,
+          volume_level: volumeToSave,
+          music_enabled: playing && !isMuted
+        });
+    } catch (error) {
+      console.error("Error updating player state:", error);
+    }
   };
   
   return (
@@ -184,6 +205,7 @@ const MusicPlayer: React.FC = () => {
             variant="ghost" 
             size="icon" 
             onClick={prevSong}
+            disabled={songs.length === 0}
             className="h-8 w-8 text-gray-300 hover:bg-fantasy-primary/20"
           >
             <SkipBack className="h-4 w-4" />
@@ -193,6 +215,7 @@ const MusicPlayer: React.FC = () => {
             variant="ghost" 
             size="icon" 
             onClick={togglePlay}
+            disabled={songs.length === 0}
             className="h-8 w-8 text-gray-300 hover:bg-fantasy-primary/20"
           >
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -202,6 +225,7 @@ const MusicPlayer: React.FC = () => {
             variant="ghost" 
             size="icon" 
             onClick={nextSong}
+            disabled={songs.length === 0}
             className="h-8 w-8 text-gray-300 hover:bg-fantasy-primary/20"
           >
             <SkipForward className="h-4 w-4" />

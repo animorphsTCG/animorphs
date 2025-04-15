@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -107,6 +106,7 @@ const MusicPlayer: React.FC = () => {
         }
       }
 
+      // Fetch user's music settings
       const { data: settings, error: settingsError } = await supabase
         .from('user_music_settings')
         .select('*')
@@ -117,9 +117,20 @@ const MusicPlayer: React.FC = () => {
         setVolume(settings.volume_level * 100);
         setIsMuted(!settings.music_enabled);
       } else if (settingsError && settingsError.code !== 'PGRST116') {
-        // PGRST116 is 'not found' which is expected for new users
         console.error("Error fetching music settings:", settingsError);
       }
+
+      // Fetch user's music subscription
+      const { data, error } = await supabase
+        .from('music_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      const hasActiveSubscription = !!data && new Date(data.end_date) > new Date();
+      setHasSubscription(hasActiveSubscription);
+      setIsPreviewMode(!hasActiveSubscription);
+
     } catch (error) {
       console.error("Unexpected error fetching music data:", error);
     }

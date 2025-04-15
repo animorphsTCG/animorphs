@@ -152,6 +152,33 @@ export type Database = {
           },
         ]
       }
+      music_subscriptions: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          start_date: string
+          subscription_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          start_date?: string
+          subscription_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          start_date?: string
+          subscription_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_status: {
         Row: {
           created_at: string
@@ -251,6 +278,33 @@ export type Database = {
         }
         Relationships: []
       }
+      songs: {
+        Row: {
+          created_at: string
+          id: string
+          preview_duration_seconds: number
+          preview_start_seconds: number
+          title: string
+          youtube_url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preview_duration_seconds?: number
+          preview_start_seconds?: number
+          title: string
+          youtube_url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preview_duration_seconds?: number
+          preview_start_seconds?: number
+          title?: string
+          youtube_url?: string
+        }
+        Relationships: []
+      }
       user_decks: {
         Row: {
           created_at: string
@@ -271,6 +325,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_music_settings: {
+        Row: {
+          created_at: string
+          id: string
+          music_enabled: boolean
+          user_id: string
+          volume_level: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          music_enabled?: boolean
+          user_id: string
+          volume_level?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          music_enabled?: boolean
+          user_id?: string
+          volume_level?: number
+        }
+        Relationships: []
+      }
+      user_song_selections: {
+        Row: {
+          created_at: string
+          id: string
+          song_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          song_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          song_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_song_selections_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vip_codes: {
         Row: {

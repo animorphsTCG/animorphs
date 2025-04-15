@@ -1,26 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { 
-  Play, 
-  Pause, 
-  SkipForward, 
-  SkipBack, 
-  Volume2, 
-  VolumeX,
-  Lock
-} from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
-
-interface Song {
-  id: string;
-  title: string;
-  youtube_url: string;
-  preview_start_seconds: number;
-  preview_duration_seconds: number;
-}
+import { Song } from "@/types/music";
+import SongInfo from "./music/SongInfo";
+import PlaybackControls from "./music/PlaybackControls";
+import VolumeControl from "./music/VolumeControl";
+import YouTubeEmbed from "./music/YouTubeEmbed";
 
 const MusicPlayer: React.FC = () => {
   const { user } = useAuth();
@@ -33,7 +19,7 @@ const MusicPlayer: React.FC = () => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewTimerRef = useRef<NodeJS.Timeout>();
-  
+
   useEffect(() => {
     if (user) {
       fetchMusicData();
@@ -43,7 +29,6 @@ const MusicPlayer: React.FC = () => {
 
   useEffect(() => {
     if (isPreviewMode && isPlaying) {
-      // Start preview timer
       previewTimerRef.current = setTimeout(() => {
         setIsPlaying(false);
         toast({
@@ -64,7 +49,6 @@ const MusicPlayer: React.FC = () => {
     if (!user) return;
 
     try {
-      // First, get the song IDs selected by the user
       const { data: userSongSelections, error: selectionsError } = await supabase
         .from('user_song_selections')
         .select('song_id')
@@ -78,7 +62,6 @@ const MusicPlayer: React.FC = () => {
       if (userSongSelections && userSongSelections.length > 0) {
         const songIds = userSongSelections.map(selection => selection.song_id);
         
-        // Now fetch the actual song data for these IDs
         const { data: songsData, error: songsError } = await supabase
           .from('songs')
           .select('*')
@@ -89,7 +72,6 @@ const MusicPlayer: React.FC = () => {
           return;
         }
         
-        // Ensure we have valid song data with all required properties
         const validSongs: Song[] = songsData?.filter((song): song is Song => 
           song && 
           typeof song.id === 'string' && 
@@ -106,7 +88,6 @@ const MusicPlayer: React.FC = () => {
         }
       }
 
-      // Fetch user's music settings
       const { data: settings, error: settingsError } = await supabase
         .from('user_music_settings')
         .select('*')
@@ -120,7 +101,6 @@ const MusicPlayer: React.FC = () => {
         console.error("Error fetching music settings:", settingsError);
       }
 
-      // Fetch user's music subscription
       const { data, error } = await supabase
         .from('music_subscriptions')
         .select('*')
@@ -130,7 +110,6 @@ const MusicPlayer: React.FC = () => {
       const hasActiveSubscription = !!data && new Date(data.end_date) > new Date();
       setHasSubscription(hasActiveSubscription);
       setIsPreviewMode(!hasActiveSubscription);
-
     } catch (error) {
       console.error("Unexpected error fetching music data:", error);
     }
@@ -153,33 +132,31 @@ const MusicPlayer: React.FC = () => {
       console.error("Error checking subscription:", error);
     }
   };
-  
+
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
     updatePlayerState(!isPlaying);
   };
-  
+
   const nextSong = () => {
     if (songs.length === 0) return;
-    
     const currentIndex = songs.findIndex(song => song.id === currentSong?.id);
     const nextIndex = (currentIndex + 1) % songs.length;
     setCurrentSong(songs[nextIndex]);
   };
-  
+
   const prevSong = () => {
     if (songs.length === 0) return;
-    
     const currentIndex = songs.findIndex(song => song.id === currentSong?.id);
     const prevIndex = (currentIndex - 1 + songs.length) % songs.length;
     setCurrentSong(songs[prevIndex]);
   };
-  
+
   const toggleMute = () => {
     setIsMuted(!isMuted);
     updatePlayerState(isPlaying, isMuted ? volume : 0);
   };
-  
+
   const handleVolumeChange = (value: number[]) => {
     const newVolume = value[0];
     setVolume(newVolume);
@@ -208,89 +185,40 @@ const MusicPlayer: React.FC = () => {
       console.error("Error updating player state:", error);
     }
   };
-  
+
   return (
     <div className="bg-black/60 border border-fantasy-primary/30 rounded-md p-3">
       <div className="flex items-center justify-between">
-        <div className="flex-1 truncate">
-          <p className="font-medium truncate">
-            {currentSong?.title || "No song selected"}
-          </p>
-          <p className="text-xs text-gray-400">
-            {isPreviewMode ? "Preview Mode" : "Music Player"}
-            {!hasSubscription && (
-              <span className="ml-2 text-yellow-400">
-                <Lock className="inline-block h-3 w-3 mr-1" />
-                Limited Access
-              </span>
-            )}
-          </p>
-        </div>
+        <SongInfo
+          currentSong={currentSong}
+          isPreviewMode={isPreviewMode}
+          hasSubscription={hasSubscription}
+        />
         
-        <div className="flex items-center gap-1">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={prevSong}
-            disabled={songs.length === 0}
-            className="h-8 w-8 text-gray-300 hover:bg-fantasy-primary/20"
-          >
-            <SkipBack className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-4">
+          <PlaybackControls
+            isPlaying={isPlaying}
+            hasSongs={songs.length > 0}
+            onPlayPause={togglePlay}
+            onPrevious={prevSong}
+            onNext={nextSong}
+          />
           
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={togglePlay}
-            disabled={songs.length === 0}
-            className="h-8 w-8 text-gray-300 hover:bg-fantasy-primary/20"
-          >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={nextSong}
-            disabled={songs.length === 0}
-            className="h-8 w-8 text-gray-300 hover:bg-fantasy-primary/20"
-          >
-            <SkipForward className="h-4 w-4" />
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleMute}
-            className="h-8 w-8 text-gray-300 hover:bg-fantasy-primary/20"
-          >
-            {isMuted || volume === 0 ? (
-              <VolumeX className="h-4 w-4" />
-            ) : (
-              <Volume2 className="h-4 w-4" />
-            )}
-          </Button>
-          
-          <div className="w-20">
-            <Slider
-              value={[isMuted ? 0 : volume]}
-              max={100}
-              step={1}
-              onValueChange={handleVolumeChange}
-              className="h-1"
-            />
-          </div>
+          <VolumeControl
+            settings={{ volume, isMuted }}
+            onVolumeChange={handleVolumeChange}
+            onMuteToggle={toggleMute}
+          />
         </div>
       </div>
 
-      <div className="hidden">
-        <iframe 
-          ref={iframeRef}
-          src={currentSong ? `https://www.youtube.com/embed/${currentSong.youtube_url.split('?v=')[1]}?autoplay=${isPlaying ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0&start=${isPreviewMode ? currentSong.preview_start_seconds : 0}` : ''}
-          allow="autoplay"
-          title="Music Player"
-        />
-      </div>
+      <YouTubeEmbed
+        currentSong={currentSong}
+        isPlaying={isPlaying}
+        isMuted={isMuted}
+        isPreviewMode={isPreviewMode}
+        iframeRef={iframeRef}
+      />
     </div>
   );
 };

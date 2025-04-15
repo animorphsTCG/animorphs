@@ -9,6 +9,7 @@ import { Loader2, Edit, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useAdmin } from "@/hooks/useAdmin";
 
 interface Song {
   id: string;
@@ -18,7 +19,8 @@ interface Song {
   preview_duration_seconds: number;
 }
 
-const SongManagement: React.FC = () => {
+const SongManagement = () => {
+  const { isAdmin } = useAdmin();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -32,26 +34,48 @@ const SongManagement: React.FC = () => {
   });
 
   useEffect(() => {
+    if (!isAdmin) return;
+    
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('songs_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'songs' 
+        }, 
+        (payload) => {
+          fetchSongs();
+        }
+      )
+      .subscribe();
+
     fetchSongs();
-  }, []);
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin]);
 
   const fetchSongs = async () => {
-    setLoading(true);
+    if (!isAdmin) return;
+    
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('songs')
         .select('*')
         .order('title');
         
       if (error) throw error;
-      
       setSongs(data || []);
     } catch (error) {
       console.error('Error fetching songs:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load songs."
+        description: "Failed to load songs"
       });
     } finally {
       setLoading(false);

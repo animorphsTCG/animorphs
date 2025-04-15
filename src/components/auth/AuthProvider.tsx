@@ -33,38 +33,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      setProfileError(null);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
-      setUserProfile(data);
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        setProfileError(error.message);
+        return null;
+      }
+      
+      // If the profile was found, check if they have paid
+      if (data) {
+        try {
+          const { data: paymentData } = await supabase
+            .from('payment_status')
+            .select('has_paid')
+            .eq('id', userId)
+            .single();
+            
+          // Add the has_paid property to the profile
+          const completeProfile = {
+            ...data,
+            has_paid: paymentData?.has_paid || false
+          };
+          
+          setUserProfile(completeProfile);
+          return completeProfile;
+        } catch (paymentError) {
+          console.error('Error checking payment status:', paymentError);
+          // Still return the profile even if payment status check fails
+          setUserProfile(data);
+          return data;
+        }
+      }
+      
+      return null;
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error in fetchUserProfile:', error);
+      setProfileError('Failed to fetch profile data');
+      return null;
     }
   };
 
   const refreshProfile = async () => {
     if (user?.id) {
-      await fetchUserProfile(user.id);
+      return await fetchUserProfile(user.id);
     }
+    return null;
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST to avoid missing events
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        console.log('Auth state changed:', event);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_IN' && currentSession?.user) {
-          // Use setTimeout to prevent potential deadlocks
+          // Use setTimeout to prevent potential race conditions
           setTimeout(() => {
             fetchUserProfile(currentSession.user.id);
           }, 0);
@@ -79,12 +115,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log('Got session:', currentSession ? 'yes' : 'no');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
       if (currentSession?.user) {
-        fetchUserProfile(currentSession.user.id);
+        fetchUserProfile(currentSession.user.id)
+          .finally(() => setIsLoading(false));
+      } else {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
     return () => {

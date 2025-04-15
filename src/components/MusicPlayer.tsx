@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
@@ -17,18 +18,17 @@ const MusicPlayer: React.FC = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewTimerRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    if (user) {
-      fetchMusicData();
-      checkSubscription();
-    }
+    // Always attempt to fetch songs, even for anonymous users
+    fetchMusicData();
   }, [user]);
 
   useEffect(() => {
-    if (isPreviewMode && isPlaying) {
+    if (isPreviewMode && isPlaying && currentSong) {
       previewTimerRef.current = setTimeout(() => {
         setIsPlaying(false);
         toast({
@@ -46,22 +46,67 @@ const MusicPlayer: React.FC = () => {
   }, [isPreviewMode, isPlaying, currentSong]);
 
   const fetchMusicData = async () => {
-    if (!user) return;
-
     try {
-      const { data: userSongSelections, error: selectionsError } = await supabase
-        .from('user_song_selections')
-        .select('song_id')
-        .eq('user_id', user.id);
+      setIsLoading(true);
+      console.log("Fetching music data...");
+      
+      // For anonymous users or when the user object isn't available yet,
+      // we'll still show some default songs
+      let songIds: string[] = [];
+      let settings = { volume: 50, musicEnabled: true };
+      
+      // Try to fetch user-specific settings if logged in
+      if (user) {
+        try {
+          console.log("Fetching user song selections...");
+          const { data: userSongSelections, error: selectionsError } = await supabase
+            .from('user_song_selections')
+            .select('song_id')
+            .eq('user_id', user.id);
 
-      if (selectionsError) {
-        console.error("Error fetching song selections:", selectionsError);
-        return;
+          if (selectionsError) {
+            console.error("Error fetching song selections:", selectionsError);
+          } else {
+            songIds = userSongSelections?.map(selection => selection.song_id) || [];
+            console.log(`Got ${songIds.length} song selections`);
+          }
+
+          // Fetch user settings
+          const { data: userSettings, error: settingsError } = await supabase
+            .from('user_music_settings')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (!settingsError && userSettings) {
+            settings = {
+              volume: userSettings.volume_level * 100,
+              musicEnabled: userSettings.music_enabled
+            };
+          }
+        } catch (err) {
+          console.error("Error fetching user-specific music data:", err);
+        }
       }
 
-      if (userSongSelections && userSongSelections.length > 0) {
-        const songIds = userSongSelections.map(selection => selection.song_id);
-        
+      // If the user has no selections or is not logged in, fetch default songs
+      if (songIds.length === 0) {
+        console.log("Fetching default songs...");
+        // Just get the first few songs from the database as defaults
+        const { data: defaultSongs, error: defaultError } = await supabase
+          .from('songs')
+          .select('id')
+          .limit(3);
+          
+        if (!defaultError && defaultSongs) {
+          songIds = defaultSongs.map(song => song.id);
+          console.log(`Using ${songIds.length} default songs`);
+        }
+      }
+      
+      // Now fetch the actual song data if we have any IDs
+      if (songIds.length > 0) {
+        console.log("Fetching song details for IDs:", songIds);
         const { data: songsData, error: songsError } = await supabase
           .from('songs')
           .select('*')
@@ -69,67 +114,37 @@ const MusicPlayer: React.FC = () => {
         
         if (songsError) {
           console.error("Error fetching songs:", songsError);
-          return;
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Couldn't load your music. Please try again later."
+          });
+        } else if (songsData && songsData.length > 0) {
+          console.log(`Retrieved ${songsData.length} song details`);
+          setSongs(songsData);
+          if (!currentSong) {
+            console.log("Setting current song to:", songsData[0]?.title);
+            setCurrentSong(songsData[0]);
+          }
         }
-        
-        const validSongs: Song[] = songsData?.filter((song): song is Song => 
-          song && 
-          typeof song.id === 'string' && 
-          typeof song.title === 'string' && 
-          typeof song.youtube_url === 'string' &&
-          typeof song.preview_start_seconds === 'number' &&
-          typeof song.preview_duration_seconds === 'number'
-        ) || [];
-        
-        setSongs(validSongs);
-        
-        if (validSongs.length > 0 && !currentSong) {
-          setCurrentSong(validSongs[0]);
-        }
+      } else {
+        console.log("No song IDs available");
       }
 
-      const { data: settings, error: settingsError } = await supabase
-        .from('user_music_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (settings) {
-        setVolume(settings.volume_level * 100);
-        setIsMuted(!settings.music_enabled);
-      } else if (settingsError && settingsError.code !== 'PGRST116') {
-        console.error("Error fetching music settings:", settingsError);
-      }
-
-      const { data, error } = await supabase
-        .from('music_subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      const hasActiveSubscription = !!data && new Date(data.end_date) > new Date();
-      setHasSubscription(hasActiveSubscription);
-      setIsPreviewMode(!hasActiveSubscription);
+      // Apply user settings
+      setVolume(settings.volume);
+      setIsMuted(!settings.musicEnabled);
+      setIsPreviewMode(!hasSubscription);
+      
     } catch (error) {
       console.error("Unexpected error fetching music data:", error);
-    }
-  };
-
-  const checkSubscription = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('music_subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      const hasActiveSubscription = !!data && new Date(data.end_date) > new Date();
-      setHasSubscription(hasActiveSubscription);
-      setIsPreviewMode(!hasActiveSubscription);
-    } catch (error) {
-      console.error("Error checking subscription:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load music player data."
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -185,6 +200,20 @@ const MusicPlayer: React.FC = () => {
       console.error("Error updating player state:", error);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="bg-black/60 border border-fantasy-primary/30 rounded-md p-3">
+        <div className="flex items-center">
+          <div className="animate-pulse space-y-2 w-full">
+            <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+            <div className="h-3 bg-gray-700 rounded w-1/2"></div>
+          </div>
+          <Loader2 className="h-5 w-5 animate-spin ml-2" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-black/60 border border-fantasy-primary/30 rounded-md p-3">

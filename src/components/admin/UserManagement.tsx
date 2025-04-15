@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,23 +10,11 @@ import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-
-interface UserProfile {
-  id: string;
-  username: string;
-  email?: string;
-  name: string;
-  surname: string;
-  age: number;
-  gender: string | null;
-  country: string | null;
-  music_unlocked: boolean;
-  created_at: string;
-}
+import { UserProfile } from "@/types";
 
 const UserManagement = () => {
   const { isAdmin } = useAdmin();
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<(UserProfile & {email?: string})[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -36,7 +25,8 @@ const UserManagement = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editData, setEditData] = useState({
     hasPaid: false,
-    musicUnlocked: false
+    musicUnlocked: false,
+    isAdmin: false
   });
 
   useEffect(() => {
@@ -76,20 +66,38 @@ const UserManagement = () => {
 
       if (profilesError) throw profilesError;
 
-      // Fetch user emails using the secure function
+      // Fetch user emails using the RPC function
       const { data: emailsData, error: emailsError } = await supabase
         .rpc('get_user_emails');
 
       if (emailsError) throw emailsError;
 
+      // Fetch payment statuses
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payment_status')
+        .select('id, has_paid');
+        
+      if (paymentError) throw paymentError;
+      
       // Merge the data
       const emailMap = new Map(emailsData.map((user: any) => [user.id, user.email]));
+      const paymentMap = new Map(paymentData?.map((item: any) => [item.id, item.has_paid]) || []);
+      
       const mergedUsers = profiles.map((profile: any) => ({
         ...profile,
-        email: emailMap.get(profile.id) || 'Not available'
+        email: emailMap.get(profile.id) || 'Not available',
+        has_paid: paymentMap.get(profile.id) || false
       }));
 
       setUsers(mergedUsers);
+      
+      // Update statistics
+      setStats({
+        totalUsers: profiles.length,
+        paidUsers: paymentData?.filter((item: any) => item.has_paid).length || 0,
+        musicSubscribers: profiles.filter((profile: any) => profile.music_unlocked).length || 0
+      });
+      
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -107,21 +115,10 @@ const UserManagement = () => {
     if (user) {
       setSelectedUser(userId);
       setEditData({
-        hasPaid: false, // We'll fetch the actual value
-        musicUnlocked: user.music_unlocked
+        hasPaid: user.has_paid || false,
+        musicUnlocked: user.music_unlocked,
+        isAdmin: user.is_admin || false
       });
-      
-      // Get payment status
-      supabase
-        .from('payment_status')
-        .select('has_paid')
-        .eq('id', userId)
-        .single()
-        .then(({ data, error }) => {
-          if (!error && data) {
-            setEditData(prev => ({ ...prev, hasPaid: data.has_paid }));
-          }
-        });
       
       setIsEditDialogOpen(true);
     }
@@ -141,10 +138,13 @@ const UserManagement = () => {
           payment_method: editData.hasPaid ? 'admin_override' : null
         });
         
-      // Update music_unlocked status
+      // Update profile status
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ music_unlocked: editData.musicUnlocked })
+        .update({ 
+          music_unlocked: editData.musicUnlocked,
+          is_admin: editData.isAdmin
+        })
         .eq('id', selectedUser);
         
       if (paymentError || profileError) {
@@ -210,6 +210,7 @@ const UserManagement = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Has Paid</TableHead>
                   <TableHead>Music Unlocked</TableHead>
+                  <TableHead>Admin</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -221,14 +222,21 @@ const UserManagement = () => {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.name} {user.surname}</TableCell>
                       <TableCell>
-                        {/* We don't have the actual payment status here, we'll show a placeholder */}
-                        <span className="flex items-center">
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Loading...
-                        </span>
+                        {user.has_paid ? (
+                          <Check className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-500" />
+                        )}
                       </TableCell>
                       <TableCell>
                         {user.music_unlocked ? (
+                          <Check className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <X className="h-5 w-5 text-red-500" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.is_admin ? (
                           <Check className="h-5 w-5 text-green-500" />
                         ) : (
                           <X className="h-5 w-5 text-red-500" />
@@ -247,7 +255,7 @@ const UserManagement = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -279,6 +287,14 @@ const UserManagement = () => {
                 id="music-unlocked"
                 checked={editData.musicUnlocked}
                 onCheckedChange={(checked) => setEditData(prev => ({ ...prev, musicUnlocked: checked }))}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="is-admin">Admin Access</Label>
+              <Switch
+                id="is-admin"
+                checked={editData.isAdmin}
+                onCheckedChange={(checked) => setEditData(prev => ({ ...prev, isAdmin: checked }))}
               />
             </div>
           </div>

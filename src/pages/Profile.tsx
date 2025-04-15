@@ -1,17 +1,20 @@
+
 import React, { useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
-import PaymentSection from '@/components/payment/PaymentSection';
-import { Loader2, Lock } from 'lucide-react';
+import PaymentSection from '@/components/profile/PaymentSection';
+import { Loader2, Lock, AlertTriangle } from 'lucide-react';
 import MusicSettings from '@/components/MusicSettings';
 import MusicPlayer from '@/components/MusicPlayer';
 
 const Profile = () => {
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const [profileLoading, setProfileLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -21,12 +24,24 @@ const Profile = () => {
 
   // Ensure profile is loaded
   useEffect(() => {
-    if (user && !userProfile) {
-      refreshProfile();
-    }
+    const loadProfile = async () => {
+      if (user && !userProfile) {
+        setProfileLoading(true);
+        try {
+          await refreshProfile();
+        } catch (err) {
+          setError('Failed to load profile data');
+          console.error('Error refreshing profile:', err);
+        } finally {
+          setProfileLoading(false);
+        }
+      }
+    };
+    
+    loadProfile();
   }, [user, userProfile, refreshProfile]);
 
-  if (isLoading || !user) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -43,11 +58,20 @@ const Profile = () => {
               <CardTitle className="text-2xl">Your Profile</CardTitle>
             </CardHeader>
             <CardContent>
-              {!userProfile ? (
+              {profileLoading || (!userProfile && !error) ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
-              ) : (
+              ) : error ? (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <AlertTriangle className="h-10 w-10 text-yellow-500 mb-3" />
+                  <p className="text-lg font-medium">Error loading profile</p>
+                  <p className="text-gray-500 mb-4">{error}</p>
+                  <Button onClick={() => window.location.reload()}>
+                    Try Again
+                  </Button>
+                </div>
+              ) : userProfile ? (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -56,25 +80,29 @@ const Profile = () => {
                     </div>
                     <div>
                       <h3 className="text-sm text-gray-500">Email</h3>
-                      <p className="text-lg">{userProfile.email}</p>
+                      <p className="text-lg">{user?.email}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h3 className="text-sm text-gray-500">Date of Birth</h3>
-                      <p className="text-lg">{formatDate(userProfile.date_of_birth)}</p>
+                      <h3 className="text-sm text-gray-500">Age</h3>
+                      <p className="text-lg">{userProfile.age}</p>
                     </div>
                     <div>
                       <h3 className="text-sm text-gray-500">Gender</h3>
-                      <p className="text-lg">{userProfile.gender}</p>
+                      <p className="text-lg">{userProfile.gender || 'Not specified'}</p>
                     </div>
                   </div>
 
                   <div>
                     <h3 className="text-sm text-gray-500">Country</h3>
-                    <p className="text-lg">{userProfile.country}</p>
+                    <p className="text-lg">{userProfile.country || 'Not specified'}</p>
                   </div>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p>No profile data available.</p>
                 </div>
               )}
             </CardContent>
@@ -85,11 +113,20 @@ const Profile = () => {
               <CardTitle className="text-2xl">Game Status</CardTitle>
             </CardHeader>
             <CardContent>
-              {!userProfile ? (
+              {profileLoading || (!userProfile && !error) ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
-              ) : (
+              ) : error ? (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <AlertTriangle className="h-10 w-10 text-yellow-500 mb-3" />
+                  <p className="text-lg font-medium">Error loading game status</p>
+                  <p className="text-gray-500 mb-4">{error}</p>
+                  <Button onClick={() => window.location.reload()}>
+                    Try Again
+                  </Button>
+                </div>
+              ) : userProfile ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 bg-gray-100 rounded-lg">
                     <div>
@@ -121,6 +158,10 @@ const Profile = () => {
                     </Button>
                   </div>
                 </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p>No game status available.</p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -134,12 +175,24 @@ const Profile = () => {
               <CardTitle className="text-2xl">Game Access</CardTitle>
             </CardHeader>
             <CardContent>
-              {!userProfile ? (
+              {profileLoading || (!userProfile && !error) ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
-              ) : (
+              ) : error ? (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <AlertTriangle className="h-10 w-10 text-yellow-500 mb-3" />
+                  <p className="text-gray-500 mb-4">{error}</p>
+                  <Button onClick={() => window.location.reload()}>
+                    Try Again
+                  </Button>
+                </div>
+              ) : userProfile ? (
                 <PaymentSection userProfile={userProfile} onPaymentComplete={refreshProfile} />
+              ) : (
+                <div className="text-center py-4">
+                  <p>No payment data available.</p>
+                </div>
               )}
             </CardContent>
           </Card>

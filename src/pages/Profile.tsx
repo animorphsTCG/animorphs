@@ -6,15 +6,17 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
 import PaymentSection from '@/components/profile/PaymentSection';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock, AlertTriangle } from 'lucide-react';
 import MusicSettings from '@/components/MusicSettings';
 import MusicPlayer from '@/components/MusicPlayer';
 import { toast } from '@/components/ui/use-toast';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 const Profile = () => {
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [errorState, setErrorState] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -24,8 +26,10 @@ const Profile = () => {
 
   // Ensure profile is loaded
   useEffect(() => {
-    if (user && !userProfile) {
+    if (user && !userProfile && !loadingProfile) {
       setLoadingProfile(true);
+      setErrorState(null);
+      
       refreshProfile()
         .then(() => {
           setLoadingProfile(false);
@@ -33,6 +37,7 @@ const Profile = () => {
         .catch((error) => {
           console.error('Error loading profile:', error);
           setLoadingProfile(false);
+          setErrorState('There was a problem loading your profile. Please try refreshing the page.');
           toast({
             variant: 'destructive',
             title: 'Profile Error',
@@ -42,10 +47,46 @@ const Profile = () => {
     }
   }, [user, userProfile, refreshProfile]);
 
+  const handleRefresh = () => {
+    setLoadingProfile(true);
+    setErrorState(null);
+    refreshProfile()
+      .then(() => {
+        setLoadingProfile(false);
+        toast({
+          title: 'Profile Refreshed',
+          description: 'Your profile data has been refreshed.',
+        });
+      })
+      .catch(() => {
+        setLoadingProfile(false);
+        setErrorState('Failed to refresh profile data.');
+      });
+  };
+
   if (isLoading || loadingProfile) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (errorState) {
+    return (
+      <div className="container mx-auto py-12 px-4">
+        <Alert variant="destructive" className="mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{errorState}</AlertDescription>
+        </Alert>
+        <Button onClick={handleRefresh} disabled={loadingProfile}>
+          {loadingProfile ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Refreshing...</>
+          ) : (
+            'Refresh Profile'
+          )}
+        </Button>
       </div>
     );
   }
@@ -72,7 +113,7 @@ const Profile = () => {
                     </div>
                     <div>
                       <h3 className="text-sm text-gray-500">Email</h3>
-                      <p className="text-lg">{userProfile.email || 'Not set'}</p>
+                      <p className="text-lg">{userProfile.email || user?.email || 'Not set'}</p>
                     </div>
                   </div>
 
@@ -113,15 +154,15 @@ const Profile = () => {
                     <div>
                       <h3 className="font-medium">Account Status</h3>
                       <p className="text-sm text-gray-600">
-                        {(userProfile.has_paid !== undefined ? userProfile.has_paid : false) 
+                        {userProfile.has_paid 
                           ? "Full Access" : "Limited Access (Demo Mode)"}
                       </p>
                     </div>
                     <div className={`px-3 py-1 rounded-full text-sm ${
-                      (userProfile.has_paid !== undefined ? userProfile.has_paid : false) 
+                      userProfile.has_paid 
                         ? "bg-green-100 text-green-800" 
                         : "bg-yellow-100 text-yellow-800"}`}>
-                      {(userProfile.has_paid !== undefined ? userProfile.has_paid : false) ? "Paid" : "Free"}
+                      {userProfile.has_paid ? "Paid" : "Free"}
                     </div>
                   </div>
 
@@ -129,11 +170,11 @@ const Profile = () => {
                     <div>
                       <h3 className="font-medium">Card Access</h3>
                       <p className="text-sm text-gray-600">
-                        {(userProfile.has_paid !== undefined ? userProfile.has_paid : false) 
+                        {userProfile.has_paid
                           ? "All 200 cards" : "Limited cards (Demo only)"}
                       </p>
                     </div>
-                    {!(userProfile.has_paid !== undefined ? userProfile.has_paid : false) && (
+                    {!userProfile.has_paid && (
                       <Lock className="h-5 w-5 text-gray-500" />
                     )}
                   </div>

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { 
@@ -10,52 +10,104 @@ import {
   Volume2, 
   VolumeX 
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface Song {
-  id: number;
+  id: string;
   title: string;
   youtube_url: string;
 }
 
-// Mock playlist - in a real implementation this would come from the database
-const mockPlaylist: Song[] = [
-  { id: 1, title: "Battle Theme 1", youtube_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
-  { id: 2, title: "Epic Fight Music", youtube_url: "https://www.youtube.com/watch?v=ZZ5LpwO-An4" },
-  { id: 3, title: "Fantasy Adventure", youtube_url: "https://www.youtube.com/watch?v=q6EoRBvdVPQ" },
-];
-
 const MusicPlayer: React.FC = () => {
+  const { user } = useAuth();
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentSong, setCurrentSong] = useState(0);
+  const [currentSong, setCurrentSong] = useState<Song | null>(null);
+  const [songs, setSongs] = useState<Song[]>([]);
   const [volume, setVolume] = useState(50);
   const [isMuted, setIsMuted] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  
+  // Fetch user's music settings and available songs
+  useEffect(() => {
+    const fetchMusicData = async () => {
+      if (!user) return;
+
+      // Fetch available songs
+      const { data: songData, error: songError } = await supabase
+        .from('songs')
+        .select('*');
+
+      // Fetch user's music settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('user_music_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (songData) setSongs(songData);
+      
+      // Set initial volume and playback state
+      if (settingsData) {
+        setVolume(settingsData.volume_level * 100);
+        setIsMuted(!settingsData.music_enabled);
+      }
+    };
+
+    fetchMusicData();
+  }, [user]);
   
   // Play/pause toggle
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
+    updatePlayerState(!isPlaying);
   };
   
   // Skip to next song
   const nextSong = () => {
-    setCurrentSong((prev) => (prev + 1) % mockPlaylist.length);
+    const currentIndex = songs.findIndex(song => song.id === currentSong?.id);
+    const nextIndex = (currentIndex + 1) % songs.length;
+    setCurrentSong(songs[nextIndex]);
   };
   
   // Go to previous song
   const prevSong = () => {
-    setCurrentSong((prev) => (prev - 1 + mockPlaylist.length) % mockPlaylist.length);
+    const currentIndex = songs.findIndex(song => song.id === currentSong?.id);
+    const prevIndex = (currentIndex - 1 + songs.length) % songs.length;
+    setCurrentSong(songs[prevIndex]);
   };
   
   // Toggle mute
   const toggleMute = () => {
     setIsMuted(!isMuted);
+    updatePlayerState(isPlaying, isMuted ? volume : 0);
   };
   
   // Handle volume change
   const handleVolumeChange = (value: number[]) => {
-    setVolume(value[0]);
-    if (value[0] > 0 && isMuted) {
+    const newVolume = value[0];
+    setVolume(newVolume);
+    if (newVolume > 0 && isMuted) {
       setIsMuted(false);
     }
+    updatePlayerState(isPlaying, newVolume);
+  };
+
+  // Update player state and save to database
+  const updatePlayerState = async (playing: boolean, volumeLevel?: number) => {
+    if (!user) return;
+
+    const volumeToSave = volumeLevel !== undefined 
+      ? volumeLevel / 100 
+      : volume / 100;
+
+    await supabase
+      .from('user_music_settings')
+      .update({
+        volume_level: volumeToSave,
+        music_enabled: playing && !isMuted
+      })
+      .eq('user_id', user.id);
   };
   
   return (
@@ -63,9 +115,9 @@ const MusicPlayer: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex-1 truncate">
           <p className="font-medium truncate">
-            {mockPlaylist[currentSong]?.title || "No song selected"}
+            {currentSong?.title || "No song selected"}
           </p>
-          <p className="text-xs text-gray-400">Host's Playlist</p>
+          <p className="text-xs text-gray-400">Music Player</p>
         </div>
         
         <div className="flex items-center gap-1">
@@ -115,6 +167,16 @@ const MusicPlayer: React.FC = () => {
             />
           </div>
         </div>
+      </div>
+
+      {/* Hidden YouTube Player */}
+      <div className="hidden">
+        <iframe 
+          ref={iframeRef}
+          src={currentSong ? `https://www.youtube.com/embed/${currentSong.youtube_url.split('?v=')[1]}?autoplay=${isPlaying ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0` : ''}
+          allow="autoplay"
+          title="Music Player"
+        />
       </div>
     </div>
   );

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +21,7 @@ import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import OneVOneBattle from "./pages/OneVOneBattle";
 import VisitorDemoBattle from "./pages/VisitorDemoBattle";
+import MusicPlayer from "./components/MusicPlayer";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -82,6 +82,9 @@ const App = () => (
               <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+          </div>
+          <div className="fixed bottom-4 right-4 z-50">
+            <MusicPlayer />
           </div>
           <Footer />
         </div>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { fetchAnimorphCards } from "@/lib/db";
 import { AnimorphCard } from "@/types";
 import CardSelectionScreen from "@/components/battle/CardSelectionScreen";

@@ -1,9 +1,8 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface Message {
   id: string;
@@ -32,19 +31,15 @@ const BattleChat: React.FC<BattleChatProps> = ({
   ]);
   const [newMessage, setNewMessage] = useState("");
   
-  // Get username safely from user object or userProfile
   const getUsername = () => {
-    // First check if there's a username in the userProfile
     if (userProfile?.username) {
       return userProfile.username;
     }
     
-    // Fallback to email if available, extract username part
     if (user?.email) {
       return user.email.split('@')[0];
     }
     
-    // Last resort
     return 'Guest';
   };
   

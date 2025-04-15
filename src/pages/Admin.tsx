@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -28,18 +29,12 @@ const Admin = () => {
   const [maxUses, setMaxUses] = useState<string>("50");
   const [loading, setLoading] = useState(false);
   
-  if (!adminLoading && !isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (adminLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
+  useEffect(() => {
+    if (activeTab === "vip-codes") {
+      fetchVipCodes();
+    }
+  }, [activeTab]);
+  
   const fetchVipCodes = async () => {
     try {
       const { data, error } = await supabase
@@ -111,11 +106,19 @@ const Admin = () => {
     }
   };
   
-  React.useEffect(() => {
-    if (activeTab === "vip-codes") {
-      fetchVipCodes();
-    }
-  }, [activeTab]);
+  // Early return for loading state
+  if (adminLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+  
+  // Early return for unauthorized access
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
   
   return (
     <div className="min-h-screen py-16 px-4">

@@ -65,10 +65,10 @@ const MusicPlayer: React.FC = () => {
     if (!user) return;
 
     try {
-      // Using a properly typed query to fetch songs
+      // First, get the song IDs selected by the user
       const { data: userSongSelections, error: selectionsError } = await supabase
         .from('user_song_selections')
-        .select('song_id, songs:songs(*)') 
+        .select('song_id')
         .eq('user_id', user.id);
 
       if (selectionsError) {
@@ -77,18 +77,34 @@ const MusicPlayer: React.FC = () => {
       }
 
       if (userSongSelections && userSongSelections.length > 0) {
-        // Properly extract the nested song objects
-        const extractedSongs: Song[] = userSongSelections
-          .map(selection => selection.songs as Song)
-          .filter((song): song is Song => song !== null);
+        const songIds = userSongSelections.map(selection => selection.song_id);
         
-        setSongs(extractedSongs);
+        // Now fetch the actual song data for these IDs
+        const { data: songsData, error: songsError } = await supabase
+          .from('songs')
+          .select('*')
+          .in('id', songIds);
         
-        if (extractedSongs.length > 0 && !currentSong) {
-          setCurrentSong(extractedSongs[0]);
+        if (songsError) {
+          console.error("Error fetching songs:", songsError);
+          return;
         }
-      } else {
-        console.log("No song selections found for user");
+        
+        // Ensure we have valid song data with all required properties
+        const validSongs: Song[] = songsData?.filter((song): song is Song => 
+          song && 
+          typeof song.id === 'string' && 
+          typeof song.title === 'string' && 
+          typeof song.youtube_url === 'string' &&
+          typeof song.preview_start_seconds === 'number' &&
+          typeof song.preview_duration_seconds === 'number'
+        ) || [];
+        
+        setSongs(validSongs);
+        
+        if (validSongs.length > 0 && !currentSong) {
+          setCurrentSong(validSongs[0]);
+        }
       }
 
       const { data: settings, error: settingsError } = await supabase

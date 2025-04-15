@@ -2,22 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Edit, Trash2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAdmin } from "@/hooks/useAdmin";
-
-interface Song {
-  id: string;
-  title: string;
-  youtube_url: string;
-  preview_start_seconds: number;
-  preview_duration_seconds: number;
-}
+import { Song } from '@/types/music';
+import { SongForm } from '@/types/songs';
+import { extractVideoId, buildYouTubeUrl } from '@/utils/youtubeUtils';
+import { SongTable } from './components/SongTable';
+import { SongFormDialog } from './components/SongFormDialog';
 
 const SongManagement = () => {
   const { isAdmin } = useAdmin();
@@ -26,7 +19,7 @@ const SongManagement = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
-  const [songForm, setSongForm] = useState({
+  const [songForm, setSongForm] = useState<SongForm>({
     title: '',
     videoId: '',
     previewStart: 0,
@@ -36,7 +29,6 @@ const SongManagement = () => {
   useEffect(() => {
     if (!isAdmin) return;
     
-    // Set up realtime subscription
     const channel = supabase
       .channel('songs_changes')
       .on('postgres_changes', 
@@ -45,7 +37,7 @@ const SongManagement = () => {
           schema: 'public', 
           table: 'songs' 
         }, 
-        (payload) => {
+        () => {
           fetchSongs();
         }
       )
@@ -80,29 +72,6 @@ const SongManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const extractVideoId = (url: string): string => {
-    if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
-      return url; // Assume it's already a video ID
-    }
-    
-    // Handle youtube.com URL format
-    if (url.includes('youtube.com/watch?v=')) {
-      const params = new URLSearchParams(url.split('?')[1]);
-      return params.get('v') || '';
-    }
-    
-    // Handle youtu.be URL format
-    if (url.includes('youtu.be/')) {
-      return url.split('youtu.be/')[1].split('?')[0];
-    }
-    
-    return '';
-  };
-
-  const buildYouTubeUrl = (videoId: string): string => {
-    return `https://www.youtube.com/watch?v=${videoId}`;
   };
 
   const handleAddSong = async () => {
@@ -140,8 +109,6 @@ const SongManagement = () => {
         previewStart: 0,
         previewDuration: 30
       });
-      
-      fetchSongs();
     } catch (error) {
       console.error('Error adding song:', error);
       toast({
@@ -188,7 +155,6 @@ const SongManagement = () => {
       
       setIsEditDialogOpen(false);
       setEditingSong(null);
-      fetchSongs();
     } catch (error) {
       console.error('Error updating song:', error);
       toast({
@@ -213,8 +179,6 @@ const SongManagement = () => {
           title: "Success",
           description: "Song deleted successfully."
         });
-        
-        fetchSongs();
       }
     } catch (error) {
       console.error('Error deleting song:', error);
@@ -249,193 +213,34 @@ const SongManagement = () => {
           </Button>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>YouTube Link</TableHead>
-                  <TableHead>Preview Start</TableHead>
-                  <TableHead>Preview Duration</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {songs.length > 0 ? (
-                  songs.map((song) => (
-                    <TableRow key={song.id}>
-                      <TableCell className="font-medium">{song.title}</TableCell>
-                      <TableCell>
-                        <a 
-                          href={song.youtube_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-500 hover:underline"
-                        >
-                          {extractVideoId(song.youtube_url)}
-                        </a>
-                      </TableCell>
-                      <TableCell>{song.preview_start_seconds}s</TableCell>
-                      <TableCell>{song.preview_duration_seconds}s</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => openEditDialog(song)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            onClick={() => handleDeleteSong(song.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      No songs found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
+          <SongTable
+            songs={songs}
+            onEdit={openEditDialog}
+            onDelete={handleDeleteSong}
+            loading={loading}
+          />
         </CardContent>
       </Card>
 
-      {/* Add Song Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Song</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="song-title">Song Title</Label>
-              <Input
-                id="song-title"
-                value={songForm.title}
-                onChange={(e) => setSongForm({ ...songForm, title: e.target.value })}
-                placeholder="Enter song title"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="video-id">YouTube Video ID</Label>
-              <Input
-                id="video-id"
-                value={songForm.videoId}
-                onChange={(e) => setSongForm({ ...songForm, videoId: e.target.value })}
-                placeholder="e.g., Otzj9m_PAfY"
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the video ID from a YouTube URL (e.g., for https://www.youtube.com/watch?v=Otzj9m_PAfY, enter "Otzj9m_PAfY")
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="preview-start">Preview Start (seconds)</Label>
-                <Input
-                  id="preview-start"
-                  type="number"
-                  min="0"
-                  value={songForm.previewStart}
-                  onChange={(e) => setSongForm({ ...songForm, previewStart: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="preview-duration">Preview Duration (seconds)</Label>
-                <Input
-                  id="preview-duration"
-                  type="number"
-                  min="1"
-                  value={songForm.previewDuration}
-                  onChange={(e) => setSongForm({ ...songForm, previewDuration: parseInt(e.target.value) || 30 })}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddSong}>
-              Add Song
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SongFormDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={handleAddSong}
+        songForm={songForm}
+        setSongForm={setSongForm}
+        editingSong={null}
+        mode="add"
+      />
 
-      {/* Edit Song Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Song</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-song-title">Song Title</Label>
-              <Input
-                id="edit-song-title"
-                value={songForm.title}
-                onChange={(e) => setSongForm({ ...songForm, title: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-video-id">YouTube Video ID</Label>
-              <Input
-                id="edit-video-id"
-                value={songForm.videoId}
-                onChange={(e) => setSongForm({ ...songForm, videoId: e.target.value })}
-                placeholder="Leave blank to keep current URL"
-              />
-              <p className="text-xs text-muted-foreground">
-                Current video ID: {editingSong && extractVideoId(editingSong.youtube_url)}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-preview-start">Preview Start (seconds)</Label>
-                <Input
-                  id="edit-preview-start"
-                  type="number"
-                  min="0"
-                  value={songForm.previewStart}
-                  onChange={(e) => setSongForm({ ...songForm, previewStart: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-preview-duration">Preview Duration (seconds)</Label>
-                <Input
-                  id="edit-preview-duration"
-                  type="number"
-                  min="1"
-                  value={songForm.previewDuration}
-                  onChange={(e) => setSongForm({ ...songForm, previewDuration: parseInt(e.target.value) || 30 })}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditSong}>
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SongFormDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSubmit={handleEditSong}
+        songForm={songForm}
+        setSongForm={setSongForm}
+        editingSong={editingSong}
+        mode="edit"
+      />
     </div>
   );
 };

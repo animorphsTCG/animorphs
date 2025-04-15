@@ -1,11 +1,109 @@
+
 import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase";
 import UserManagement from "@/components/admin/UserManagement";
 import SongManagement from "@/components/admin/SongManagement";
 
+interface VipCode {
+  id: number;
+  code: string;
+  max_uses: number;
+  current_uses: number;
+}
+
 const Admin = () => {
   const [activeTab, setActiveTab] = useState("users");
+  const [vipCodes, setVipCodes] = useState<VipCode[]>([]);
+  const [newVipCode, setNewVipCode] = useState("");
+  const [maxUses, setMaxUses] = useState<string>("50");
+  const [loading, setLoading] = useState(false);
+  
+  // Function to fetch VIP codes from database
+  const fetchVipCodes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("vip_codes")
+        .select("*")
+        .order("id", { ascending: true });
+        
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        setVipCodes(data);
+      }
+    } catch (error) {
+      console.error("Error fetching VIP codes:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load VIP codes"
+      });
+    }
+  };
+  
+  // Function to create a new VIP code
+  const handleCreateVipCode = async () => {
+    if (!newVipCode.trim() || !maxUses.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please provide both a code name and maximum uses"
+      });
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from("vip_codes")
+        .insert({
+          code: newVipCode.trim(),
+          max_uses: parseInt(maxUses),
+          current_uses: 0
+        })
+        .select();
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Success",
+        description: `VIP code "${newVipCode}" created successfully`
+      });
+      
+      setNewVipCode("");
+      setMaxUses("50");
+      fetchVipCodes(); // Refresh the list
+      
+    } catch (error) {
+      console.error("Error creating VIP code:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create VIP code"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Load VIP codes when the component mounts or the tab changes to "vip-codes"
+  React.useEffect(() => {
+    if (activeTab === "vip-codes") {
+      fetchVipCodes();
+    }
+  }, [activeTab]);
   
   return (
     <div className="min-h-screen py-16 px-4">

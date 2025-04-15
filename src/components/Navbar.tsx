@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,7 @@ import {
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, signOut, loading } = useAuth();
+  const { user, signOut, isLoading } = useAuth();
   const navigate = useNavigate();
 
   const toggleMenu = () => {
@@ -56,7 +55,7 @@ const Navbar = () => {
               </Link>
             )}
             
-            {!loading && (
+            {!isLoading && (
               <>
                 {user ? (
                   <DropdownMenu>
@@ -137,7 +136,7 @@ const Navbar = () => {
               </>
             )}
             
-            {!user && !loading && (
+            {!user && !isLoading && (
               <div className="flex flex-col space-y-2">
                 <Link to="/register" className="w-full">
                   <Button className="fantasy-button w-full">

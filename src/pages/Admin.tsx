@@ -1,5 +1,5 @@
+
 import React, { useState } from "react";
-import { Navigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
-import { Loader2 } from "lucide-react";
-import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/lib/supabase";
 import UserManagement from "@/components/admin/UserManagement";
 import SongManagement from "@/components/admin/SongManagement";
@@ -21,25 +19,13 @@ interface VipCode {
 }
 
 const Admin = () => {
-  const { isAdmin, loading: adminLoading } = useAdmin();
   const [activeTab, setActiveTab] = useState("users");
   const [vipCodes, setVipCodes] = useState<VipCode[]>([]);
   const [newVipCode, setNewVipCode] = useState("");
   const [maxUses, setMaxUses] = useState<string>("50");
   const [loading, setLoading] = useState(false);
   
-  if (!adminLoading && !isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
-  if (adminLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
+  // Function to fetch VIP codes from database
   const fetchVipCodes = async () => {
     try {
       const { data, error } = await supabase
@@ -64,6 +50,7 @@ const Admin = () => {
     }
   };
   
+  // Function to create a new VIP code
   const handleCreateVipCode = async () => {
     if (!newVipCode.trim() || !maxUses.trim()) {
       toast({
@@ -111,6 +98,7 @@ const Admin = () => {
     }
   };
   
+  // Load VIP codes when the component mounts or the tab changes to "vip-codes"
   React.useEffect(() => {
     if (activeTab === "vip-codes") {
       fetchVipCodes();
@@ -134,14 +122,17 @@ const Admin = () => {
             <TabsTrigger value="vip-codes">VIP Codes</TabsTrigger>
           </TabsList>
           
+          {/* Users Tab */}
           <TabsContent value="users">
             <UserManagement />
           </TabsContent>
           
+          {/* Music Tab */}
           <TabsContent value="music">
             <SongManagement />
           </TabsContent>
           
+          {/* VIP Codes Tab */}
           <TabsContent value="vip-codes">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">

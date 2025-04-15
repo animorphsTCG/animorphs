@@ -222,7 +222,6 @@ export type Database = {
           gender: string | null
           gold: number
           id: string
-          is_admin: boolean | null
           lbp: number
           mp: number
           music_unlocked: boolean
@@ -245,7 +244,6 @@ export type Database = {
           gender?: string | null
           gold?: number
           id: string
-          is_admin?: boolean | null
           lbp?: number
           mp?: number
           music_unlocked?: boolean
@@ -268,7 +266,6 @@ export type Database = {
           gender?: string | null
           gold?: number
           id?: string
-          is_admin?: boolean | null
           lbp?: number
           mp?: number
           music_unlocked?: boolean
@@ -411,13 +408,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_user_emails: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          id: string
-          email: string
-        }[]
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

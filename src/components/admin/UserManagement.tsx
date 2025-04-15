@@ -1,9 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Loader2, Check, X } from "lucide-react";
-import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -23,8 +23,18 @@ interface UserProfile {
   created_at: string;
 }
 
-const UserManagement = () => {
-  const { isAdmin } = useAdmin();
+interface PaymentInfo {
+  has_paid: boolean;
+  payment_date: string | null;
+  payment_method: string | null;
+}
+
+interface MusicSubscription {
+  subscription_type: string;
+  end_date: string;
+}
+
+const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -40,62 +50,68 @@ const UserManagement = () => {
   });
 
   useEffect(() => {
-    if (!isAdmin) return;
-
-    // Set up realtime subscription for profiles
-    const channel = supabase
-      .channel('profiles_changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'profiles' 
-        }, 
-        () => {
-          fetchUsers();
-        }
-      )
-      .subscribe();
-
     fetchUsers();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isAdmin]);
+  }, []);
 
   const fetchUsers = async () => {
-    if (!isAdmin) return;
-    
+    setLoading(true);
     try {
-      setLoading(true);
-      // Fetch profiles
+      // Fetch user profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
 
       if (profilesError) throw profilesError;
-
-      // Fetch user emails using the secure function
-      const { data: emailsData, error: emailsError } = await supabase
-        .rpc('get_user_emails');
-
-      if (emailsError) throw emailsError;
-
-      // Merge the data
-      const emailMap = new Map(emailsData.map((user: any) => [user.id, user.email]));
-      const mergedUsers = profiles.map((profile: any) => ({
+      
+      // Fetch emails from auth (requires admin privileges)
+      const { data: users, error: usersError } = await supabase
+        .from('auth.users')
+        .select('id, email');
+      
+      // Fetch payment status
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payment_status')
+        .select('*');
+        
+      // Fetch music subscriptions
+      const { data: subscriptions, error: subscriptionsError } = await supabase
+        .from('music_subscriptions')
+        .select('*');
+        
+      if (profilesError || usersError || paymentsError || subscriptionsError) {
+        toast({
+          variant: "destructive",
+          title: "Error fetching user data",
+          description: "There was an error loading user data."
+        });
+        return;
+      }
+      
+      // Merge data and set users
+      const usersMap = users?.reduce((acc: Record<string, string>, user) => {
+        acc[user.id] = user.email;
+        return acc;
+      }, {});
+      
+      const mergedUsers = profiles?.map((profile: UserProfile) => ({
         ...profile,
-        email: emailMap.get(profile.id) || 'Not available'
+        email: usersMap?.[profile.id] || 'Not available'
       }));
-
-      setUsers(mergedUsers);
+      
+      setUsers(mergedUsers || []);
+      
+      // Calculate stats
+      setStats({
+        totalUsers: profiles?.length || 0,
+        paidUsers: payments?.filter((p: PaymentInfo) => p.has_paid).length || 0,
+        musicSubscribers: subscriptions?.length || 0
+      });
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load user data"
+        description: "Failed to load user data."
       });
     } finally {
       setLoading(false);

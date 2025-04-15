@@ -4,6 +4,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { Song } from "@/types/music";
+import { Loader2 } from "lucide-react";
 import SongInfo from "./music/SongInfo";
 import PlaybackControls from "./music/PlaybackControls";
 import VolumeControl from "./music/VolumeControl";

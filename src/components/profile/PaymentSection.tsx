@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import { UserProfile } from '@/types';
+import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { createCheckoutSession } from '@/lib/payment';
@@ -41,12 +41,7 @@ export default function PaymentSection({ userProfile, onPaymentComplete }: Payme
     }
   };
 
-  // Use has_paid if available, fall back to music_unlocked as a potential indicator
-  const hasPaid = userProfile?.has_paid !== undefined 
-    ? userProfile.has_paid 
-    : false;
-
-  if (hasPaid) {
+  if (userProfile.has_paid) {
     return (
       <div className="space-y-4">
         <div className="bg-green-100 text-green-800 p-4 rounded-md">

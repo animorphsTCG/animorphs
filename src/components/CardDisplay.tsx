@@ -14,10 +14,10 @@ const CardDisplay = ({
   onClick,
   className
 }: CardDisplayProps) => {
-  // Only use real data, with fallbacks for nullable fields
-  const imageUrl = card.image_url || '';
-  const cardName = card.nft_name || `Card #${card.card_number || 0}`;
-
+  // Only use real data, no fallbacks
+  const imageUrl = card.image_url;
+  const cardName = card.nft_name;
+  
   return (
     <div 
       className={cn("fantasy-card cursor-pointer transition-transform hover:scale-105", className)} 
@@ -27,25 +27,22 @@ const CardDisplay = ({
         <div className="h-full w-full">
           <img 
             src={imageUrl} 
-            alt={cardName} 
+            alt={cardName || `Card #${card.card_number}`} 
             className="w-full h-full rounded-lg object-cover" 
             loading="lazy" 
-            onError={(e) => {
-              e.currentTarget.src = '/placeholder.svg';
-            }} 
           />
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-            <h3 className="text-white font-bold truncate">{cardName}</h3>
-            
+            <div className="text-white font-bold mb-1">{cardName}</div>
+            <div className="text-fantasy-accent text-sm mb-1">{card.animorph_type}</div>
             <div className="grid grid-cols-3 gap-1 mt-1">
-              <div className="bg-black/50 text-white text-xs p-1 rounded text-center">
-                Power: {card.power || 0}
+              <div className="bg-fantasy-primary/20 px-2 py-1 rounded text-xs">
+                <span className="font-bold">PWR:</span> {card.power}
               </div>
-              <div className="bg-black/50 text-white text-xs p-1 rounded text-center">
-                ATK: {card.attack || 0}
+              <div className="bg-fantasy-primary/20 px-2 py-1 rounded text-xs">
+                <span className="font-bold">HP:</span> {card.health}
               </div>
-              <div className="bg-black/50 text-white text-xs p-1 rounded text-center">
-                HP: {card.health || 0}
+              <div className="bg-fantasy-primary/20 px-2 py-1 rounded text-xs">
+                <span className="font-bold">ATK:</span> {card.attack}
               </div>
             </div>
           </div>

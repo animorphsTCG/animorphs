@@ -1,9 +1,10 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -23,7 +24,6 @@ import VisitorDemoBattle from "./pages/VisitorDemoBattle";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import { AuthProvider } from "./contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
 const queryClient = new QueryClient({
@@ -37,7 +37,7 @@ const queryClient = new QueryClient({
 });
 
 // Protected route component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRouteComponent = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -83,9 +83,30 @@ const AppContent = () => {
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/payment-cancelled" element={<PaymentCancelled />} />
-          <Route path="/battle" element={<ProtectedRoute><Battle /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/1v1-battle" element={<ProtectedRoute><OneVOneBattle /></ProtectedRoute>} />
+          <Route 
+            path="/battle" 
+            element={
+              <ProtectedRoute>
+                <Battle />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/1v1-battle" 
+            element={
+              <ProtectedRoute>
+                <OneVOneBattle />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

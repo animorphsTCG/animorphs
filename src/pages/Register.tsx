@@ -1,6 +1,9 @@
 
 import React from 'react';
 import RegistrationForm from '@/components/auth/RegistrationForm';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Gamepad2 } from 'lucide-react';
 
 const Register = () => {
   return (
@@ -10,7 +13,21 @@ const Register = () => {
         <p className="text-gray-500 mb-8 text-center">
           Join our gaming community and start your adventure
         </p>
+        
+        {/* Registration form */}
         <RegistrationForm />
+        
+        {/* Demo battle option for visitors */}
+        <div className="mt-12 text-center">
+          <p className="text-lg mb-4">Not ready to register yet?</p>
+          <Link to="/visitor-demo-battle">
+            <Button className="bg-fantasy-accent hover:bg-fantasy-accent/80 text-black font-bold">
+              <Gamepad2 className="mr-2 h-5 w-5" />
+              Try Demo Battle
+            </Button>
+          </Link>
+          <p className="text-sm text-gray-300 mt-2">No registration required</p>
+        </div>
       </div>
     </div>
   );

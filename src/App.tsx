@@ -24,6 +24,7 @@ import VisitorDemoBattle from "./pages/VisitorDemoBattle";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { AuthProvider } from "./contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +38,32 @@ const queryClient = new QueryClient({
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      setIsAuthenticated(!!data.session);
+    };
+
+    checkAuth();
+    
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+    
+    return () => {
+      data.subscription.unsubscribe();
+    };
+  }, []);
+  
+  if (isAuthenticated === null) {
+    // Still loading auth state
+    return <div className="flex justify-center items-center h-[50vh]">
+      <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent" />
+    </div>;
+  }
+  
   // The actual protection happens in each component with useEffect + useAuth
   // This is just a wrapper for organizational purposes
   return <>{children}</>;

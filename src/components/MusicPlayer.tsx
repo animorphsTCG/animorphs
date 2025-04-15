@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -8,15 +7,19 @@ import {
   SkipForward, 
   SkipBack, 
   Volume2, 
-  VolumeX 
+  VolumeX,
+  Lock
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { toast } from "@/components/ui/use-toast";
 
 interface Song {
   id: string;
   title: string;
   youtube_url: string;
+  preview_start_seconds: number;
+  preview_duration_seconds: number;
 }
 
 const MusicPlayer: React.FC = () => {
@@ -26,64 +29,96 @@ const MusicPlayer: React.FC = () => {
   const [songs, setSongs] = useState<Song[]>([]);
   const [volume, setVolume] = useState(50);
   const [isMuted, setIsMuted] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const previewTimerRef = useRef<NodeJS.Timeout>();
   
-  // Fetch user's music settings and available songs
   useEffect(() => {
-    const fetchMusicData = async () => {
-      if (!user) return;
+    if (user) {
+      fetchMusicData();
+      checkSubscription();
+    }
+  }, [user]);
 
-      // Fetch available songs
-      const { data: songData, error: songError } = await supabase
-        .from('songs')
-        .select('*');
+  useEffect(() => {
+    if (isPreviewMode && isPlaying) {
+      // Start preview timer
+      previewTimerRef.current = setTimeout(() => {
+        setIsPlaying(false);
+        toast({
+          title: "Preview ended",
+          description: "Subscribe to listen to full songs!",
+        });
+      }, (currentSong?.preview_duration_seconds || 30) * 1000);
+    }
 
-      // Fetch user's music settings
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('user_music_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (songData) setSongs(songData);
-      
-      // Set initial volume and playback state
-      if (settingsData) {
-        setVolume(settingsData.volume_level * 100);
-        setIsMuted(!settingsData.music_enabled);
+    return () => {
+      if (previewTimerRef.current) {
+        clearTimeout(previewTimerRef.current);
       }
     };
+  }, [isPreviewMode, isPlaying, currentSong]);
 
-    fetchMusicData();
-  }, [user]);
+  const fetchMusicData = async () => {
+    if (!user) return;
+
+    const { data: userSongs, error: selectionsError } = await supabase
+      .from('user_song_selections')
+      .select('songs(*)')
+      .eq('user_id', user.id);
+
+    if (userSongs) {
+      setSongs(userSongs.map(s => s.songs));
+    }
+
+    const { data: settings, error: settingsError } = await supabase
+      .from('user_music_settings')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (settings) {
+      setVolume(settings.volume_level * 100);
+      setIsMuted(!settings.music_enabled);
+    }
+  };
+
+  const checkSubscription = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('music_subscriptions')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    setHasSubscription(!!data && new Date(data.end_date) > new Date());
+    setIsPreviewMode(!hasSubscription);
+  };
   
-  // Play/pause toggle
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
     updatePlayerState(!isPlaying);
   };
   
-  // Skip to next song
   const nextSong = () => {
     const currentIndex = songs.findIndex(song => song.id === currentSong?.id);
     const nextIndex = (currentIndex + 1) % songs.length;
     setCurrentSong(songs[nextIndex]);
   };
   
-  // Go to previous song
   const prevSong = () => {
     const currentIndex = songs.findIndex(song => song.id === currentSong?.id);
     const prevIndex = (currentIndex - 1 + songs.length) % songs.length;
     setCurrentSong(songs[prevIndex]);
   };
   
-  // Toggle mute
   const toggleMute = () => {
     setIsMuted(!isMuted);
     updatePlayerState(isPlaying, isMuted ? volume : 0);
   };
   
-  // Handle volume change
   const handleVolumeChange = (value: number[]) => {
     const newVolume = value[0];
     setVolume(newVolume);
@@ -93,7 +128,6 @@ const MusicPlayer: React.FC = () => {
     updatePlayerState(isPlaying, newVolume);
   };
 
-  // Update player state and save to database
   const updatePlayerState = async (playing: boolean, volumeLevel?: number) => {
     if (!user) return;
 
@@ -117,7 +151,15 @@ const MusicPlayer: React.FC = () => {
           <p className="font-medium truncate">
             {currentSong?.title || "No song selected"}
           </p>
-          <p className="text-xs text-gray-400">Music Player</p>
+          <p className="text-xs text-gray-400">
+            {isPreviewMode ? "Preview Mode" : "Music Player"}
+            {!hasSubscription && (
+              <span className="ml-2 text-yellow-400">
+                <Lock className="inline-block h-3 w-3 mr-1" />
+                Limited Access
+              </span>
+            )}
+          </p>
         </div>
         
         <div className="flex items-center gap-1">
@@ -154,7 +196,11 @@ const MusicPlayer: React.FC = () => {
             onClick={toggleMute}
             className="h-8 w-8 text-gray-300 hover:bg-fantasy-primary/20"
           >
-            {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            {isMuted || volume === 0 ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
           </Button>
           
           <div className="w-20">
@@ -169,11 +215,10 @@ const MusicPlayer: React.FC = () => {
         </div>
       </div>
 
-      {/* Hidden YouTube Player */}
       <div className="hidden">
         <iframe 
           ref={iframeRef}
-          src={currentSong ? `https://www.youtube.com/embed/${currentSong.youtube_url.split('?v=')[1]}?autoplay=${isPlaying ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0` : ''}
+          src={currentSong ? `https://www.youtube.com/embed/${currentSong.youtube_url.split('?v=')[1]}?autoplay=${isPlaying ? 1 : 0}&mute=${isMuted ? 1 : 0}&controls=0&start=${isPreviewMode ? currentSong.preview_start_seconds : 0}` : ''}
           allow="autoplay"
           title="Music Player"
         />

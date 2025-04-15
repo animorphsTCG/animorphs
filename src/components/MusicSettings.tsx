@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Lock, Unlock } from "lucide-react";
+import { Lock, Music } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+import SongBrowser from './music/SongBrowser';
+import MusicSubscription from './music/MusicSubscription';
 
 interface Song {
   id: string;
@@ -14,75 +17,129 @@ interface Song {
   youtube_url: string;
 }
 
+interface MusicSubscription {
+  subscription_type: 'monthly' | 'yearly';
+  end_date: string;
+}
+
 const MusicSettings: React.FC = () => {
-  const { user, userProfile } = useAuth();
-  const [songs, setSongs] = useState<Song[]>([]);
+  const { user } = useAuth();
   const [selectedSongs, setSelectedSongs] = useState<string[]>([]);
-  const [favouriteSongs, setFavouriteSongs] = useState<string[]>([]);
   const [volume, setVolume] = useState(50);
   const [musicEnabled, setMusicEnabled] = useState(true);
+  const [showSongBrowser, setShowSongBrowser] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
+  const [subscription, setSubscription] = useState<MusicSubscription | null>(null);
 
-  // Fetch songs and user settings
   useEffect(() => {
-    const fetchMusicData = async () => {
-      if (!user) return;
-
-      // Fetch all songs
-      const { data: songData, error: songError } = await supabase
-        .from('songs')
-        .select('*');
-
-      // Fetch user's music settings
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('user_music_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (songData) setSongs(songData);
-      
-      if (settingsData) {
-        setSelectedSongs(settingsData.selected_songs || []);
-        setFavouriteSongs(settingsData.favourite_songs || []);
-        setVolume(settingsData.volume_level * 100);
-        setMusicEnabled(settingsData.music_enabled);
-      }
-    };
-
-    fetchMusicData();
+    if (user) {
+      fetchUserSettings();
+      fetchSubscription();
+    }
   }, [user]);
 
-  // Update user settings
-  const updateUserSettings = async () => {
+  const fetchUserSettings = async () => {
     if (!user) return;
 
-    await supabase
-      .from('user_music_settings')
-      .update({
-        selected_songs: selectedSongs,
-        favourite_songs: favouriteSongs,
-        volume_level: volume / 100,
-        music_enabled: musicEnabled
-      })
+    const { data: selections, error: selectionsError } = await supabase
+      .from('user_song_selections')
+      .select('song_id')
       .eq('user_id', user.id);
-  };
 
-  // Toggle song selection (max 5 for free users)
-  const toggleSongSelection = (songId: string) => {
-    if (selectedSongs.includes(songId)) {
-      setSelectedSongs(selectedSongs.filter(id => id !== songId));
-    } else if (selectedSongs.length < 5 || userProfile?.has_paid) {
-      setSelectedSongs([...selectedSongs, songId]);
+    if (selectionsError) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch song selections",
+      });
+      return;
+    }
+
+    setSelectedSongs(selections?.map(s => s.song_id) || []);
+
+    const { data: settings, error: settingsError } = await supabase
+      .from('user_music_settings')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!settingsError && settings) {
+      setVolume(settings.volume_level * 100);
+      setMusicEnabled(settings.music_enabled);
     }
   };
 
-  // Toggle favourite song
-  const toggleFavouriteSong = (songId: string) => {
-    if (favouriteSongs.includes(songId)) {
-      setFavouriteSongs(favouriteSongs.filter(id => id !== songId));
+  const fetchSubscription = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('music_subscriptions')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!error && data) {
+      setSubscription(data);
+    }
+  };
+
+  const handleSongSelect = async (songId: string) => {
+    if (!user) return;
+
+    const isSelected = selectedSongs.includes(songId);
+    let newSelectedSongs: string[];
+
+    if (isSelected) {
+      const { error } = await supabase
+        .from('user_song_selections')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('song_id', songId);
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to remove song selection",
+        });
+        return;
+      }
+
+      newSelectedSongs = selectedSongs.filter(id => id !== songId);
     } else {
-      setFavouriteSongs([...favouriteSongs, songId]);
+      const { error } = await supabase
+        .from('user_song_selections')
+        .insert({
+          user_id: user.id,
+          song_id: songId,
+        });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to add song selection",
+        });
+        return;
+      }
+
+      newSelectedSongs = [...selectedSongs, songId];
     }
+
+    setSelectedSongs(newSelectedSongs);
+    toast({
+      title: "Success",
+      description: isSelected ? "Song removed from your collection" : "Song added to your collection",
+    });
+  };
+
+  const handleSubscribe = async (plan: 'monthly' | 'yearly') => {
+    // In a real implementation, this would integrate with a payment provider
+    toast({
+      title: "Coming Soon",
+      description: "Subscription functionality will be available soon!",
+    });
+    setShowSubscription(false);
   };
 
   return (
@@ -93,12 +150,9 @@ const MusicSettings: React.FC = () => {
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <span>Music Enabled</span>
-          <Switch 
+          <Switch
             checked={musicEnabled}
-            onCheckedChange={(checked) => {
-              setMusicEnabled(checked);
-              updateUserSettings();
-            }}
+            onCheckedChange={setMusicEnabled}
           />
         </div>
 
@@ -108,72 +162,62 @@ const MusicSettings: React.FC = () => {
             value={[volume]}
             max={100}
             step={1}
-            onValueChange={(value) => {
-              setVolume(value[0]);
-              updateUserSettings();
-            }}
+            onValueChange={(value) => setVolume(value[0])}
           />
         </div>
 
-        <div>
-          <h3 className="text-lg font-semibold mb-4">Song Selection</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {songs.map(song => (
-              <div 
-                key={song.id} 
-                className={`
-                  p-2 rounded-lg flex justify-between items-center 
-                  ${selectedSongs.includes(song.id) ? 'bg-fantasy-accent/20' : 'bg-gray-100'}
-                  ${!userProfile?.has_paid && selectedSongs.length >= 5 && !selectedSongs.includes(song.id) 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : 'cursor-pointer'}
-                `}
-                onClick={() => toggleSongSelection(song.id)}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Your Song Collection</h3>
+            <div className="space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowSongBrowser(true)}
+                disabled={selectedSongs.length >= 5 && !subscription}
               >
-                <span>{song.title}</span>
-                <div className="flex items-center space-x-2">
-                  {favouriteSongs.includes(song.id) ? (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavouriteSong(song.id);
-                      }}
-                      className="text-yellow-500 hover:text-yellow-600"
-                    >
-                      ★
-                    </Button>
-                  ) : (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavouriteSong(song.id);
-                      }}
-                      className="text-gray-400 hover:text-yellow-500"
-                    >
-                      ☆
-                    </Button>
-                  )}
-                  {!userProfile?.has_paid && selectedSongs.length >= 5 && !selectedSongs.includes(song.id) ? (
-                    <Lock className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <Unlock className="h-4 w-4 text-green-500" />
-                  )}
-                </div>
-              </div>
-            ))}
+                Browse Songs
+              </Button>
+              {!subscription && (
+                <Button
+                  variant="default"
+                  onClick={() => setShowSubscription(true)}
+                >
+                  Upgrade
+                </Button>
+              )}
+            </div>
           </div>
+
+          {!subscription && selectedSongs.length < 5 && (
+            <p className="text-sm text-muted-foreground">
+              Select up to 5 free songs for your collection
+            </p>
+          )}
+
+          {subscription && (
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <p className="text-sm">
+                {subscription.subscription_type === 'monthly' ? 'Monthly' : 'Yearly'} subscription active
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Expires: {new Date(subscription.end_date).toLocaleDateString()}
+              </p>
+            </div>
+          )}
         </div>
 
-        <Button 
-          onClick={updateUserSettings} 
-          className="w-full"
-        >
-          Save Music Settings
-        </Button>
+        <SongBrowser
+          open={showSongBrowser}
+          onOpenChange={setShowSongBrowser}
+          onSongSelect={handleSongSelect}
+          selectedSongs={selectedSongs}
+        />
+
+        <MusicSubscription
+          open={showSubscription}
+          onOpenChange={setShowSubscription}
+          onSubscribe={handleSubscribe}
+        />
       </CardContent>
     </Card>
   );

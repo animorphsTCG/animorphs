@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
@@ -41,7 +42,10 @@ export default function PaymentSection({ userProfile, onPaymentComplete }: Payme
     }
   };
 
-  if (userProfile.has_paid) {
+  // Use has_paid if available, fall back to the old property if needed
+  const hasPaid = userProfile.has_paid !== undefined ? userProfile.has_paid : false;
+
+  if (hasPaid) {
     return (
       <div className="space-y-4">
         <div className="bg-green-100 text-green-800 p-4 rounded-md">

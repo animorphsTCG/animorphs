@@ -34,19 +34,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const navigate = useNavigate();
+  const [fetchingProfile, setFetchingProfile] = useState(false);
 
   const fetchUserProfile = async (userId: string) => {
+    // Prevent concurrent profile fetch operations
+    if (fetchingProfile) return;
+    
     try {
+      setFetchingProfile(true);
+      console.log('Fetching user profile for:', userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
-      setUserProfile(data);
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        throw error;
+      }
+      
+      if (data) {
+        console.log('User profile data received:', data);
+        // Check if payment info is available in the profiles table directly
+        let profileData = { ...data };
+        
+        // If profiles table doesn't have has_paid, try to get it from payment_status
+        if (profileData.has_paid === undefined) {
+          const { data: paymentData, error: paymentError } = await supabase
+            .from('payment_status')
+            .select('has_paid')
+            .eq('id', userId)
+            .maybeSingle();
+            
+          if (!paymentError && paymentData) {
+            profileData.has_paid = paymentData.has_paid;
+          }
+        }
+        
+        setUserProfile(profileData as UserProfile);
+      } else {
+        console.warn('No user profile found');
+      }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('Error in fetchUserProfile:', error);
+    } finally {
+      setFetchingProfile(false);
     }
   };
 
@@ -57,16 +91,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST to avoid race conditions
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        console.log('Auth state changed:', event);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (event === 'SIGNED_IN' && currentSession?.user) {
           // Use setTimeout to prevent potential deadlocks
           setTimeout(() => {
-            fetchUserProfile(currentSession.user.id);
+            fetchUserProfile(currentSession.user!.id);
           }, 0);
           toast({ title: 'Signed in successfully' });
         } else if (event === 'SIGNED_OUT') {
@@ -81,9 +116,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
       if (currentSession?.user) {
         fetchUserProfile(currentSession.user.id);
       }
+      
       setIsLoading(false);
     });
 

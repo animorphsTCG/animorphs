@@ -1,17 +1,20 @@
-import React, { useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
-import PaymentSection from '@/components/payment/PaymentSection';
+import PaymentSection from '@/components/profile/PaymentSection';
 import { Loader2, Lock } from 'lucide-react';
 import MusicSettings from '@/components/MusicSettings';
 import MusicPlayer from '@/components/MusicPlayer';
+import { toast } from '@/components/ui/use-toast';
 
 const Profile = () => {
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -22,11 +25,24 @@ const Profile = () => {
   // Ensure profile is loaded
   useEffect(() => {
     if (user && !userProfile) {
-      refreshProfile();
+      setLoadingProfile(true);
+      refreshProfile()
+        .then(() => {
+          setLoadingProfile(false);
+        })
+        .catch((error) => {
+          console.error('Error loading profile:', error);
+          setLoadingProfile(false);
+          toast({
+            variant: 'destructive',
+            title: 'Profile Error',
+            description: 'There was a problem loading your profile. Please try again.',
+          });
+        });
     }
   }, [user, userProfile, refreshProfile]);
 
-  if (isLoading || !user) {
+  if (isLoading || loadingProfile) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -45,35 +61,37 @@ const Profile = () => {
             <CardContent>
               {!userProfile ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <p className="text-gray-500">No profile information available</p>
                 </div>
               ) : (
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <h3 className="text-sm text-gray-500">Name</h3>
-                      <p className="text-lg">{userProfile.name} {userProfile.surname}</p>
+                      <p className="text-lg">{userProfile.name || 'Not set'} {userProfile.surname || ''}</p>
                     </div>
                     <div>
                       <h3 className="text-sm text-gray-500">Email</h3>
-                      <p className="text-lg">{userProfile.email}</p>
+                      <p className="text-lg">{userProfile.email || 'Not set'}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <h3 className="text-sm text-gray-500">Date of Birth</h3>
-                      <p className="text-lg">{formatDate(userProfile.date_of_birth)}</p>
+                      <p className="text-lg">
+                        {userProfile.date_of_birth ? formatDate(userProfile.date_of_birth) : 'Not set'}
+                      </p>
                     </div>
                     <div>
                       <h3 className="text-sm text-gray-500">Gender</h3>
-                      <p className="text-lg">{userProfile.gender}</p>
+                      <p className="text-lg">{userProfile.gender || 'Not set'}</p>
                     </div>
                   </div>
 
                   <div>
                     <h3 className="text-sm text-gray-500">Country</h3>
-                    <p className="text-lg">{userProfile.country}</p>
+                    <p className="text-lg">{userProfile.country || 'Not set'}</p>
                   </div>
                 </div>
               )}
@@ -87,7 +105,7 @@ const Profile = () => {
             <CardContent>
               {!userProfile ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <p className="text-gray-500">No game status available</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -95,11 +113,15 @@ const Profile = () => {
                     <div>
                       <h3 className="font-medium">Account Status</h3>
                       <p className="text-sm text-gray-600">
-                        {userProfile.has_paid ? "Full Access" : "Limited Access (Demo Mode)"}
+                        {(userProfile.has_paid !== undefined ? userProfile.has_paid : false) 
+                          ? "Full Access" : "Limited Access (Demo Mode)"}
                       </p>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-sm ${userProfile.has_paid ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
-                      {userProfile.has_paid ? "Paid" : "Free"}
+                    <div className={`px-3 py-1 rounded-full text-sm ${
+                      (userProfile.has_paid !== undefined ? userProfile.has_paid : false) 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-yellow-100 text-yellow-800"}`}>
+                      {(userProfile.has_paid !== undefined ? userProfile.has_paid : false) ? "Paid" : "Free"}
                     </div>
                   </div>
 
@@ -107,10 +129,11 @@ const Profile = () => {
                     <div>
                       <h3 className="font-medium">Card Access</h3>
                       <p className="text-sm text-gray-600">
-                        {userProfile.has_paid ? "All 200 cards" : "Limited cards (Demo only)"}
+                        {(userProfile.has_paid !== undefined ? userProfile.has_paid : false) 
+                          ? "All 200 cards" : "Limited cards (Demo only)"}
                       </p>
                     </div>
-                    {!userProfile.has_paid && (
+                    {!(userProfile.has_paid !== undefined ? userProfile.has_paid : false) && (
                       <Lock className="h-5 w-5 text-gray-500" />
                     )}
                   </div>

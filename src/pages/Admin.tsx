@@ -1,46 +1,12 @@
-
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import UserManagement from "@/components/admin/UserManagement";
+import SongManagement from "@/components/admin/SongManagement";
 
 const Admin = () => {
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("users");
   
-  // Sample VIP codes data
-  const vipCodes = [
-    { id: 1, code: "WonAgainstAi", max_uses: 50, current_uses: 12 },
-    { id: 2, code: "ZypherDan", max_uses: 51, current_uses: 3 },
-    { id: 3, code: "BattleMaster", max_uses: 20, current_uses: 20 },
-  ];
-  
-  // Sample users data
-  const users = [
-    { id: 1, username: "dragonslayer", email: "dragon@example.com", name: "Alex", surname: "Carter", age: 27 },
-    { id: 2, username: "techwarrior", email: "warrior@example.com", name: "Sam", surname: "Johnson", age: 31 },
-    { id: 3, username: "forestmage", email: "forest@example.com", name: "Jamie", surname: "Smith", age: 24 },
-  ];
-  
-  // Form states
-  const [newVipCode, setNewVipCode] = useState("");
-  const [maxUses, setMaxUses] = useState("50");
-  
-  const handleCreateVipCode = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      setNewVipCode("");
-      setMaxUses("50");
-      alert("VIP code created successfully!");
-    }, 1000);
-  };
-
   return (
     <div className="min-h-screen py-16 px-4">
       <div className="container mx-auto max-w-6xl">
@@ -51,13 +17,22 @@ const Admin = () => {
           Manage your Animorph Battle Verse game from this central dashboard
         </p>
         
-        <Tabs defaultValue="vip-codes" className="w-full">
-          <TabsList className="grid grid-cols-4 mb-8">
-            <TabsTrigger value="vip-codes">VIP Codes</TabsTrigger>
+        <Tabs defaultValue="users" className="w-full" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-3 mb-8">
             <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="cards">Cards</TabsTrigger>
             <TabsTrigger value="music">Music</TabsTrigger>
+            <TabsTrigger value="vip-codes">VIP Codes</TabsTrigger>
           </TabsList>
+          
+          {/* Users Tab */}
+          <TabsContent value="users">
+            <UserManagement />
+          </TabsContent>
+          
+          {/* Music Tab */}
+          <TabsContent value="music">
+            <SongManagement />
+          </TabsContent>
           
           {/* VIP Codes Tab */}
           <TabsContent value="vip-codes">
@@ -66,7 +41,6 @@ const Admin = () => {
                 <Card className="bg-black/70 border-fantasy-primary/50">
                   <CardHeader>
                     <CardTitle>VIP Codes</CardTitle>
-                    <CardDescription>Manage existing VIP codes and their usage</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-md border border-fantasy-primary/30">
@@ -114,7 +88,6 @@ const Admin = () => {
                 <Card className="bg-black/70 border-fantasy-primary/50">
                   <CardHeader>
                     <CardTitle>Create VIP Code</CardTitle>
-                    <CardDescription>Generate a new VIP code for users</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <form className="space-y-4">
@@ -153,73 +126,6 @@ const Admin = () => {
                     </Button>
                   </CardFooter>
                 </Card>
-              </div>
-            </div>
-          </TabsContent>
-          
-          {/* Users Tab */}
-          <TabsContent value="users">
-            <Card className="bg-black/70 border-fantasy-primary/50">
-              <CardHeader>
-                <CardTitle>Users Management</CardTitle>
-                <CardDescription>Manage registered users and their details</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border border-fantasy-primary/30">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Username</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Surname</TableHead>
-                        <TableHead>Age</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.username}</TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.name}</TableCell>
-                          <TableCell>{user.surname}</TableCell>
-                          <TableCell>{user.age}</TableCell>
-                          <TableCell>
-                            <Button variant="outline" size="sm" className="mr-2">
-                              View
-                            </Button>
-                            <Button variant="outline" size="sm" className="text-fantasy-danger">
-                              Delete
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          {/* Cards Tab */}
-          <TabsContent value="cards">
-            <div className="h-96 flex items-center justify-center">
-              <div className="text-center">
-                <h3 className="text-2xl font-fantasy mb-4">Card Management</h3>
-                <p className="text-gray-300 mb-6">Create, edit and manage battle cards</p>
-                <Button className="fantasy-button">Coming Soon</Button>
-              </div>
-            </div>
-          </TabsContent>
-          
-          {/* Music Tab */}
-          <TabsContent value="music">
-            <div className="h-96 flex items-center justify-center">
-              <div className="text-center">
-                <h3 className="text-2xl font-fantasy mb-4">Music Management</h3>
-                <p className="text-gray-300 mb-6">Add and manage YouTube music tracks</p>
-                <Button className="fantasy-button">Coming Soon</Button>
               </div>
             </div>
           </TabsContent>

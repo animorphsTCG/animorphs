@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +23,8 @@ import NotFound from "./pages/NotFound";
 import OneVOneBattle from "./pages/OneVOneBattle";
 import VisitorDemoBattle from "./pages/VisitorDemoBattle";
 import MusicPlayer from "./components/MusicPlayer";
+import AdminAccessTrigger from "./components/admin/AdminAccessTrigger";
+import Admin from "./pages/Admin";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -43,6 +46,7 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
+        <AdminAccessTrigger />
         <div className="flex flex-col min-h-screen">
           <Navbar />
           <div className="flex-grow">
@@ -80,6 +84,7 @@ const App = () => (
                 } 
               />
               <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>

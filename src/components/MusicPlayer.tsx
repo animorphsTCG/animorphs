@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -63,13 +64,28 @@ const MusicPlayer: React.FC = () => {
   const fetchMusicData = async () => {
     if (!user) return;
 
-    const { data: userSongs, error: selectionsError } = await supabase
+    // Using a properly typed query to fetch songs
+    const { data: userSongSelections, error: selectionsError } = await supabase
       .from('user_song_selections')
-      .select('songs(*)')
+      .select('song_id, songs:songs(*)')
       .eq('user_id', user.id);
 
-    if (userSongs) {
-      setSongs(userSongs.map(s => s.songs));
+    if (selectionsError) {
+      console.error("Error fetching song selections:", selectionsError);
+      return;
+    }
+
+    if (userSongSelections && userSongSelections.length > 0) {
+      // Extract the songs data from the nested structure
+      const extractedSongs: Song[] = userSongSelections
+        .map(selection => selection.songs)
+        .filter(song => song !== null);
+      
+      setSongs(extractedSongs);
+      
+      if (extractedSongs.length > 0 && !currentSong) {
+        setCurrentSong(extractedSongs[0]);
+      }
     }
 
     const { data: settings, error: settingsError } = await supabase
@@ -93,8 +109,9 @@ const MusicPlayer: React.FC = () => {
       .eq('user_id', user.id)
       .single();
 
-    setHasSubscription(!!data && new Date(data.end_date) > new Date());
-    setIsPreviewMode(!hasSubscription);
+    const hasActiveSubscription = !!data && new Date(data.end_date) > new Date();
+    setHasSubscription(hasActiveSubscription);
+    setIsPreviewMode(!hasActiveSubscription);
   };
   
   const togglePlay = () => {

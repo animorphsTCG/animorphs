@@ -8,6 +8,54 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 
+// Add YouTube Player API type definition
+declare global {
+  interface Window {
+    YT: typeof YT;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
+// Define the YouTube Player API namespace
+interface YT {
+  Player: any;
+  PlayerState: {
+    ENDED: number;
+    PLAYING: number;
+    PAUSED: number;
+    BUFFERING: number;
+    CUED: number;
+  };
+}
+
+declare var YT: {
+  Player: new (
+    elementId: string, 
+    options: {
+      height?: string | number;
+      width?: string | number;
+      videoId?: string;
+      playerVars?: {
+        autoplay?: number;
+        start?: number;
+        [key: string]: any;
+      };
+      events?: {
+        onReady?: (event: any) => void;
+        onStateChange?: (event: any) => void;
+        [key: string]: any;
+      };
+    }
+  ) => any;
+  PlayerState: {
+    ENDED: number;
+    PLAYING: number;
+    PAUSED: number;
+    BUFFERING: number;
+    CUED: number;
+  };
+};
+
 interface Song {
   id: string;
   title: string;
@@ -32,10 +80,36 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
   const { user } = useAuth();
   const [songs, setSongs] = useState<Song[]>([]);
   const [playingPreview, setPlayingPreview] = useState<string | null>(null);
-  const [previewPlayer, setPreviewPlayer] = useState<YT.Player | null>(null);
+  const [previewPlayer, setPreviewPlayer] = useState<any | null>(null);
+  const [ytApiReady, setYtApiReady] = useState(false);
 
   useEffect(() => {
     fetchSongs();
+    
+    // Load YouTube iframe API
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+      
+      // Set up the callback for when the API is ready
+      window.onYouTubeIframeAPIReady = () => {
+        setYtApiReady(true);
+      };
+    } else {
+      setYtApiReady(true);
+    }
+
+    return () => {
+      if (previewPlayer) {
+        try {
+          previewPlayer.destroy();
+        } catch (error) {
+          console.error("Error destroying YouTube player:", error);
+        }
+      }
+    };
   }, []);
 
   const fetchSongs = async () => {
@@ -57,36 +131,68 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
   };
 
   const handlePreviewClick = (songId: string, youtubeUrl: string) => {
+    if (!ytApiReady) {
+      toast({
+        title: "Please wait",
+        description: "YouTube player is loading...",
+      });
+      return;
+    }
+
     if (playingPreview === songId) {
-      previewPlayer?.pauseVideo();
+      if (previewPlayer) {
+        previewPlayer.pauseVideo();
+      }
       setPlayingPreview(null);
     } else {
-      const videoId = youtubeUrl.split('v=')[1];
+      const urlParts = youtubeUrl.split('v=');
+      const videoId = urlParts.length > 1 ? urlParts[1] : youtubeUrl;
+      
       if (!previewPlayer) {
         // Create new player
-        const player = new YT.Player('preview-player', {
-          height: '0',
-          width: '0',
-          videoId,
-          playerVars: {
-            autoplay: 1,
-            start: songs.find(s => s.id === songId)?.preview_start_seconds || 0,
-          },
-          events: {
-            onStateChange: (event) => {
-              if (event.data === YT.PlayerState.ENDED) {
-                setPlayingPreview(null);
+        try {
+          const player = new YT.Player('preview-player', {
+            height: '0',
+            width: '0',
+            videoId,
+            playerVars: {
+              autoplay: 1,
+              start: songs.find(s => s.id === songId)?.preview_start_seconds || 0,
+            },
+            events: {
+              onStateChange: (event) => {
+                if (event.data === YT.PlayerState.ENDED) {
+                  setPlayingPreview(null);
+                }
               }
             }
-          }
-        });
-        setPreviewPlayer(player);
+          });
+          setPreviewPlayer(player);
+        } catch (error) {
+          console.error("Error creating YouTube player:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to play preview",
+          });
+          return;
+        }
       } else {
         // Use existing player
-        previewPlayer.loadVideoById({
-          videoId,
-          startSeconds: songs.find(s => s.id === songId)?.preview_start_seconds || 0,
-        });
+        try {
+          previewPlayer.loadVideoById({
+            videoId,
+            startSeconds: songs.find(s => s.id === songId)?.preview_start_seconds || 0,
+          });
+        } catch (error) {
+          console.error("Error loading video:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to play preview",
+          });
+          return;
+        }
       }
       setPlayingPreview(songId);
     }

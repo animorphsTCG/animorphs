@@ -9,7 +9,7 @@ interface YouTubeEmbedProps {
   isPreviewMode: boolean;
   ytApiReady: boolean;
   iframeRef: React.RefObject<HTMLIFrameElement>;
-  playerRef: MutableRefObject<YTPlayer | null>;
+  playerRef: MutableRefObject<any>; // Using any for YT.Player to avoid TS issues
 }
 
 const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
@@ -53,7 +53,10 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
 
         if (!playerRef.current) {
           // Initialize new player
-          const player = new window.YT.Player('youtube-player', {
+          console.log("Creating new YouTube player for:", videoId);
+          // We create a new player but don't directly assign it to playerRef.current
+          // The player will be assigned in the onReady event
+          new window.YT.Player('youtube-player', {
             height: '0',
             width: '0',
             videoId: videoId,
@@ -66,7 +69,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
             events: {
               onReady: (event) => {
                 playerRef.current = event.target;
-                console.log("YouTube player ready");
+                console.log("YouTube player ready, id:", videoId);
                 if (isPlaying && !isMuted) {
                   event.target.playVideo();
                 }
@@ -75,6 +78,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
             }
           });
         } else {
+          console.log("Using existing player for:", videoId);
           if (isPlaying) {
             playerRef.current.loadVideoById({
               videoId: videoId,

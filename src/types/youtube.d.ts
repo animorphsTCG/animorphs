@@ -1,3 +1,4 @@
+
 // Type definitions for YouTube IFrame API
 interface YT {
   PlayerState: {
@@ -32,13 +33,18 @@ interface YT {
 
 interface YTPlayer {
   loadVideoById(videoIdOrOptions: string | object, startSeconds?: number): void;
-  cueVideoById(videoIdOrOptions: string | object): void;
+  cueVideoById(videoIdOrOptions: string | object, startSeconds?: number): void;
   playVideo(): void;
   pauseVideo(): void;
   stopVideo(): void;
   destroy(): void;
   mute(): void;
   unMute(): void;
+  getPlayerState(): number;
+  getCurrentTime(): number;
+  getDuration(): number;
+  getVideoUrl(): string;
+  getVideoData(): any;
 }
 
 declare namespace YT {

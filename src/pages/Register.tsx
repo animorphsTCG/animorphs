@@ -1,9 +1,9 @@
 
 import React from 'react';
-import RegistrationForm from '@/components/auth/RegistrationForm';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Gamepad2 } from 'lucide-react';
+import { RegistrationForm } from '@/modules/auth';
 
 const Register = () => {
   return (

@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/modules/auth/context/AuthContext";
 import { fetchAnimorphCards } from "@/lib/db";
 import { AnimorphCard } from "@/types";
 import CardSelectionScreen from "@/components/battle/CardSelectionScreen";
 import BattleScreen from "@/components/battle/BattleScreen";
-import { useBattle } from "@/hooks/useBattle";
+import { useBattle } from "@/modules/battle";
 import { useAI } from "@/hooks/useAI";
 
 const OneVOneBattle = () => {

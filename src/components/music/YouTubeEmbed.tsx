@@ -1,4 +1,3 @@
-
 import React, { useEffect, MutableRefObject } from "react";
 import { Song } from "@/types/music";
 
@@ -8,8 +7,9 @@ interface YouTubeEmbedProps {
   isMuted: boolean;
   isPreviewMode: boolean;
   ytApiReady: boolean;
-  iframeRef: React.RefObject<HTMLIFrameElement>;
+  iframeRef?: React.RefObject<HTMLIFrameElement>;
   playerRef: MutableRefObject<any>; // Using any for YT.Player to avoid TS issues
+  extractVideoId?: (url: string) => string;
 }
 
 const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
@@ -20,9 +20,14 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   ytApiReady,
   iframeRef,
   playerRef,
+  extractVideoId,
 }) => {
-  const extractVideoId = (url: string): string => {
+  const extractVideoIdImpl = (url: string): string => {
     if (!url) return '';
+    
+    if (extractVideoId) {
+      return extractVideoId(url);
+    }
     
     try {
       const urlObj = new URL(url);
@@ -43,7 +48,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   useEffect(() => {
     if (ytApiReady && currentSong && window.YT) {
       try {
-        const videoId = extractVideoId(currentSong.youtube_url);
+        const videoId = extractVideoIdImpl(currentSong.youtube_url);
         console.log("Extracted video ID:", videoId);
         
         if (!videoId) {
@@ -52,10 +57,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
         }
 
         if (!playerRef.current) {
-          // Initialize new player
           console.log("Creating new YouTube player for:", videoId);
-          // We create a new player but don't directly assign it to playerRef.current
-          // The player will be assigned in the onReady event
           new window.YT.Player('youtube-player', {
             height: '0',
             width: '0',

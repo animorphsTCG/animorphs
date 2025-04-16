@@ -1,5 +1,6 @@
+
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { useAuth } from '@/modules/auth'; // Updated import path
 import { supabase } from '@/lib/supabase';
 
 export const useAdmin = () => {

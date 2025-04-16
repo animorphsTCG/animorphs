@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/modules/auth"; // Updated import path
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import SongBrowser from './SongBrowser';

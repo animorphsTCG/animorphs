@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -7,11 +6,10 @@ import { Link } from 'react-router-dom';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { useAuth } from '../context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),

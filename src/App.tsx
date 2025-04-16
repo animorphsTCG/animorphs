@@ -46,7 +46,7 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
-        <AdminAccessTrigger />
+        <AdminAccessTrigger onAuthenticated={() => {}} />
         <div className="flex flex-col min-h-screen">
           <Navbar />
           <div className="flex-grow">

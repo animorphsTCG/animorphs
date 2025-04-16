@@ -10,7 +10,7 @@ import { toast } from "@/components/ui/use-toast";
 const ADMIN_PASSWORD = "Adanacia23.";
 
 interface AdminAccessTriggerProps {
-  onAuthenticated: () => void;
+  onAuthenticated?: () => void;
 }
 
 const AdminAccessTrigger: React.FC<AdminAccessTriggerProps> = ({ onAuthenticated }) => {
@@ -39,10 +39,10 @@ const AdminAccessTrigger: React.FC<AdminAccessTriggerProps> = ({ onAuthenticated
 
     const handleKeyPress = (event: KeyboardEvent) => {
       if (isKeyCombination) {
-        setTypedKeys(prev => prev + event.key);
+        setTypedKeys(prevKeys => prevKeys + event.key);
         
         // Check if "admin" has been typed
-        if ((prev + event.key).toLowerCase().includes("admin")) {
+        if ((typedKeys + event.key).toLowerCase().includes("admin")) {
           setIsDialogOpen(true);
           setTypedKeys("");
           setIsKeyCombination(false);
@@ -97,7 +97,9 @@ const AdminAccessTrigger: React.FC<AdminAccessTriggerProps> = ({ onAuthenticated
       });
       
       setIsDialogOpen(false);
-      onAuthenticated();
+      if (onAuthenticated) {
+        onAuthenticated();
+      }
     } catch (error) {
       toast({
         title: "Error",

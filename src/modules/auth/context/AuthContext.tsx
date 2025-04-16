@@ -134,7 +134,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, metadata?: any) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log("Signing up with email:", email);
+      console.log("Metadata:", metadata);
+      
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -142,12 +145,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
+      
       if (error) throw error;
+      
+      console.log("Sign up response:", data);
+      
       toast({
         title: 'Registration successful',
         description: 'Please check your email to verify your account.',
       });
+      
+      // After successful registration, redirect to verification page
+      navigate('/verify', { state: { email } });
     } catch (error: any) {
+      console.error("Sign up error:", error);
       toast({
         title: 'Registration failed',
         description: error.message,

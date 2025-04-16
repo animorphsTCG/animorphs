@@ -87,6 +87,12 @@ export const RegistrationForm = () => {
 
     try {
       const { confirmPassword, termsAccepted, ...dataToSubmit } = data;
+      
+      // Calculate age from date of birth
+      const birthDate = new Date(data.dateOfBirth);
+      const age = calculateAge(birthDate);
+      
+      // Prepare metadata for Supabase with correct data types
       const metadata = {
         username: data.username,
         name: data.name,
@@ -95,11 +101,15 @@ export const RegistrationForm = () => {
         gender: data.gender,
         country: data.country,
         vip_code: data.vipCode || null,
-        age: calculateAge(new Date(data.dateOfBirth)),
+        age: age,
       };
 
+      console.log("Registration metadata:", metadata);
+      
+      // Call signUp with metadata
       await signUp(data.email, data.password, metadata);
     } catch (err: any) {
+      console.error("Registration error:", err);
       setError(err.message || "Registration failed. Please try again.");
     } finally {
       setIsSubmitting(false);

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/modules/auth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 

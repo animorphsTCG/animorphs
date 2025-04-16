@@ -18,7 +18,7 @@ interface AuthState {
   refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthState>({} as AuthState);
+export const AuthContext = createContext<AuthState>({} as AuthState);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

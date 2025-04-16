@@ -7,8 +7,9 @@ import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
 import PaymentSection from '@/components/profile/PaymentSection';
 import { Loader2, Lock, AlertTriangle } from 'lucide-react';
-import MusicSettings from '@/components/MusicSettings';
+import MusicSettings from '@/components/music/MusicSettings';
 import MusicPlayer from '@/components/MusicPlayer';
+import AdminPanel from '@/components/admin/AdminPanel';
 
 const Profile = () => {
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
@@ -51,6 +52,7 @@ const Profile = () => {
 
   return (
     <div className="container mx-auto py-12 px-4">
+      <AdminPanel />
       <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="col-span-2 space-y-8">
           <Card>

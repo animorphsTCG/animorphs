@@ -1,293 +1,282 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Loader2, Check, X } from "lucide-react";
-import { useAdmin } from "@/hooks/useAdmin";
+import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { toast } from "@/components/ui/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { UserProfile } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "@/components/ui/use-toast";
+import { Loader2, User, UserCheck } from "lucide-react";
+
+interface UserProfile {
+  id: string;
+  username: string;
+  name: string;
+  surname: string;
+  email?: string;
+  created_at: string;
+  has_paid: boolean;
+  music_subscription?: {
+    subscription_type: string;
+    end_date: string;
+  };
+}
 
 const UserManagement = () => {
-  const { isAdmin } = useAdmin();
-  const [users, setUsers] = useState<(UserProfile & {email?: string})[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
-    totalUsers: 0,
-    paidUsers: 0,
-    musicSubscribers: 0
-  });
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editData, setEditData] = useState({
-    hasPaid: false,
-    musicUnlocked: false,
-    isAdmin: false
+    total: 0,
+    paid: 0,
+    free: 0,
+    musicSubscribers: 0,
   });
 
   useEffect(() => {
-    if (!isAdmin) return;
     fetchUsers();
-  }, [isAdmin]);
+  }, []);
 
   const fetchUsers = async () => {
-    if (!isAdmin) return;
-    
     try {
       setLoading(true);
-      setError(null);
       
-      // Use the admin edge function to fetch user data
-      const { data: adminData, error: adminError } = await supabase.functions.invoke('admin-dashboard', {
-        body: { action: 'fetch_users' }
+      // Get profiles with payment status joined
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          payment_status:payment_status(has_paid)
+        `)
+        .order('created_at', { ascending: false });
+        
+      if (profilesError) throw profilesError;
+
+      // Get user emails
+      const { data: usersData, error: usersError } = await supabase
+        .rpc('get_user_emails');
+        
+      if (usersError) throw usersError;
+      
+      // Get music subscriptions
+      const { data: musicSubs, error: musicError } = await supabase
+        .from('music_subscriptions')
+        .select('*');
+        
+      if (musicError) throw musicError;
+
+      // Combine data
+      const combined = profiles?.map(profile => {
+        const userEmail = usersData?.find(u => u.id === profile.id);
+        const musicSub = musicSubs?.find(sub => sub.user_id === profile.id);
+        
+        return {
+          id: profile.id,
+          username: profile.username || 'No username',
+          name: profile.name || '',
+          surname: profile.surname || '',
+          email: userEmail?.email,
+          created_at: profile.created_at,
+          has_paid: profile.payment_status?.has_paid || false,
+          music_subscription: musicSub ? {
+            subscription_type: musicSub.subscription_type,
+            end_date: musicSub.end_date
+          } : undefined
+        };
+      }) || [];
+
+      setUsers(combined);
+      
+      // Calculate stats
+      const totalUsers = combined.length;
+      const paidUsers = combined.filter(user => user.has_paid).length;
+      const musicSubscribers = combined.filter(user => user.music_subscription).length;
+      
+      setStats({
+        total: totalUsers,
+        paid: paidUsers,
+        free: totalUsers - paidUsers,
+        musicSubscribers
       });
       
-      if (adminError) {
-        console.error("Admin function error:", adminError);
-        setError("Failed to call admin function");
-        throw adminError;
-      }
-
-      if (adminData?.error) {
-        console.error("Users fetch error:", adminData.error);
-        setError(`Error: ${adminData.error}`);
-        throw new Error(adminData.error);
-      }
-      
-      if (adminData?.data) {
-        setUsers(adminData.data);
-        
-        // Update statistics
-        setStats({
-          totalUsers: adminData.data.length,
-          paidUsers: adminData.data.filter((user: any) => user.has_paid).length || 0,
-          musicSubscribers: adminData.data.filter((profile: any) => profile.music_unlocked).length || 0
-        });
-      } else {
-        setError("No user data returned");
-      }
-      
     } catch (error) {
-      console.error('Error fetching users:', error);
-      setError(error.message || "Failed to load user data");
+      console.error("Error fetching users:", error);
       toast({
-        variant: "destructive",
         title: "Error",
-        description: "Failed to load user data"
+        description: "Failed to load user data",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditUser = (userId: string) => {
-    const user = users.find(u => u.id === userId);
-    if (user) {
-      setSelectedUser(userId);
-      setEditData({
-        hasPaid: user.has_paid || false,
-        musicUnlocked: user.music_unlocked,
-        isAdmin: user.is_admin || false
-      });
-      
-      setIsEditDialogOpen(true);
-    }
-  };
-
-  const handleSaveChanges = async () => {
-    if (!selectedUser) return;
-    
+  const togglePaymentStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      // Update payment status
-      const { error: paymentError } = await supabase
+      const { error } = await supabase
         .from('payment_status')
-        .upsert({
-          id: selectedUser,
-          has_paid: editData.hasPaid,
-          payment_date: editData.hasPaid ? new Date().toISOString() : null,
-          payment_method: editData.hasPaid ? 'admin_override' : null
-        });
+        .update({ has_paid: !currentStatus })
+        .eq('id', userId);
         
-      // Update profile status
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          music_unlocked: editData.musicUnlocked,
-          is_admin: editData.isAdmin
-        })
-        .eq('id', selectedUser);
-        
-      if (paymentError || profileError) {
-        throw new Error("Failed to update user settings");
-      }
+      if (error) throw error;
+      
+      setUsers(users.map(user => 
+        user.id === userId 
+          ? { ...user, has_paid: !currentStatus } 
+          : user
+      ));
       
       toast({
         title: "Success",
-        description: "User settings updated successfully."
+        description: `Payment status updated for user`
       });
       
-      fetchUsers(); // Refresh the data
-      setIsEditDialogOpen(false);
+      // Update stats
+      const newPaidCount = currentStatus 
+        ? stats.paid - 1 
+        : stats.paid + 1;
+        
+      setStats({
+        ...stats,
+        paid: newPaidCount,
+        free: stats.total - newPaidCount
+      });
+      
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error("Error toggling payment status:", error);
       toast({
-        variant: "destructive",
         title: "Error",
-        description: "Failed to update user settings."
+        description: "Failed to update payment status",
+        variant: "destructive"
       });
     }
   };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>User Statistics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-muted/50 p-3 rounded-lg">
-              <div className="text-2xl font-bold">{stats.totalUsers}</div>
-              <div className="text-sm text-muted-foreground">Total Users</div>
-            </div>
-            <div className="bg-muted/50 p-3 rounded-lg">
-              <div className="text-2xl font-bold">{stats.paidUsers}</div>
-              <div className="text-sm text-muted-foreground">Paid Users</div>
-            </div>
-            <div className="bg-muted/50 p-3 rounded-lg">
-              <div className="text-2xl font-bold">{stats.musicSubscribers}</div>
-              <div className="text-sm text-muted-foreground">Music Subscribers</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Paid Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.paid}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Free Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.free}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Music Subscribers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.musicSubscribers}</div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>
           <CardTitle>User Management</CardTitle>
+          <CardDescription>Manage user accounts and permissions</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
-          ) : error ? (
-            <div className="text-center py-8">
-              <p className="text-red-500 mb-4">{error}</p>
-              <Button onClick={fetchUsers}>Try Again</Button>
-            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Has Paid</TableHead>
-                  <TableHead>Music Unlocked</TableHead>
-                  <TableHead>Admin</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.length > 0 ? (
-                  users.map((user) => (
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Paid Status</TableHead>
+                    <TableHead>Music Subscription</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.username}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                            <User className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{user.name} {user.surname}</p>
+                            <p className="text-xs text-muted-foreground">{user.username}</p>
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.name} {user.surname}</TableCell>
+                      <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
-                        {user.has_paid ? (
-                          <Check className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <X className="h-5 w-5 text-red-500" />
-                        )}
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={user.has_paid}
+                            onCheckedChange={() => togglePaymentStatus(user.id, user.has_paid)}
+                          />
+                          <Badge variant={user.has_paid ? "default" : "outline"}>
+                            {user.has_paid ? "Paid" : "Free"}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell>
-                        {user.music_unlocked ? (
-                          <Check className="h-5 w-5 text-green-500" />
+                        {user.music_subscription ? (
+                          <div>
+                            <Badge variant="secondary">{user.music_subscription.subscription_type}</Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Expires: {new Date(user.music_subscription.end_date).toLocaleDateString()}
+                            </p>
+                          </div>
                         ) : (
-                          <X className="h-5 w-5 text-red-500" />
+                          <Badge variant="outline">None</Badge>
                         )}
                       </TableCell>
-                      <TableCell>
-                        {user.is_admin ? (
-                          <Check className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <X className="h-5 w-5 text-red-500" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEditUser(user.id)}
-                        >
-                          Edit
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm">
+                          <UserCheck className="h-4 w-4 mr-1" /> View
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      No users found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Edit User Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit User Settings</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="has-paid">Game Access (Paid Status)</Label>
-              <Switch
-                id="has-paid"
-                checked={editData.hasPaid}
-                onCheckedChange={(checked) => setEditData(prev => ({ ...prev, hasPaid: checked }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="music-unlocked">Music Unlocked</Label>
-              <Switch
-                id="music-unlocked"
-                checked={editData.musicUnlocked}
-                onCheckedChange={(checked) => setEditData(prev => ({ ...prev, musicUnlocked: checked }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="is-admin">Admin Access</Label>
-              <Switch
-                id="is-admin"
-                checked={editData.isAdmin}
-                onCheckedChange={(checked) => setEditData(prev => ({ ...prev, isAdmin: checked }))}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveChanges}>
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

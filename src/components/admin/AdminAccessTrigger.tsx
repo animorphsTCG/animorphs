@@ -1,121 +1,137 @@
 
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import React, { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "@/components/ui/use-toast";
 
-/**
- * Hidden admin panel access trigger component
- * Listens for Ctrl+Alt+"admin" key combination and shows login dialog
- */
-const AdminAccessTrigger: React.FC = () => {
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [password, setPassword] = useState('');
-  const [keyBuffer, setKeyBuffer] = useState('');
-  const [keysPressed, setKeysPressed] = useState({
-    ctrl: false,
-    alt: false
-  });
-  
-  const navigate = useNavigate();
+const ADMIN_PASSWORD = "Adanacia23.";
 
-  // Listen for key combinations
+interface AdminAccessTriggerProps {
+  onAuthenticated: () => void;
+}
+
+const AdminAccessTrigger: React.FC<AdminAccessTriggerProps> = ({ onAuthenticated }) => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [isKeyCombination, setIsKeyCombination] = useState(false);
+  const [typedKeys, setTypedKeys] = useState("");
+  const { user } = useAuth();
+
+  // Track key states for Ctrl+Alt
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Update pressed modifier keys state
-      if (event.key === 'Control') {
-        setKeysPressed(prev => ({ ...prev, ctrl: true }));
-      }
-      if (event.key === 'Alt') {
-        setKeysPressed(prev => ({ ...prev, alt: true }));
-      }
-      
-      // If both modifiers are pressed, start capturing typed keys
-      if (keysPressed.ctrl && keysPressed.alt) {
-        // Don't add modifier keys to the buffer
-        if (event.key !== 'Control' && event.key !== 'Alt') {
-          setKeyBuffer(prev => prev + event.key);
-        }
+      if (event.ctrlKey && event.altKey) {
+        setIsKeyCombination(true);
       }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      // Update released modifier keys state
-      if (event.key === 'Control') {
-        setKeysPressed(prev => ({ ...prev, ctrl: false }));
-      }
-      if (event.key === 'Alt') {
-        setKeysPressed(prev => ({ ...prev, alt: false }));
-      }
-      
-      // If modifiers are released, check buffer
-      if (event.key === 'Alt' || event.key === 'Control') {
-        if (keyBuffer.toLowerCase().includes('admin')) {
-          setIsLoginOpen(true);
-          setKeyBuffer('');
+      if (!event.ctrlKey || !event.altKey) {
+        setIsKeyCombination(false);
+        if (typedKeys.length > 0) {
+          setTypedKeys("");
         }
-        
-        // Reset buffer if the combination wasn't completed
-        setTimeout(() => {
-          setKeyBuffer('');
-        }, 2000);
       }
     };
 
-    // Add event listeners
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    // Clean up listeners
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (isKeyCombination) {
+        setTypedKeys(prev => prev + event.key);
+        
+        // Check if "admin" has been typed
+        if ((prev + event.key).toLowerCase().includes("admin")) {
+          setIsDialogOpen(true);
+          setTypedKeys("");
+          setIsKeyCombination(false);
+        }
+      }
     };
-  }, [keysPressed, keyBuffer]);
 
-  const handleLogin = () => {
-    if (password === 'Adanacia23.') {
-      setIsLoginOpen(false);
-      setPassword('');
-      navigate('/admin');
-    } else {
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("keypress", handleKeyPress);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("keypress", handleKeyPress);
+    };
+  }, [isKeyCombination, typedKeys]);
+
+  const handleAdminLogin = async () => {
+    if (password !== ADMIN_PASSWORD) {
       toast({
-        variant: "destructive",
-        title: "Access Denied",
-        description: "Incorrect password."
+        title: "Authentication Failed",
+        description: "Invalid admin password",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to access admin functions",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Set the user as an admin
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_admin: true })
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Admin Access Granted",
+        description: "Welcome to the admin dashboard"
+      });
+      
+      setIsDialogOpen(false);
+      onAuthenticated();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to authenticate admin",
+        variant: "destructive"
       });
     }
   };
 
   return (
-    <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Strictly for Admin only use</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="py-4">
           <Input
             type="password"
-            placeholder="Enter password"
+            placeholder="Enter admin password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleLogin();
+              if (e.key === "Enter") {
+                handleAdminLogin();
               }
             }}
           />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsLoginOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleLogin}>
-              Login
-            </Button>
-          </div>
         </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleAdminLogin}>Login</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

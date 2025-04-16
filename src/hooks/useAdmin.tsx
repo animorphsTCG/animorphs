@@ -3,20 +3,25 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { supabase } from '@/lib/supabase';
 
 export const useAdmin = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [adminToken, setAdminToken] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
-      if (!user) {
+      if (!user || !session) {
         setIsAdmin(false);
         setLoading(false);
+        setAdminToken(null);
         return;
       }
 
       try {
-        // Hard-coded admin email for security
+        // Store the access token for admin API calls
+        setAdminToken(session.access_token);
+
+        // Hard-coded admin email for security (keep this for quick admin access)
         const adminEmail = 'adanacia23d@gmail.com';
         
         // First check if current user's email matches admin email
@@ -39,7 +44,10 @@ export const useAdmin = () => {
           .eq('id', user.id)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
+        
         setIsAdmin(data?.is_admin || false);
       } catch (error) {
         console.error('Error checking admin status:', error);
@@ -50,7 +58,7 @@ export const useAdmin = () => {
     };
 
     checkAdminStatus();
-  }, [user]);
+  }, [user, session]);
 
-  return { isAdmin, loading };
+  return { isAdmin, loading, adminToken };
 };

@@ -16,6 +16,7 @@ const UserManagement = () => {
   const { isAdmin } = useAdmin();
   const [users, setUsers] = useState<(UserProfile & {email?: string})[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     paidUsers: 0,
@@ -31,27 +32,7 @@ const UserManagement = () => {
 
   useEffect(() => {
     if (!isAdmin) return;
-
-    // Set up realtime subscription for profiles
-    const channel = supabase
-      .channel('profiles_changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'profiles' 
-        }, 
-        () => {
-          fetchUsers();
-        }
-      )
-      .subscribe();
-
     fetchUsers();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [isAdmin]);
 
   const fetchUsers = async () => {
@@ -59,47 +40,41 @@ const UserManagement = () => {
     
     try {
       setLoading(true);
-      // Fetch profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
-
-      if (profilesError) throw profilesError;
-
-      // Fetch user emails using the RPC function
-      const { data: emailsData, error: emailsError } = await supabase
-        .rpc('get_user_emails');
-
-      if (emailsError) throw emailsError;
-
-      // Fetch payment statuses
-      const { data: paymentData, error: paymentError } = await supabase
-        .from('payment_status')
-        .select('id, has_paid');
-        
-      if (paymentError) throw paymentError;
+      setError(null);
       
-      // Merge the data
-      const emailMap = new Map(emailsData.map((user: any) => [user.id, user.email]));
-      const paymentMap = new Map(paymentData?.map((item: any) => [item.id, item.has_paid]) || []);
-      
-      const mergedUsers = profiles.map((profile: any) => ({
-        ...profile,
-        email: emailMap.get(profile.id) || 'Not available',
-        has_paid: paymentMap.get(profile.id) || false
-      }));
-
-      setUsers(mergedUsers);
-      
-      // Update statistics
-      setStats({
-        totalUsers: profiles.length,
-        paidUsers: paymentData?.filter((item: any) => item.has_paid).length || 0,
-        musicSubscribers: profiles.filter((profile: any) => profile.music_unlocked).length || 0
+      // Use the admin edge function to fetch user data
+      const { data: adminData, error: adminError } = await supabase.functions.invoke('admin-dashboard', {
+        body: { action: 'fetch_users' }
       });
+      
+      if (adminError) {
+        console.error("Admin function error:", adminError);
+        setError("Failed to call admin function");
+        throw adminError;
+      }
+
+      if (adminData?.error) {
+        console.error("Users fetch error:", adminData.error);
+        setError(`Error: ${adminData.error}`);
+        throw new Error(adminData.error);
+      }
+      
+      if (adminData?.data) {
+        setUsers(adminData.data);
+        
+        // Update statistics
+        setStats({
+          totalUsers: adminData.data.length,
+          paidUsers: adminData.data.filter((user: any) => user.has_paid).length || 0,
+          musicSubscribers: adminData.data.filter((profile: any) => profile.music_unlocked).length || 0
+        });
+      } else {
+        setError("No user data returned");
+      }
       
     } catch (error) {
       console.error('Error fetching users:', error);
+      setError(error.message || "Failed to load user data");
       toast({
         variant: "destructive",
         title: "Error",
@@ -200,6 +175,11 @@ const UserManagement = () => {
           {loading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-red-500 mb-4">{error}</p>
+              <Button onClick={fetchUsers}>Try Again</Button>
             </div>
           ) : (
             <Table>

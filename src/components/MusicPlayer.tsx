@@ -4,11 +4,18 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { Song } from "@/types/music";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import SongInfo from "./music/SongInfo";
 import PlaybackControls from "./music/PlaybackControls";
 import VolumeControl from "./music/VolumeControl";
 import YouTubeEmbed from "./music/YouTubeEmbed";
+
+declare global {
+  interface Window {
+    onYouTubeIframeAPIReady: () => void;
+    YT: any;
+  }
+}
 
 const MusicPlayer: React.FC = () => {
   const { user } = useAuth();
@@ -20,13 +27,38 @@ const MusicPlayer: React.FC = () => {
   const [hasSubscription, setHasSubscription] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [ytApiReady, setYtApiReady] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewTimerRef = useRef<NodeJS.Timeout>();
+  const playerRef = useRef<any>(null);
 
   useEffect(() => {
+    // Initialize YouTube API
+    loadYouTubeApi();
+    
     // Always attempt to fetch songs, even for anonymous users
     fetchMusicData();
   }, [user]);
+
+  const loadYouTubeApi = () => {
+    // Check if the YouTube API is already loaded
+    if (window.YT) {
+      setYtApiReady(true);
+      return;
+    }
+
+    // Load the YouTube API
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    
+    window.onYouTubeIframeAPIReady = () => {
+      console.log('YouTube API ready');
+      setYtApiReady(true);
+    };
+  };
 
   useEffect(() => {
     if (isPreviewMode && isPlaying && currentSong) {
@@ -49,6 +81,7 @@ const MusicPlayer: React.FC = () => {
   const fetchMusicData = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       console.log("Fetching music data...");
       
       // For anonymous users or when the user object isn't available yet,
@@ -87,6 +120,7 @@ const MusicPlayer: React.FC = () => {
           }
         } catch (err) {
           console.error("Error fetching user-specific music data:", err);
+          setError("Failed to fetch your music settings");
         }
       }
 
@@ -99,7 +133,10 @@ const MusicPlayer: React.FC = () => {
           .select('id')
           .limit(3);
           
-        if (!defaultError && defaultSongs) {
+        if (defaultError) {
+          console.error("Error fetching default songs:", defaultError);
+          setError("Failed to load default songs");
+        } else if (defaultSongs) {
           songIds = defaultSongs.map(song => song.id);
           console.log(`Using ${songIds.length} default songs`);
         }
@@ -115,11 +152,7 @@ const MusicPlayer: React.FC = () => {
         
         if (songsError) {
           console.error("Error fetching songs:", songsError);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Couldn't load your music. Please try again later."
-          });
+          setError("Couldn't load your music. Please try again later.");
         } else if (songsData && songsData.length > 0) {
           console.log(`Retrieved ${songsData.length} song details`);
           setSongs(songsData);
@@ -130,6 +163,7 @@ const MusicPlayer: React.FC = () => {
         }
       } else {
         console.log("No song IDs available");
+        setError("No songs available. Add songs to your collection.");
       }
 
       // Apply user settings
@@ -139,11 +173,7 @@ const MusicPlayer: React.FC = () => {
       
     } catch (error) {
       console.error("Unexpected error fetching music data:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load music player data."
-      });
+      setError("Failed to load music player data.");
     } finally {
       setIsLoading(false);
     }
@@ -202,6 +232,11 @@ const MusicPlayer: React.FC = () => {
     }
   };
 
+  const handleRetry = () => {
+    setError(null);
+    fetchMusicData();
+  };
+
   if (isLoading) {
     return (
       <div className="bg-black/60 border border-fantasy-primary/30 rounded-md p-3">
@@ -211,6 +246,25 @@ const MusicPlayer: React.FC = () => {
             <div className="h-3 bg-gray-700 rounded w-1/2"></div>
           </div>
           <Loader2 className="h-5 w-5 animate-spin ml-2" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-black/60 border border-fantasy-primary/30 rounded-md p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+            <div>
+              <p className="font-medium">Music Player Error</p>
+              <p className="text-sm text-gray-400">{error}</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleRetry}>
+            Retry
+          </Button>
         </div>
       </div>
     );
@@ -247,7 +301,9 @@ const MusicPlayer: React.FC = () => {
         isPlaying={isPlaying}
         isMuted={isMuted}
         isPreviewMode={isPreviewMode}
+        ytApiReady={ytApiReady}
         iframeRef={iframeRef}
+        playerRef={playerRef}
       />
     </div>
   );

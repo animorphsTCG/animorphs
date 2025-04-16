@@ -10,19 +10,13 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAdmin } from "@/hooks/useAdmin";
-
-interface Song {
-  id: string;
-  title: string;
-  youtube_url: string;
-  preview_start_seconds: number;
-  preview_duration_seconds: number;
-}
+import { Song } from "@/types/music";
 
 const SongManagement = () => {
   const { isAdmin } = useAdmin();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
@@ -35,27 +29,7 @@ const SongManagement = () => {
 
   useEffect(() => {
     if (!isAdmin) return;
-    
-    // Set up realtime subscription
-    const channel = supabase
-      .channel('songs_changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'songs' 
-        }, 
-        (payload) => {
-          fetchSongs();
-        }
-      )
-      .subscribe();
-
     fetchSongs();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [isAdmin]);
 
   const fetchSongs = async () => {
@@ -63,15 +37,33 @@ const SongManagement = () => {
     
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('songs')
-        .select('*')
-        .order('title');
-        
-      if (error) throw error;
-      setSongs(data || []);
+      setError(null);
+      
+      // Use the admin edge function to fetch songs data
+      const { data: adminData, error: adminError } = await supabase.functions.invoke('admin-dashboard', {
+        body: { action: 'fetch_songs' }
+      });
+      
+      if (adminError) {
+        console.error("Admin function error:", adminError);
+        setError("Failed to call admin function");
+        throw adminError;
+      }
+
+      if (adminData?.error) {
+        console.error("Songs fetch error:", adminData.error);
+        setError(`Error: ${adminData.error}`);
+        throw new Error(adminData.error);
+      }
+
+      if (adminData?.data) {
+        setSongs(adminData.data);
+      } else {
+        setError("No songs data returned");
+      }
     } catch (error) {
       console.error('Error fetching songs:', error);
+      setError(error.message || "Failed to load songs");
       toast({
         variant: "destructive",
         title: "Error",
@@ -252,6 +244,11 @@ const SongManagement = () => {
           {loading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-red-500 mb-4">{error}</p>
+              <Button onClick={fetchSongs}>Try Again</Button>
             </div>
           ) : (
             <Table>

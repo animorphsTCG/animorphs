@@ -13,8 +13,9 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/lib/supabase";
 import UserManagement from "@/components/admin/UserManagement";
 import SongManagement from "@/components/admin/SongManagement";
+import { VipCode } from "@/types";
 
-interface VipCode {
+interface VipCodeResponse {
   id: number;
   code: string;
   max_uses: number;
@@ -22,40 +23,57 @@ interface VipCode {
 }
 
 const Admin = () => {
-  const { isAdmin, loading: adminLoading } = useAdmin();
+  const { isAdmin, loading: adminLoading, adminToken } = useAdmin();
   const [activeTab, setActiveTab] = useState("users");
   const [vipCodes, setVipCodes] = useState<VipCode[]>([]);
   const [newVipCode, setNewVipCode] = useState("");
   const [maxUses, setMaxUses] = useState<string>("50");
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   
   useEffect(() => {
-    if (activeTab === "vip-codes") {
+    // Only fetch data once the admin status is confirmed
+    if (!adminLoading && isAdmin && activeTab === "vip-codes") {
       fetchVipCodes();
     }
-  }, [activeTab]);
+  }, [activeTab, isAdmin, adminLoading]);
   
   const fetchVipCodes = async () => {
     try {
-      const { data, error } = await supabase
-        .from("vip_codes")
-        .select("*")
-        .order("id", { ascending: true });
-        
-      if (error) {
-        throw error;
-      }
+      setLoading(true);
+      setFetchError(null);
       
-      if (data) {
-        setVipCodes(data);
+      const { data: adminData, error: adminError } = await supabase.functions.invoke('admin-dashboard', {
+        body: { action: 'fetch_vip_codes' }
+      });
+
+      if (adminError) {
+        console.error("Admin function error:", adminError);
+        setFetchError("Failed to call admin function");
+        throw adminError;
+      }
+
+      if (adminData?.error) {
+        console.error("VIP codes error:", adminData.error);
+        setFetchError(`Error: ${adminData.error}`);
+        throw new Error(adminData.error);
+      }
+        
+      if (adminData?.data) {
+        setVipCodes(adminData.data);
+      } else {
+        setFetchError("No VIP codes data returned");
       }
     } catch (error) {
       console.error("Error fetching VIP codes:", error);
+      setFetchError(error.message || "Failed to load VIP codes");
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to load VIP codes"
       });
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -72,19 +90,20 @@ const Admin = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
-        .from("vip_codes")
-        .insert({
-          code: newVipCode.trim(),
-          max_uses: parseInt(maxUses),
-          current_uses: 0
-        })
-        .select();
-        
-      if (error) {
-        throw error;
-      }
+      const { data: adminData, error: adminError } = await supabase.functions.invoke('admin-dashboard', {
+        body: { 
+          action: 'create_vip_code', 
+          data: { 
+            code: newVipCode.trim(), 
+            max_uses: maxUses 
+          } 
+        }
+      });
       
+      if (adminError || adminData?.error) {
+        throw new Error(adminError?.message || adminData?.error || "Failed to create VIP code");
+      }
+        
       toast({
         title: "Success",
         description: `VIP code "${newVipCode}" created successfully`
@@ -99,7 +118,7 @@ const Admin = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create VIP code"
+        description: error.message || "Failed to create VIP code"
       });
     } finally {
       setLoading(false);
@@ -153,43 +172,62 @@ const Admin = () => {
                     <CardTitle>VIP Codes</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="rounded-md border border-fantasy-primary/30">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Code</TableHead>
-                            <TableHead>Max Uses</TableHead>
-                            <TableHead>Current Uses</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {vipCodes.map((code) => (
-                            <TableRow key={code.id}>
-                              <TableCell className="font-medium">{code.code}</TableCell>
-                              <TableCell>{code.max_uses}</TableCell>
-                              <TableCell>{code.current_uses}</TableCell>
-                              <TableCell>
-                                {code.current_uses >= code.max_uses ? (
-                                  <span className="text-fantasy-danger">Exhausted</span>
-                                ) : (
-                                  <span className="text-fantasy-success">Active</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Button variant="outline" size="sm" className="mr-2">
-                                  Edit
-                                </Button>
-                                <Button variant="outline" size="sm" className="text-fantasy-danger">
-                                  Delete
-                                </Button>
-                              </TableCell>
+                    {loading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                      </div>
+                    ) : fetchError ? (
+                      <div className="text-center py-8">
+                        <p className="text-red-500 mb-4">{fetchError}</p>
+                        <Button onClick={fetchVipCodes}>Try Again</Button>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-fantasy-primary/30">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Code</TableHead>
+                              <TableHead>Max Uses</TableHead>
+                              <TableHead>Current Uses</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Actions</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          </TableHeader>
+                          <TableBody>
+                            {vipCodes.length > 0 ? (
+                              vipCodes.map((code) => (
+                                <TableRow key={code.id}>
+                                  <TableCell className="font-medium">{code.code}</TableCell>
+                                  <TableCell>{code.max_uses}</TableCell>
+                                  <TableCell>{code.current_uses}</TableCell>
+                                  <TableCell>
+                                    {code.current_uses >= code.max_uses ? (
+                                      <span className="text-fantasy-danger">Exhausted</span>
+                                    ) : (
+                                      <span className="text-fantasy-success">Active</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Button variant="outline" size="sm" className="mr-2">
+                                      Edit
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="text-fantasy-danger">
+                                      Delete
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-4">
+                                  No VIP codes found
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

@@ -34,7 +34,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
 
         if (!playerRef.current) {
           // Initialize new player
-          playerRef.current = new window.YT.Player('youtube-player', {
+          const newYTPlayer = new window.YT.Player('youtube-player', {
             height: '0',
             width: '0',
             videoId: videoId,
@@ -45,6 +45,10 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
               start: isPreviewMode ? currentSong.preview_start_seconds : 0,
             },
             events: {
+              onReady: (event) => {
+                // Safely assign to playerRef.current
+                playerRef.current = event.target;
+              },
               onError: (e: any) => console.error("YouTube player error:", e)
             }
           });

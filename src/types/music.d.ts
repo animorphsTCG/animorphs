@@ -31,3 +31,8 @@ export interface MusicSubscription {
   end_date: string;
   created_at?: string;
 }
+
+export interface MusicSettings {
+  volume: number;
+  isMuted: boolean;
+}

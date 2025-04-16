@@ -9,11 +9,12 @@ import SongInfo from "./music/SongInfo";
 import PlaybackControls from "./music/PlaybackControls";
 import VolumeControl from "./music/VolumeControl";
 import YouTubeEmbed from "./music/YouTubeEmbed";
+import { Button } from "@/components/ui/button";
 
 declare global {
   interface Window {
     onYouTubeIframeAPIReady: () => void;
-    YT: any;
+    YT: typeof YT;
   }
 }
 
@@ -30,8 +31,8 @@ const MusicPlayer: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [ytApiReady, setYtApiReady] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const previewTimerRef = useRef<NodeJS.Timeout>();
   const playerRef = useRef<any>(null);
+  const previewTimerRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     // Initialize YouTube API

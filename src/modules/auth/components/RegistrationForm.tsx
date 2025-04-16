@@ -1,288 +1,425 @@
+
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Link } from 'react-router-dom';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useAuth } from '../context/AuthContext';
-import { toast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/modules/auth/context/AuthContext';
+import { Loader2, FileText, HelpCircle, User } from 'lucide-react';
+import { countries } from '@/lib/countries';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import TermsAndConditionsDialog from '@/components/TermsAndConditionsDialog';
+import { validateEmail, validatePassword, validateUsername } from '@/lib/validation';
+import PasswordStrengthIndicator from '@/components/auth/PasswordStrengthIndicator';
 
-const RegistrationForm = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    surname: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    age: '',
-    gender: '',
-    country: '',
-    agreeTerms: false,
-  });
+const registrationSchema = z.object({
+  username: z.string().min(3, { message: "Username must be at least 3 characters" })
+    .max(30, { message: "Username must be less than 30 characters" })
+    .regex(/^[a-zA-Z0-9_.-]+$/, { message: "Username can only contain letters, numbers, and _.-" }),
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  surname: z.string().min(2, { message: "Surname must be at least 2 characters" }),
+  dateOfBirth: z.string().refine(date => {
+    const birthDate = new Date(date);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      return age - 1 >= 18;
+    }
+    return age >= 18;
+  }, { message: "You must be at least 18 years old to register" }),
+  gender: z.enum(['Male', 'Female', 'Other', 'Prefer not to say']),
+  country: z.string().min(1, { message: "Please select your country" }),
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  confirmPassword: z.string(),
+  termsAccepted: z.boolean().refine(val => val === true, {
+    message: "You must accept the terms and conditions"
+  }),
+  vipCode: z.string().optional(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+type RegistrationFormValues = z.infer<typeof registrationSchema>;
+
+export const RegistrationForm = () => {
+  const { signUp } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { signUp, signInWithGoogle } = useAuth();
-  const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState<string | undefined>(undefined);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value,
-    });
-  };
+  const form = useForm<RegistrationFormValues>({
+    resolver: zodResolver(registrationSchema),
+    defaultValues: {
+      username: "",
+      name: "",
+      surname: "",
+      dateOfBirth: "",
+      gender: "Prefer not to say",
+      country: "South Africa",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      termsAccepted: false,
+      vipCode: "",
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validation
-    if (!formData.name || !formData.surname || !formData.email || !formData.password) {
-      toast({
-        title: 'Error',
-        description: 'Please fill in all required fields',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: 'Error',
-        description: 'Passwords do not match',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    if (!formData.agreeTerms) {
-      toast({
-        title: 'Error',
-        description: 'You must agree to the terms and conditions',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
+  const onSubmit = async (data: RegistrationFormValues) => {
     setIsSubmitting(true);
-    
+    setError(null);
+
     try {
-      // Additional user metadata to be stored in the profiles table
+      const { confirmPassword, termsAccepted, ...dataToSubmit } = data;
       const metadata = {
-        name: formData.name,
-        surname: formData.surname,
-        age: formData.age ? parseInt(formData.age) : null,
-        gender: formData.gender || null,
-        country: formData.country || null,
+        username: data.username,
+        name: data.name,
+        surname: data.surname,
+        date_of_birth: data.dateOfBirth,
+        gender: data.gender,
+        country: data.country,
+        vip_code: data.vipCode || null,
+        age: calculateAge(new Date(data.dateOfBirth)),
       };
-      
-      await signUp(formData.email, formData.password, metadata);
-      navigate('/verify');
-    } catch (error) {
-      console.error('Registration error:', error);
-      // Error message is handled by the AuthProvider
+
+      await signUp(data.email, data.password, metadata);
+    } catch (err: any) {
+      setError(err.message || "Registration failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setIsSubmitting(true);
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-      // Error message is handled by the AuthProvider
-    } finally {
-      setIsSubmitting(false);
+  const calculateAge = (birthDate: Date): number => {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
     }
+    return age;
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const password = e.target.value;
+    const result = validatePassword(password);
+    setPasswordStrength(result.strength);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">First Name *</Label>
-          <Input
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            placeholder="John"
-            required
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="surname">Last Name *</Label>
-          <Input
-            id="surname"
-            name="surname"
-            value={formData.surname}
-            onChange={handleChange}
-            placeholder="Doe"
-            required
-          />
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="email">Email *</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="you@example.com"
-          required
-        />
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="password">Password *</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder="••••••••"
-            required
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password *</Label>
-          <Input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            placeholder="••••••••"
-            required
-          />
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="age">Age</Label>
-          <Input
-            id="age"
-            name="age"
-            type="number"
-            value={formData.age}
-            onChange={handleChange}
-            placeholder="25"
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="gender">Gender</Label>
-          <Input
-            id="gender"
-            name="gender"
-            value={formData.gender}
-            onChange={handleChange}
-            placeholder="Optional"
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="country">Country</Label>
-          <Input
-            id="country"
-            name="country"
-            value={formData.country}
-            onChange={handleChange}
-            placeholder="Optional"
-          />
-        </div>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Checkbox 
-          id="agreeTerms" 
-          name="agreeTerms"
-          checked={formData.agreeTerms}
-          onCheckedChange={(checked) => 
-            setFormData({...formData, agreeTerms: checked as boolean})
-          }
-        />
-        <label
-          htmlFor="agreeTerms"
-          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-        >
-          I agree to the{" "}
-          <Link to="/terms-and-conditions" className="text-primary hover:underline">
-            terms and conditions
-          </Link>
-        </label>
-      </div>
-      
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating account...
-          </>
-        ) : (
-          'Create account'
+    <Card>
+      <CardContent className="pt-6">
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
-      </Button>
-      
-      <div className="relative my-4">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-gray-300" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="bg-background px-2 text-muted-foreground">or</span>
-        </div>
-      </div>
-      
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        onClick={handleGoogleSignIn}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-            <path
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              fill="#4285F4"
+        
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Username field */}
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                    Username
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 ml-2 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="w-[200px] text-xs">Your unique username for the Animorphs platform. Must be 3-30 characters using only letters, numbers, and _.-</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <User className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+                      <Input 
+                        placeholder="Enter username" 
+                        className="pl-10" 
+                        {...field} 
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <path
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              fill="#34A853"
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="surname"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Surname</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your surname" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="dateOfBirth"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center gap-2">
+                    <FormLabel>Date of Birth</FormLabel>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="w-[200px] text-xs">You must be at least 18 years old to register for an account with full features.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <path
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              fill="#FBBC05"
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gender</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your gender" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                        <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your country" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {countries.map((country) => (
+                          <SelectItem key={country} value={country}>{country}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="Enter your email" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <path
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              fill="#EA4335"
+            
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="password" 
+                      placeholder="Create a password" 
+                      {...field} 
+                      onChange={(e) => {
+                        field.onChange(e);
+                        handlePasswordChange(e);
+                      }} 
+                    />
+                  </FormControl>
+                  {passwordStrength && (
+                    <PasswordStrengthIndicator strength={passwordStrength} />
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </svg>
-        )}
-        Continue with Google
-      </Button>
-      
-      <div className="text-center mt-6">
-        <p className="text-sm text-muted-foreground">
-          Already have an account?{' '}
-          <Link to="/login" className="text-primary hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </div>
-    </form>
+            
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="Confirm your password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="vipCode"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center gap-2">
+                    <FormLabel>VIP Code (Optional)</FormLabel>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="w-[200px] text-xs">Enter a VIP code if you have one to receive special benefits.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <FormControl>
+                    <Input placeholder="Enter VIP code (if you have one)" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="termsAccepted"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox 
+                      checked={field.value} 
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="flex items-center gap-1">
+                      I accept the 
+                      <Button 
+                        type="button" 
+                        variant="link" 
+                        className="h-auto p-0 text-fantasy-accent"
+                        onClick={() => setShowTermsDialog(true)}
+                      >
+                        <span className="flex items-center">
+                          terms and conditions
+                          <FileText className="ml-1 h-3 w-3" />
+                        </span>
+                      </Button>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+            
+            <Button 
+              type="submit" 
+              className="w-full fantasy-button" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Registering...
+                </>
+              ) : (
+                "Register"
+              )}
+            </Button>
+            
+            <div className="text-center mt-4">
+              <p>
+                Already have an account?{" "}
+                <Link to="/login" className="text-fantasy-accent hover:underline">
+                  Log in
+                </Link>
+              </p>
+            </div>
+          </form>
+        </Form>
+        
+        <TermsAndConditionsDialog 
+          open={showTermsDialog} 
+          onOpenChange={setShowTermsDialog} 
+          onAgree={() => {
+            form.setValue('termsAccepted', true);
+            setShowTermsDialog(false);
+          }} 
+        />
+      </CardContent>
+    </Card>
   );
 };
 

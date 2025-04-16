@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/modules/auth';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';

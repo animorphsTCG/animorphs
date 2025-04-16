@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
@@ -14,7 +13,7 @@ import { Button } from "@/components/ui/button";
 declare global {
   interface Window {
     onYouTubeIframeAPIReady: () => void;
-    YT: typeof YT;
+    YT: any;
   }
 }
 
@@ -35,21 +34,17 @@ const MusicPlayer: React.FC = () => {
   const previewTimerRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    // Initialize YouTube API
     loadYouTubeApi();
     
-    // Always attempt to fetch songs, even for anonymous users
     fetchMusicData();
   }, [user]);
 
   const loadYouTubeApi = () => {
-    // Check if the YouTube API is already loaded
     if (window.YT) {
       setYtApiReady(true);
       return;
     }
 
-    // Load the YouTube API
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
     const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -85,12 +80,9 @@ const MusicPlayer: React.FC = () => {
       setError(null);
       console.log("Fetching music data...");
       
-      // For anonymous users or when the user object isn't available yet,
-      // we'll still show some default songs
       let songIds: string[] = [];
       let settings = { volume: 50, musicEnabled: true };
       
-      // Try to fetch user-specific settings if logged in
       if (user) {
         try {
           console.log("Fetching user song selections...");
@@ -106,7 +98,6 @@ const MusicPlayer: React.FC = () => {
             console.log(`Got ${songIds.length} song selections`);
           }
 
-          // Fetch user settings
           const { data: userSettings, error: settingsError } = await supabase
             .from('user_music_settings')
             .select('*')
@@ -125,10 +116,8 @@ const MusicPlayer: React.FC = () => {
         }
       }
 
-      // If the user has no selections or is not logged in, fetch default songs
       if (songIds.length === 0) {
         console.log("Fetching default songs...");
-        // Just get the first few songs from the database as defaults
         const { data: defaultSongs, error: defaultError } = await supabase
           .from('songs')
           .select('id')
@@ -143,7 +132,6 @@ const MusicPlayer: React.FC = () => {
         }
       }
       
-      // Now fetch the actual song data if we have any IDs
       if (songIds.length > 0) {
         console.log("Fetching song details for IDs:", songIds);
         const { data: songsData, error: songsError } = await supabase
@@ -167,7 +155,6 @@ const MusicPlayer: React.FC = () => {
         setError("No songs available. Add songs to your collection.");
       }
 
-      // Apply user settings
       setVolume(settings.volume);
       setIsMuted(!settings.musicEnabled);
       setIsPreviewMode(!hasSubscription);

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 declare global {
   interface Window {
     onYouTubeIframeAPIReady: () => void;
-    YT: any;
+    YT: YT;
   }
 }
 

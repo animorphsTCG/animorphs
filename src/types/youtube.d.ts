@@ -1,4 +1,3 @@
-
 // Type definitions for YouTube IFrame API
 interface YT {
   PlayerState: {
@@ -8,30 +7,27 @@ interface YT {
     BUFFERING: number;
     CUED: number;
   };
-  Player: {
-    new (
-      elementId: string, 
-      options: {
-        height?: string | number;
-        width?: string | number;
-        videoId?: string;
-        playerVars?: {
-          autoplay?: 0 | 1;
-          controls?: 0 | 1;
-          start?: number;
-          end?: number;
-          mute?: 0 | 1;
-          [key: string]: any;
-        };
-        events?: {
-          onReady?: (event: any) => void;
-          onStateChange?: (event: any) => void;
-          onError?: (event: any) => void;
-          [key: string]: any;
-        };
-      }
-    ): YT.Player;
-  };
+  Player: new (
+    elementId: string,
+    config: {
+      height?: string | number;
+      width?: string | number;
+      videoId?: string;
+      playerVars?: {
+        autoplay?: 0 | 1;
+        controls?: 0 | 1;
+        start?: number;
+        mute?: 0 | 1;
+        [key: string]: any;
+      };
+      events?: {
+        onReady?: (event: { target: YTPlayer }) => void;
+        onStateChange?: (event: any) => void;
+        onError?: (event: any) => void;
+        [key: string]: any;
+      };
+    }
+  ) => YTPlayer;
 }
 
 interface YTPlayer {
@@ -41,6 +37,8 @@ interface YTPlayer {
   pauseVideo(): void;
   stopVideo(): void;
   destroy(): void;
+  mute(): void;
+  unMute(): void;
 }
 
 declare namespace YT {

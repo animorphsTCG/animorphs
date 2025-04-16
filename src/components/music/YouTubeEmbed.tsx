@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, MutableRefObject } from "react";
 import { Song } from "@/types/music";
 
 interface YouTubeEmbedProps {
@@ -9,7 +9,7 @@ interface YouTubeEmbedProps {
   isPreviewMode: boolean;
   ytApiReady: boolean;
   iframeRef: React.RefObject<HTMLIFrameElement>;
-  playerRef: React.RefObject<any>;
+  playerRef: MutableRefObject<YTPlayer | null>;
 }
 
 const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
@@ -21,11 +21,30 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   iframeRef,
   playerRef,
 }) => {
+  const extractVideoId = (url: string): string => {
+    if (!url) return '';
+    
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.hostname.includes('youtube.com')) {
+        return urlObj.searchParams.get('v') || '';
+      }
+      if (urlObj.hostname.includes('youtu.be')) {
+        return urlObj.pathname.slice(1);
+      }
+    } catch (e) {
+      console.error("Invalid URL format:", url);
+      return '';
+    }
+    
+    return '';
+  };
+
   useEffect(() => {
-    // Initialize or update YouTube player when current song changes
     if (ytApiReady && currentSong && window.YT) {
       try {
         const videoId = extractVideoId(currentSong.youtube_url);
+        console.log("Extracted video ID:", videoId);
         
         if (!videoId) {
           console.error("Invalid YouTube URL:", currentSong.youtube_url);
@@ -34,7 +53,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
 
         if (!playerRef.current) {
           // Initialize new player
-          new window.YT.Player('youtube-player', {
+          const player = new window.YT.Player('youtube-player', {
             height: '0',
             width: '0',
             videoId: videoId,
@@ -46,16 +65,16 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
             },
             events: {
               onReady: (event) => {
-                // Set the player reference to the event target
-                if (playerRef && typeof playerRef === 'object') {
-                  playerRef.current = event.target;
+                playerRef.current = event.target;
+                console.log("YouTube player ready");
+                if (isPlaying && !isMuted) {
+                  event.target.playVideo();
                 }
               },
-              onError: (e: any) => console.error("YouTube player error:", e)
+              onError: (e) => console.error("YouTube player error:", e)
             }
           });
         } else {
-          // Update existing player
           if (isPlaying) {
             playerRef.current.loadVideoById({
               videoId: videoId,
@@ -75,7 +94,6 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   }, [currentSong, ytApiReady]);
 
   useEffect(() => {
-    // Control playback state
     if (playerRef.current) {
       try {
         if (isPlaying) {
@@ -90,7 +108,6 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   }, [isPlaying]);
 
   useEffect(() => {
-    // Control volume/mute state
     if (playerRef.current) {
       try {
         if (isMuted) {
@@ -103,28 +120,6 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
       }
     }
   }, [isMuted]);
-
-  const extractVideoId = (url: string): string => {
-    if (!url) return '';
-    
-    // Handle direct video IDs
-    if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
-      return url;
-    }
-    
-    // Handle youtube.com URLs
-    if (url.includes('youtube.com/watch')) {
-      const urlParams = new URLSearchParams(url.split('?')[1]);
-      return urlParams.get('v') || '';
-    }
-    
-    // Handle youtu.be URLs
-    if (url.includes('youtu.be/')) {
-      return url.split('youtu.be/')[1].split('?')[0];
-    }
-    
-    return '';
-  };
 
   if (!currentSong) return null;
 

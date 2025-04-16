@@ -1,13 +1,13 @@
 
 import React, { useEffect } from 'react';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { useAuth } from '@/modules/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
 import PaymentSection from '@/components/profile/PaymentSection';
 import { Loader2, Lock, AlertTriangle } from 'lucide-react';
-import MusicSettings from '@/components/music/MusicSettings';
+import MusicSettings from '@/components/MusicSettings';
 import MusicPlayer from '@/components/MusicPlayer';
 import AdminPanel from '@/components/admin/AdminPanel';
 

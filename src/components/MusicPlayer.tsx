@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from "react";
-import { useAuth } from "@/modules/auth";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { Song } from "@/types/music";

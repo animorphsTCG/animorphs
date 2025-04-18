@@ -18,6 +18,11 @@ export interface UserProfile {
   date_of_birth?: string;
   has_paid?: boolean;
   profile_image_url?: string | null;
+  bio?: string | null;
+  favorite_animorph?: string | null;
+  favorite_battle_mode?: string | null;
+  online_times_gmt2?: string | null;
+  playing_times?: string | null;
 }
 
 export interface AnimorphCard {

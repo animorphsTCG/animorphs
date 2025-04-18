@@ -111,14 +111,14 @@ const Navbar = () => {
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <div className="md:hidden mt-4 py-3 border-t border-fantasy-primary/30 flex flex-col space-y-3">
-            <Link to="/" className="text-white hover:text-fantasy-accent text-lg font-medium">
+            <Link to="/" className="text-white hover:text-fantasy-accent text-lg font-medium" onClick={toggleMenu}>
               Home
             </Link>
-            <Link to="/card-gallery" className="text-white hover:text-fantasy-accent text-lg font-medium">
+            <Link to="/card-gallery" className="text-white hover:text-fantasy-accent text-lg font-medium" onClick={toggleMenu}>
               Cards
             </Link>
             
-            <Link to="/visitor-demo-battle" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center">
+            <Link to="/visitor-demo-battle" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
               <Gamepad className="mr-2 h-4 w-4" /> Demo Battle
             </Link>
             
@@ -150,12 +150,12 @@ const Navbar = () => {
             
             {!user && !isLoading && (
               <div className="flex flex-col space-y-2">
-                <Link to="/register" className="w-full">
+                <Link to="/register" className="w-full" onClick={toggleMenu}>
                   <Button className="fantasy-button w-full">
                     Register
                   </Button>
                 </Link>
-                <Link to="/login" className="w-full">
+                <Link to="/login" className="w-full" onClick={toggleMenu}>
                   <Button className="fantasy-button-secondary w-full">
                     Login
                   </Button>

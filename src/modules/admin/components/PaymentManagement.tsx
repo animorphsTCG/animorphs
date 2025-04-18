@@ -27,15 +27,15 @@ interface Payment {
   transaction_id: string | null;
   created_at: string;
   updated_at?: string;
-  profiles?: UserProfile; // Changed from array to object
+  user_info?: {
+    username: string;
+    email: string;
+  };
 }
-
-// Define the structure of payments with user info
-type PaymentWithUser = Payment;
 
 const PaymentManagement = () => {
   const { isAdmin, adminToken } = useAdmin();
-  const [payments, setPayments] = useState<PaymentWithUser[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -59,24 +59,36 @@ const PaymentManagement = () => {
   const fetchPayments = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Get all payment records
+      const { data: paymentData, error: paymentError } = await supabase
         .from('payment_status')
-        .select('*, profiles:user_id(username, email:auth.users(email))');
+        .select('*');
 
-      if (error) throw error;
+      if (paymentError) throw paymentError;
 
-      // Transform data to match PaymentWithUser structure
-      const transformedData = data.map(item => {
-        return {
-          ...item,
-          profiles: {
-            username: item.profiles?.username || 'Unknown',
-            email: item.profiles?.auth_users?.[0]?.email || 'Unknown'
-          }
-        };
-      }) as PaymentWithUser[];
+      // Get all profiles with emails for joining
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, username, email:auth.users(email)');
 
-      setPayments(transformedData);
+      if (profileError) throw profileError;
+
+      // Create map of profiles by id for easy lookup
+      const profileMap = new Map();
+      profileData.forEach((profile) => {
+        profileMap.set(profile.id, {
+          username: profile.username || 'Unknown',
+          email: profile.email?.[0]?.email || 'Unknown'
+        });
+      });
+
+      // Join payment data with profile data
+      const combinedData = paymentData.map((payment) => ({
+        ...payment,
+        user_info: profileMap.get(payment.user_id) || { username: 'Unknown', email: 'Unknown' }
+      }));
+
+      setPayments(combinedData);
     } catch (error) {
       console.error('Error fetching payments:', error);
       toast({
@@ -93,7 +105,7 @@ const PaymentManagement = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, auth_users:auth.users(email)')
+        .select('id, username, email:auth.users(email)')
         .order('username');
 
       if (error) throw error;
@@ -101,7 +113,7 @@ const PaymentManagement = () => {
       const transformedUsers = data.map(user => ({
         id: user.id,
         username: user.username || 'Unknown',
-        email: user.auth_users?.[0]?.email || 'Unknown'
+        email: user.email?.[0]?.email || 'Unknown'
       }));
 
       setUsers(transformedUsers);
@@ -252,8 +264,8 @@ const PaymentManagement = () => {
           <TableBody>
             {payments.map((payment) => (
               <TableRow key={payment.id}>
-                <TableCell>{payment.profiles?.username}</TableCell>
-                <TableCell>{payment.profiles?.email}</TableCell>
+                <TableCell>{payment.user_info?.username}</TableCell>
+                <TableCell>{payment.user_info?.email}</TableCell>
                 <TableCell>
                   {payment.has_paid ? (
                     <Badge variant="default" className="bg-green-500">Yes</Badge>

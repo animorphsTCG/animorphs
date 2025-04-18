@@ -12,11 +12,6 @@ import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useAdmin } from '@/hooks/useAdmin';
 import { format, addMonths, addYears } from 'date-fns';
 
-interface UserProfile {
-  username: string;
-  email: string;
-}
-
 interface MusicSubscription {
   id: string;
   user_id: string;
@@ -24,7 +19,10 @@ interface MusicSubscription {
   start_date: string;
   end_date: string;
   created_at: string;
-  profiles?: UserProfile; // Changed from array to object
+  user_info?: {
+    username: string;
+    email: string;
+  };
 }
 
 const SubscriptionManagement = () => {
@@ -63,24 +61,36 @@ const SubscriptionManagement = () => {
   const fetchSubscriptions = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Get all subscription records
+      const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('music_subscriptions')
-        .select('*, profiles:user_id(username, email:auth.users(email))');
+        .select('*');
 
-      if (error) throw error;
+      if (subscriptionError) throw subscriptionError;
 
-      // Transform data to match the expected structure
-      const transformedData = data.map(item => {
-        return {
-          ...item,
-          profiles: {
-            username: item.profiles?.username || 'Unknown',
-            email: item.profiles?.auth_users?.[0]?.email || 'Unknown'
-          }
-        };
-      }) as MusicSubscription[];
+      // Get all profiles with emails for joining
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, username, email:auth.users(email)');
 
-      setSubscriptions(transformedData);
+      if (profileError) throw profileError;
+
+      // Create map of profiles by id for easy lookup
+      const profileMap = new Map();
+      profileData.forEach((profile) => {
+        profileMap.set(profile.id, {
+          username: profile.username || 'Unknown',
+          email: profile.email?.[0]?.email || 'Unknown'
+        });
+      });
+
+      // Join subscription data with profile data
+      const combinedData = subscriptionData.map((subscription) => ({
+        ...subscription,
+        user_info: profileMap.get(subscription.user_id) || { username: 'Unknown', email: 'Unknown' }
+      }));
+
+      setSubscriptions(combinedData);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
       toast({
@@ -97,7 +107,7 @@ const SubscriptionManagement = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, auth_users:auth.users(email)')
+        .select('id, username, email:auth.users(email)')
         .order('username');
 
       if (error) throw error;
@@ -105,7 +115,7 @@ const SubscriptionManagement = () => {
       const transformedUsers = data.map(user => ({
         id: user.id,
         username: user.username || 'Unknown',
-        email: user.auth_users?.[0]?.email || 'Unknown'
+        email: user.email?.[0]?.email || 'Unknown'
       }));
 
       setUsers(transformedUsers);
@@ -255,8 +265,8 @@ const SubscriptionManagement = () => {
           <TableBody>
             {subscriptions.map((subscription) => (
               <TableRow key={subscription.id}>
-                <TableCell>{subscription.profiles?.username}</TableCell>
-                <TableCell>{subscription.profiles?.email}</TableCell>
+                <TableCell>{subscription.user_info?.username}</TableCell>
+                <TableCell>{subscription.user_info?.email}</TableCell>
                 <TableCell className="capitalize">{subscription.subscription_type}</TableCell>
                 <TableCell>{format(new Date(subscription.start_date), 'PPP')}</TableCell>
                 <TableCell>{format(new Date(subscription.end_date), 'PPP')}</TableCell>

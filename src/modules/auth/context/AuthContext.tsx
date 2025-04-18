@@ -15,6 +15,8 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (accessToken: string, newPassword: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -109,6 +111,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserProfile(null);
           toast({ title: 'Signed out successfully' });
           navigate('/login');
+        } else if (event === 'PASSWORD_RECOVERY') {
+          navigate('/update-password');
         }
       }
     );
@@ -204,6 +208,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Password reset email sent',
+        description: 'Check your email for a link to reset your password.',
+      });
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      toast({
+        title: 'Failed to send reset email',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
+  const updatePassword = async (accessToken: string, newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Password updated',
+        description: 'You can now log in with your new password.',
+      });
+    } catch (error: any) {
+      console.error('Update password error:', error);
+      toast({
+        title: 'Failed to update password',
+        description: error.message,
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -228,6 +278,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signInWithGoogle,
         signOut,
+        resetPassword,
+        updatePassword,
         refreshProfile,
       }}
     >
@@ -235,3 +287,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
+

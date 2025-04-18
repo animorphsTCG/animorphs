@@ -41,7 +41,6 @@ export const LoginForm = () => {
     } catch (err: any) {
       console.error("Error signing in:", err);
       
-      // More descriptive error message
       if (err.message?.includes("Invalid login credentials")) {
         setError(
           "Login failed. Please check your email and password. If you just registered, make sure your email is verified."
@@ -89,6 +88,11 @@ export const LoginForm = () => {
                   <Input type="password" placeholder="Enter your password" {...field} />
                 </FormControl>
                 <FormMessage />
+                <div className="text-sm text-right">
+                  <Link to="/reset-password" className="text-blue-600 hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
               </FormItem>
             )}
           />
@@ -118,6 +122,11 @@ export const LoginForm = () => {
             <p className="text-sm">
               <Link to="/verify" className="text-blue-600 hover:underline">
                 Resend verification email
+              </Link>
+            </p>
+            <p className="text-sm">
+              <Link to="/reset-password" className="text-blue-600 hover:underline">
+                Forgot password?
               </Link>
             </p>
           </div>

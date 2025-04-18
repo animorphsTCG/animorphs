@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes as RouterRoutes, Route } from 'react-router-dom';
 import { ProtectedRoute } from '@/modules/auth';
@@ -17,6 +18,8 @@ import NotFound from "./pages/NotFound";
 import OneVOneBattle from "./pages/OneVOneBattle";
 import VisitorDemoBattle from "./pages/VisitorDemoBattle";
 import Admin from "./pages/Admin";
+import ResetPassword from "./pages/ResetPassword";
+import UpdatePassword from "./pages/UpdatePassword";
 
 export const Routes = () => {
   return (
@@ -26,6 +29,8 @@ export const Routes = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       <Route path="/verify" element={<Verify />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/update-password" element={<UpdatePassword />} />
       <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
       <Route path="/payment-success" element={<PaymentSuccess />} />
       <Route path="/payment-cancelled" element={<PaymentCancelled />} />

@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import MusicSettings from '@/components/music/MusicSettings';
 import MusicPlayer from '@/components/MusicPlayer';
-import AdminPanel from '@/components/admin/AdminPanel';
+import AdminPanel from '@/modules/admin/components/AdminPanel';
 import UserProfileEditor from '@/components/profile/UserProfileEditor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from '@/components/ui/use-toast';

@@ -1,85 +1,92 @@
 
 import React, { useState, useEffect } from 'react';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-import { useAdminStatus } from '../hooks/useAdmin';
-import { Pencil, Trash, Plus, Loader2 } from "lucide-react";
-import { UserProfile } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { toast } from '@/components/ui/use-toast';
+import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { useAdmin } from '@/hooks/useAdmin';
+import { format, addMonths, addYears } from 'date-fns';
+
+interface UserProfile {
+  username: string;
+  email: string;
+}
 
 interface MusicSubscription {
   id: string;
   user_id: string;
-  subscription_type: string;
+  subscription_type: 'monthly' | 'yearly';
   start_date: string;
-  end_date: string | null;
+  end_date: string;
   created_at: string;
-  profiles?: {
-    username: string;
-    email?: string;
-  };
+  profiles?: UserProfile; // Changed from array to object
 }
 
 const SubscriptionManagement = () => {
-  const { adminToken } = useAdminStatus();
+  const { isAdmin } = useAdmin();
   const [subscriptions, setSubscriptions] = useState<MusicSubscription[]>([]);
-  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  
   const [selectedSubscription, setSelectedSubscription] = useState<MusicSubscription | null>(null);
-  
+  const [users, setUsers] = useState<{id: string, username: string, email: string}[]>([]);
+
   // Form state
-  const [userId, setUserId] = useState<string>("");
-  const [subscriptionType, setSubscriptionType] = useState("annual");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [userId, setUserId] = useState('');
+  const [subscriptionType, setSubscriptionType] = useState<'monthly' | 'yearly'>('monthly');
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
-    fetchSubscriptions();
-    fetchUsers();
-  }, []);
-  
+    if (isAdmin) {
+      fetchSubscriptions();
+      fetchUsers();
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    // Auto-calculate end date based on subscription type and start date
+    if (startDate) {
+      const start = new Date(startDate);
+      const end = subscriptionType === 'monthly' 
+        ? addMonths(start, 1) 
+        : addYears(start, 1);
+      setEndDate(format(end, 'yyyy-MM-dd'));
+    }
+  }, [startDate, subscriptionType]);
+
   const fetchSubscriptions = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('music_subscriptions')
-        .select(`
-          id,
-          user_id,
-          subscription_type,
-          start_date,
-          end_date,
-          created_at,
-          profiles (
-            username,
-            email
-          )
-        `);
+        .select('*, profiles:user_id(username, email:auth.users(email))');
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      setSubscriptions(data as MusicSubscription[]);
+      // Transform data to match the expected structure
+      const transformedData = data.map(item => {
+        return {
+          ...item,
+          profiles: {
+            username: item.profiles?.username || 'Unknown',
+            email: item.profiles?.auth_users?.[0]?.email || 'Unknown'
+          }
+        };
+      }) as MusicSubscription[];
+
+      setSubscriptions(transformedData);
     } catch (error) {
-      console.error("Error fetching subscriptions:", error);
+      console.error('Error fetching subscriptions:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to fetch subscription data"
+        title: 'Error',
+        description: 'Failed to fetch subscription data.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -90,347 +97,263 @@ const SubscriptionManagement = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          username,
-          email
-        `);
+        .select('id, username, auth_users:auth.users(email)')
+        .order('username');
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      setUsers(data as UserProfile[]);
+      const transformedUsers = data.map(user => ({
+        id: user.id,
+        username: user.username || 'Unknown',
+        email: user.auth_users?.[0]?.email || 'Unknown'
+      }));
+
+      setUsers(transformedUsers);
     } catch (error) {
-      console.error("Error fetching users:", error);
+      console.error('Error fetching users:', error);
     }
   };
 
-  const resetForm = () => {
-    setUserId("");
-    setSubscriptionType("annual");
-    
-    // Set start date to today
-    const today = new Date().toISOString().split('T')[0];
-    setStartDate(today);
-    
-    // Set end date to one year from today
-    const oneYearFromNow = new Date();
-    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-    setEndDate(oneYearFromNow.toISOString().split('T')[0]);
-    
-    setSelectedSubscription(null);
-    setIsEditing(false);
-  };
-
-  const handleOpenDialog = (subscription?: MusicSubscription) => {
-    if (subscription) {
-      setIsEditing(true);
-      setSelectedSubscription(subscription);
-      setUserId(subscription.user_id);
-      setSubscriptionType(subscription.subscription_type);
-      setStartDate(new Date(subscription.start_date).toISOString().split('T')[0]);
-      setEndDate(subscription.end_date ? new Date(subscription.end_date).toISOString().split('T')[0] : "");
-    } else {
-      resetForm();
-    }
-    setDialogOpen(true);
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!userId || !startDate || !endDate) {
+  const handleSave = async () => {
+    if (!userId) {
       toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please fill out all required fields"
+        title: 'Error',
+        description: 'Please select a user.',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     try {
       const subscriptionData = {
-        id: isEditing ? selectedSubscription?.id : undefined,
         user_id: userId,
         subscription_type: subscriptionType,
-        start_date: new Date(startDate).toISOString(),
-        end_date: new Date(endDate).toISOString(),
+        start_date: startDate,
+        end_date: endDate,
       };
-      
+
+      let operation;
       if (isEditing && selectedSubscription) {
-        // Update existing subscription
-        const { error } = await supabase
+        operation = supabase
           .from('music_subscriptions')
           .update(subscriptionData)
           .eq('id', selectedSubscription.id);
-          
-        if (error) throw error;
       } else {
-        // Create new subscription
-        const { error } = await supabase
+        operation = supabase
           .from('music_subscriptions')
           .insert(subscriptionData);
-          
-        if (error) throw error;
       }
-      
-      // Update music_unlocked in the profiles table
-      const { error: profileError } = await supabase
+
+      const { error } = await operation;
+      if (error) throw error;
+
+      // Update the user's music_unlocked status
+      await supabase
         .from('profiles')
         .update({ music_unlocked: true })
         .eq('id', userId);
-        
-      if (profileError) {
-        console.error("Failed to update profile music unlock status:", profileError);
-      }
-      
+
       toast({
-        title: "Success",
-        description: isEditing 
-          ? "Subscription updated successfully" 
-          : "Subscription created successfully"
+        title: 'Success',
+        description: isEditing ? 'Subscription updated successfully.' : 'Subscription added successfully.',
       });
       
       setDialogOpen(false);
       resetForm();
       fetchSubscriptions();
     } catch (error) {
-      console.error("Error saving subscription:", error);
+      console.error('Error saving subscription:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save subscription"
+        title: 'Error',
+        description: 'Failed to save subscription data.',
+        variant: 'destructive',
       });
     }
   };
 
-  const handleDelete = async (subscriptionId: string) => {
+  const handleEdit = (subscription: MusicSubscription) => {
+    setSelectedSubscription(subscription);
+    setUserId(subscription.user_id);
+    setSubscriptionType(subscription.subscription_type);
+    setStartDate(subscription.start_date);
+    setEndDate(subscription.end_date);
+    setIsEditing(true);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this subscription?')) return;
+
     try {
       const { error } = await supabase
         .from('music_subscriptions')
         .delete()
-        .eq('id', subscriptionId);
-        
+        .eq('id', id);
+
       if (error) throw error;
-      
+
       toast({
-        title: "Success",
-        description: "Subscription deleted successfully"
+        title: 'Success',
+        description: 'Subscription deleted successfully.',
       });
       
-      setDeleteConfirmOpen(false);
       fetchSubscriptions();
     } catch (error) {
-      console.error("Error deleting subscription:", error);
+      console.error('Error deleting subscription:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete subscription"
+        title: 'Error',
+        description: 'Failed to delete subscription.',
+        variant: 'destructive',
       });
     }
   };
 
-  // Check if a subscription is active
-  const isSubscriptionActive = (endDate: string | null) => {
-    if (!endDate) return false;
+  const resetForm = () => {
+    setUserId('');
+    setSubscriptionType('monthly');
+    setStartDate(format(new Date(), 'yyyy-MM-dd'));
+    setEndDate(format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
+    setSelectedSubscription(null);
+    setIsEditing(false);
+  };
+
+  const handleAddNew = () => {
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  const isActive = (endDate: string) => {
     return new Date(endDate) >= new Date();
   };
+
+  if (loading) {
+    return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-xl font-semibold">Subscription Management</h3>
-        <Button 
-          onClick={() => handleOpenDialog()}
-          className="flex items-center gap-2"
-        >
+        <h3 className="text-lg font-medium">Music Subscription Management</h3>
+        <Button onClick={handleAddNew} className="flex items-center gap-2">
           <Plus className="h-4 w-4" /> Add Subscription
         </Button>
       </div>
       
-      {loading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Subscription Type</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>End Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+      {subscriptions.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Start Date</TableHead>
+              <TableHead>End Date</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {subscriptions.map((subscription) => (
+              <TableRow key={subscription.id}>
+                <TableCell>{subscription.profiles?.username}</TableCell>
+                <TableCell>{subscription.profiles?.email}</TableCell>
+                <TableCell className="capitalize">{subscription.subscription_type}</TableCell>
+                <TableCell>{format(new Date(subscription.start_date), 'PPP')}</TableCell>
+                <TableCell>{format(new Date(subscription.end_date), 'PPP')}</TableCell>
+                <TableCell>
+                  <span className={`px-2 py-1 text-xs rounded-full ${
+                    isActive(subscription.end_date) 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {isActive(subscription.end_date) ? 'Active' : 'Expired'}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(subscription)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(subscription.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {subscriptions.length > 0 ? (
-                subscriptions.map((subscription) => {
-                  const isActive = isSubscriptionActive(subscription.end_date);
-                  return (
-                    <TableRow key={subscription.id}>
-                      <TableCell className="font-medium">
-                        {subscription.profiles?.username || "Unknown"}
-                      </TableCell>
-                      <TableCell className="capitalize">
-                        {subscription.subscription_type}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(subscription.start_date).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        {subscription.end_date 
-                          ? new Date(subscription.end_date).toLocaleDateString() 
-                          : "No end date"}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          isActive 
-                            ? "bg-green-100 text-green-800" 
-                            : "bg-red-100 text-red-800"
-                        }`}>
-                          {isActive ? "Active" : "Expired"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleOpenDialog(subscription)}
-                          className="h-8 w-8 p-0 mr-2"
-                        >
-                          <Pencil className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => {
-                            setSelectedSubscription(subscription);
-                            setDeleteConfirmOpen(true);
-                          }}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                        >
-                          <Trash className="h-4 w-4" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
-                    No subscriptions found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+            ))}
+          </TableBody>
+        </Table>
+      ) : (
+        <div className="text-center p-8 bg-muted rounded-md">
+          <p>No subscription records found.</p>
         </div>
       )}
-      
-      {/* Add/Edit Subscription Dialog */}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {isEditing ? "Edit Subscription" : "Add New Subscription"}
-            </DialogTitle>
+            <DialogTitle>{isEditing ? 'Edit Subscription' : 'Add Subscription'}</DialogTitle>
           </DialogHeader>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
               <Label htmlFor="user">User</Label>
-              <Select 
+              <select
+                id="user"
+                className="w-full px-3 py-2 border rounded-md"
                 value={userId}
-                onValueChange={setUserId}
-                disabled={isEditing}
+                onChange={(e) => setUserId(e.target.value)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a user" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.username} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="">Select a user</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.username} ({user.email})
+                  </option>
+                ))}
+              </select>
             </div>
             
-            <div className="space-y-2">
+            <div className="grid gap-2">
               <Label htmlFor="subscription-type">Subscription Type</Label>
               <Select 
-                value={subscriptionType}
-                onValueChange={setSubscriptionType}
+                value={subscriptionType} 
+                onValueChange={(value: 'monthly' | 'yearly') => setSubscriptionType(value)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select subscription type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="annual">Annual (R24 ZAR)</SelectItem>
                   <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="lifetime">Lifetime</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
-            <div className="space-y-2">
+            <div className="grid gap-2">
               <Label htmlFor="start-date">Start Date</Label>
               <Input
                 id="start-date"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                required
               />
             </div>
             
-            <div className="space-y-2">
+            <div className="grid gap-2">
               <Label htmlFor="end-date">End Date</Label>
               <Input
                 id="end-date"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                required
               />
+              <p className="text-xs text-muted-foreground">
+                Auto-calculated based on subscription type and start date
+              </p>
             </div>
-            
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {isEditing ? "Update" : "Add"} Subscription
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
-          </DialogHeader>
-          <p>Are you sure you want to delete this subscription? This action cannot be undone.</p>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={() => selectedSubscription && handleDelete(selectedSubscription.id)}
-            >
-              Delete
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

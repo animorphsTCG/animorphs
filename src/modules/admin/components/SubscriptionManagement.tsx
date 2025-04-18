@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -68,21 +67,21 @@ const SubscriptionManagement = () => {
 
       if (subscriptionError) throw subscriptionError;
 
-      // Get all profiles with emails for joining
+      // Fetch profiles separately
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, username, email:auth.users(email)');
+        .select('id, username');
 
       if (profileError) throw profileError;
-
-      // Create map of profiles by id for easy lookup
+      
+      // Create a mapping of profiles by id
       const profileMap = new Map();
-      profileData.forEach((profile) => {
+      for (const profile of profileData) {
         profileMap.set(profile.id, {
           username: profile.username || 'Unknown',
-          email: profile.email?.[0]?.email || 'Unknown'
+          email: 'Unknown' // Placeholder
         });
-      });
+      }
 
       // Join subscription data with profile data
       const combinedData = subscriptionData.map((subscription) => ({
@@ -107,7 +106,7 @@ const SubscriptionManagement = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, email:auth.users(email)')
+        .select('id, username')
         .order('username');
 
       if (error) throw error;
@@ -115,12 +114,17 @@ const SubscriptionManagement = () => {
       const transformedUsers = data.map(user => ({
         id: user.id,
         username: user.username || 'Unknown',
-        email: user.email?.[0]?.email || 'Unknown'
+        email: user.id // Using ID as placeholder since we can't access emails directly
       }));
 
       setUsers(transformedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch user data.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -253,8 +257,8 @@ const SubscriptionManagement = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead>User ID</TableHead>
+              <TableHead>Username</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Start Date</TableHead>
               <TableHead>End Date</TableHead>
@@ -265,8 +269,8 @@ const SubscriptionManagement = () => {
           <TableBody>
             {subscriptions.map((subscription) => (
               <TableRow key={subscription.id}>
+                <TableCell>{subscription.user_id}</TableCell>
                 <TableCell>{subscription.user_info?.username}</TableCell>
-                <TableCell>{subscription.user_info?.email}</TableCell>
                 <TableCell className="capitalize">{subscription.subscription_type}</TableCell>
                 <TableCell>{format(new Date(subscription.start_date), 'PPP')}</TableCell>
                 <TableCell>{format(new Date(subscription.end_date), 'PPP')}</TableCell>
@@ -316,7 +320,7 @@ const SubscriptionManagement = () => {
                 <option value="">Select a user</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.username} ({user.email})
+                    {user.username} ({user.id})
                   </option>
                 ))}
               </select>

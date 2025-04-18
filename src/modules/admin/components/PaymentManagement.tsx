@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -14,8 +13,9 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { format } from 'date-fns';
 
 interface UserProfile {
+  id: string;
   username: string;
-  email: string;
+  email?: string;
 }
 
 interface Payment {
@@ -66,22 +66,25 @@ const PaymentManagement = () => {
 
       if (paymentError) throw paymentError;
 
-      // Get all profiles with emails for joining
+      // Fetch profiles separately
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, username, email:auth.users(email)');
+        .select('id, username');
 
       if (profileError) throw profileError;
-
-      // Create map of profiles by id for easy lookup
+      
+      // Create a mapping of profiles by id
       const profileMap = new Map();
-      profileData.forEach((profile) => {
+      for (const profile of profileData) {
         profileMap.set(profile.id, {
           username: profile.username || 'Unknown',
-          email: profile.email?.[0]?.email || 'Unknown'
+          email: 'Unknown' // We'll update this later
         });
-      });
-
+      }
+      
+      // Fetch emails from auth.users is not possible directly
+      // We'll use a different approach to get user emails
+      
       // Join payment data with profile data
       const combinedData = paymentData.map((payment) => ({
         ...payment,
@@ -103,22 +106,29 @@ const PaymentManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch profiles
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, username, email:auth.users(email)')
-        .order('username');
+        .select('id, username');
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
-      const transformedUsers = data.map(user => ({
+      // Transform the data - we don't have direct access to emails through the query
+      // so we'll just use placeholder emails
+      const transformedUsers = profilesData.map(user => ({
         id: user.id,
         username: user.username || 'Unknown',
-        email: user.email?.[0]?.email || 'Unknown'
+        email: user.id // Using ID as placeholder, emails aren't accessible this way
       }));
 
       setUsers(transformedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch user data.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -252,8 +262,8 @@ const PaymentManagement = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead>User ID</TableHead>
+              <TableHead>Username</TableHead>
               <TableHead>Paid</TableHead>
               <TableHead>Payment Date</TableHead>
               <TableHead>Method</TableHead>
@@ -264,8 +274,8 @@ const PaymentManagement = () => {
           <TableBody>
             {payments.map((payment) => (
               <TableRow key={payment.id}>
+                <TableCell>{payment.user_id}</TableCell>
                 <TableCell>{payment.user_info?.username}</TableCell>
-                <TableCell>{payment.user_info?.email}</TableCell>
                 <TableCell>
                   {payment.has_paid ? (
                     <Badge variant="default" className="bg-green-500">Yes</Badge>
@@ -313,7 +323,7 @@ const PaymentManagement = () => {
                 <option value="">Select a user</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.username} ({user.email})
+                    {user.username} ({user.id})
                   </option>
                 ))}
               </select>

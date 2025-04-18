@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes as RouterRoutes, Route } from 'react-router-dom';
 import { ProtectedRoute } from '@/modules/auth';
@@ -20,6 +19,7 @@ import VisitorDemoBattle from "./pages/VisitorDemoBattle";
 import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
+import PublicProfile from './pages/PublicProfile';
 
 export const Routes = () => {
   return (
@@ -60,6 +60,9 @@ export const Routes = () => {
       />
       <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
       <Route path="/admin" element={<Admin />} />
+      
+      <Route path="/profile/:userId" element={<PublicProfile />} />
+      
       <Route path="*" element={<NotFound />} />
     </RouterRoutes>
   );

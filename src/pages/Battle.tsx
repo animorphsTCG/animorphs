@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,7 @@ const Battle = () => {
   const { user } = useAuth();
   const [showLobbyCreator, setShowLobbyCreator] = useState(false);
   
-  const battleModes = [
+  const singlePlayerModes = [
     {
       title: "Visitor Demo Battle",
       description: "Try a sample battle against the AI without an account",
@@ -22,11 +21,14 @@ const Battle = () => {
     },
     {
       title: "1v1 Battle",
-      description: "Challenge another player or AI to a 1-on-1 battle",
+      description: "Challenge the AI to a 1-on-1 battle",
       path: "/1v1-battle",
       requiresAuth: true,
       icon: <UserPlus className="h-5 w-5" />
     },
+  ];
+
+  const multiPlayerModes = [
     {
       title: "3-Player Battle (Relaxed Tournament)",
       description: "Compete in a three-player relaxed tournament mode",
@@ -79,32 +81,68 @@ const Battle = () => {
             </Button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {battleModes.map((mode, index) => (
-              <Card key={index} className="border-2 border-fantasy-primary bg-black/70 hover:border-fantasy-accent transition-colors">
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    {mode.icon}
-                    <CardTitle className="text-2xl font-fantasy text-fantasy-accent">{mode.title}</CardTitle>
-                  </div>
-                  <CardDescription>{mode.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button 
-                    className="w-full fantasy-button"
-                    onClick={() => {
-                      if (mode.requiresAuth && !user) {
-                        navigate('/login');
-                      } else {
-                        navigate(mode.path);
-                      }
-                    }}
-                  >
-                    {mode.requiresAuth && !user ? "Login to Play" : "Play Now"}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-2xl font-fantasy text-fantasy-accent mb-4">Single Player Modes</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {singlePlayerModes.map((mode, index) => (
+                  <Card key={index} className="border-2 border-fantasy-primary bg-black/70 hover:border-fantasy-accent transition-colors">
+                    <CardHeader>
+                      <div className="flex items-center gap-2">
+                        {mode.icon}
+                        <CardTitle className="text-2xl font-fantasy text-fantasy-accent">{mode.title}</CardTitle>
+                      </div>
+                      <CardDescription>{mode.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button 
+                        className="w-full fantasy-button"
+                        onClick={() => {
+                          if (mode.requiresAuth && !user) {
+                            navigate('/login');
+                          } else {
+                            navigate(mode.path);
+                          }
+                        }}
+                      >
+                        {mode.requiresAuth && !user ? "Login to Play" : "Play Now"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-fantasy text-fantasy-accent mb-4">Multiplayer Modes</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {multiPlayerModes.map((mode, index) => (
+                  <Card key={index} className="border-2 border-fantasy-primary bg-black/70 hover:border-fantasy-accent transition-colors">
+                    <CardHeader>
+                      <div className="flex items-center gap-2">
+                        {mode.icon}
+                        <CardTitle className="text-2xl font-fantasy text-fantasy-accent">{mode.title}</CardTitle>
+                      </div>
+                      <CardDescription>{mode.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button 
+                        className="w-full fantasy-button"
+                        onClick={() => {
+                          if (mode.requiresAuth && !user) {
+                            navigate('/login');
+                          } else {
+                            navigate(mode.path);
+                          }
+                        }}
+                      >
+                        {mode.requiresAuth && !user ? "Login to Play" : "Play Now"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
           </div>
           
           <div className="mt-12 text-center">

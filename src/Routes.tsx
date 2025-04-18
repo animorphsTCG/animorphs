@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes as RouterRoutes, Route } from 'react-router-dom';
 import { ProtectedRoute } from '@/modules/auth';
+import { DemoBattle, OneVOneBattle } from '@/modules/battle/single-player';
 
 // Pages
 import Index from "./pages/Index";
@@ -14,12 +15,11 @@ import PaymentCancelled from "./pages/PaymentCancelled";
 import Battle from "./pages/Battle";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
-import OneVOneBattle from "./pages/OneVOneBattle";
-import VisitorDemoBattle from "./pages/VisitorDemoBattle";
 import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import PublicProfile from './pages/PublicProfile';
+import ThreePlayerBattle from './pages/ThreePlayerBattle';
 
 export const Routes = () => {
   return (
@@ -58,7 +58,7 @@ export const Routes = () => {
           </ProtectedRoute>
         } 
       />
-      <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
+      <Route path="/visitor-demo-battle" element={<DemoBattle />} />
       <Route path="/admin" element={<Admin />} />
       
       <Route path="/profile/:userId" element={<PublicProfile />} />

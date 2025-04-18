@@ -8,6 +8,9 @@ import { useAdminStatus } from '../hooks/useAdmin';
 import UserManagement from './UserManagement';
 import SongManagement from './SongManagement';
 import AdminAccessTrigger from './AdminAccessTrigger';
+import PaymentManagement from './PaymentManagement';
+import SubscriptionManagement from './SubscriptionManagement';
+import AnalyticsDashboard from './AnalyticsDashboard';
 
 const AdminPanel = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,9 +40,11 @@ const AdminPanel = () => {
         
         <CardContent className="flex-grow overflow-auto p-0">
           <Tabs defaultValue="users" className="w-full h-full">
-            <TabsList className="w-full justify-start border-b rounded-none px-4">
+            <TabsList className="w-full justify-start border-b rounded-none px-4 overflow-x-auto">
               <TabsTrigger value="users">User Management</TabsTrigger>
               <TabsTrigger value="songs">Song Management</TabsTrigger>
+              <TabsTrigger value="payments">Payment Management</TabsTrigger>
+              <TabsTrigger value="subscriptions">Subscription Management</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
             
@@ -51,9 +56,16 @@ const AdminPanel = () => {
               <SongManagement />
             </TabsContent>
             
+            <TabsContent value="payments" className="p-4 h-[calc(100%-48px)] overflow-auto">
+              <PaymentManagement />
+            </TabsContent>
+            
+            <TabsContent value="subscriptions" className="p-4 h-[calc(100%-48px)] overflow-auto">
+              <SubscriptionManagement />
+            </TabsContent>
+            
             <TabsContent value="analytics" className="p-4 h-[calc(100%-48px)] overflow-auto">
-              <h3 className="text-xl font-semibold mb-4">Analytics Dashboard</h3>
-              <p className="text-muted-foreground">Analytics dashboard is coming soon.</p>
+              <AnalyticsDashboard />
             </TabsContent>
           </Tabs>
         </CardContent>

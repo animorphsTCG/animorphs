@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, Users, LogOut, Gamepad2 } from "lucide-react";
+import { Menu, X, User, Users, LogOut, UserCircle } from "lucide-react";
 import { useAuth } from "@/modules/auth";
 import {
   DropdownMenu,
@@ -18,12 +18,8 @@ const Navbar = () => {
   const { user, signOut, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
-
-  const handleProfileClick = () => {
-    navigate("/profile");
+  const handleProfileClick = (route: string) => {
+    navigate(route);
     setIsMenuOpen(false);
   };
 
@@ -66,12 +62,17 @@ const Navbar = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                      <DropdownMenuLabel>Profile Options</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleProfileClick}>
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
+                      <DropdownMenuItem onClick={() => handleProfileClick('/profile')}>
+                        <UserCircle className="mr-2 h-4 w-4" />
+                        <span>Edit Profile</span>
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleProfileClick(`/profile/${user.id}`)}>
+                        <Users className="mr-2 h-4 w-4" />
+                        <span>Public Profile</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => signOut()}>
                         <LogOut className="mr-2 h-4 w-4" />
                         <span>Log out</span>
@@ -119,19 +120,25 @@ const Navbar = () => {
             
             {user && (
               <>
-                <Link to="/battle" className="text-white hover:text-fantasy-accent text-lg font-medium">
-                  Battle
-                </Link>
                 <div 
-                  onClick={handleProfileClick} 
-                  className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer"
+                  onClick={() => handleProfileClick('/profile')} 
+                  className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer flex items-center"
                 >
-                  Profile
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </div>
+                <div 
+                  onClick={() => handleProfileClick(`/profile/${user.id}`)} 
+                  className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer flex items-center"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Public Profile
                 </div>
                 <div 
                   onClick={() => signOut()} 
-                  className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer"
+                  className="text-white hover:text-fantasy-accent text-lg font-medium cursor-pointer flex items-center"
                 >
+                  <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </div>
               </>

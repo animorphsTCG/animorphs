@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -122,11 +123,6 @@ export const LoginForm = () => {
             <p className="text-sm">
               <Link to="/verify" className="text-blue-600 hover:underline">
                 Resend verification email
-              </Link>
-            </p>
-            <p className="text-sm">
-              <Link to="/reset-password" className="text-blue-600 hover:underline">
-                Forgot password?
               </Link>
             </p>
           </div>

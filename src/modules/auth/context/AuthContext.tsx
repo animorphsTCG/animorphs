@@ -16,7 +16,7 @@ interface AuthState {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  updatePassword: (accessToken: string, newPassword: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -107,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchUserProfile(currentSession.user.id);
           }, 0);
           toast({ title: 'Signed in successfully' });
+          navigate('/profile');
         } else if (event === 'SIGNED_OUT') {
           setUserProfile(null);
           toast({ title: 'Signed out successfully' });
@@ -179,7 +180,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
       if (error) throw error;
+      
+      // On successful login, the onAuthStateChange will handle navigation
     } catch (error: any) {
+      console.error("Sign in error:", error);
       toast({
         title: 'Sign in failed',
         description: error.message,
@@ -231,7 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updatePassword = async (accessToken: string, newPassword: string) => {
+  const updatePassword = async (newPassword: string) => {
     try {
       const { error } = await supabase.auth.updateUser({
         password: newPassword
@@ -243,6 +247,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: 'Password updated',
         description: 'You can now log in with your new password.',
       });
+      
+      navigate('/login');
     } catch (error: any) {
       console.error('Update password error:', error);
       toast({
@@ -287,4 +293,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-

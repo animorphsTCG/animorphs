@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, Users, LogOut, UserCircle } from "lucide-react";
+import { Menu, X, User, Users, LogOut, UserCircle, Gamepad } from "lucide-react";
 import { useAuth } from "@/modules/auth";
 import {
   DropdownMenu,
@@ -17,6 +17,10 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, signOut, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
 
   const handleProfileClick = (route: string) => {
     navigate(route);
@@ -115,7 +119,7 @@ const Navbar = () => {
             </Link>
             
             <Link to="/visitor-demo-battle" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center">
-              <Gamepad2 className="mr-2 h-4 w-4" /> Demo Battle
+              <Gamepad className="mr-2 h-4 w-4" /> Demo Battle
             </Link>
             
             {user && (

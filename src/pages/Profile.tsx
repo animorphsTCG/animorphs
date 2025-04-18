@@ -28,18 +28,16 @@ const Profile = () => {
       if (user && !userProfile) {
         setProfileLoading(true);
         try {
-          const profile = await refreshProfile();
-          if (!profile) {
-            setError('Profile not found');
-            toast({
-              title: "Error loading profile",
-              description: "Could not load your profile data",
-              variant: "destructive",
-            });
-          }
+          await refreshProfile();
+          // Instead of checking the return value directly, we'll check userProfile in the next render
         } catch (err) {
           setError('Failed to load profile data');
           console.error('Error refreshing profile:', err);
+          toast({
+            title: "Error loading profile",
+            description: "Could not load your profile data",
+            variant: "destructive",
+          });
         } finally {
           setProfileLoading(false);
         }
@@ -48,6 +46,13 @@ const Profile = () => {
     
     loadProfile();
   }, [user, userProfile, refreshProfile, navigate, isLoading]);
+
+  // This useEffect will handle showing errors if the profile wasn't found
+  useEffect(() => {
+    if (!profileLoading && user && !userProfile && !isLoading) {
+      setError('Profile not found');
+    }
+  }, [profileLoading, user, userProfile, isLoading]);
 
   if (isLoading || profileLoading) {
     return (

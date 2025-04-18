@@ -1,5 +1,6 @@
+
 import React, { useEffect } from 'react';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { useAuth } from '@/modules/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +10,7 @@ import MusicPlayer from '@/components/MusicPlayer';
 import AdminPanel from '@/components/admin/AdminPanel';
 import UserProfileEditor from '@/components/profile/UserProfileEditor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from '@/components/ui/use-toast';
 
 const Profile = () => {
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
@@ -19,16 +21,22 @@ const Profile = () => {
   useEffect(() => {
     if (!isLoading && !user) {
       navigate('/login');
+      return;
     }
-  }, [user, isLoading, navigate]);
 
-  // Ensure profile is loaded
-  useEffect(() => {
     const loadProfile = async () => {
       if (user && !userProfile) {
         setProfileLoading(true);
         try {
-          await refreshProfile();
+          const profile = await refreshProfile();
+          if (!profile) {
+            setError('Profile not found');
+            toast({
+              title: "Error loading profile",
+              description: "Could not load your profile data",
+              variant: "destructive",
+            });
+          }
         } catch (err) {
           setError('Failed to load profile data');
           console.error('Error refreshing profile:', err);
@@ -39,9 +47,9 @@ const Profile = () => {
     };
     
     loadProfile();
-  }, [user, userProfile, refreshProfile]);
+  }, [user, userProfile, refreshProfile, navigate, isLoading]);
 
-  if (isLoading) {
+  if (isLoading || profileLoading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -49,9 +57,13 @@ const Profile = () => {
     );
   }
 
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="container mx-auto py-12 px-4">
-      <AdminPanel />
+      {userProfile?.is_admin && <AdminPanel />}
       <div className="max-w-4xl mx-auto space-y-8">
         <Tabs defaultValue="profile" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -65,11 +77,7 @@ const Profile = () => {
                 <CardTitle>Your Profile</CardTitle>
               </CardHeader>
               <CardContent>
-                {profileLoading || (!userProfile && !error) ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </div>
-                ) : error ? (
+                {error ? (
                   <div className="flex flex-col items-center py-8 text-center">
                     <AlertTriangle className="h-10 w-10 text-yellow-500 mb-3" />
                     <p className="text-lg font-medium">Error loading profile</p>

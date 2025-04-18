@@ -1,37 +1,50 @@
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Clock, Flag, Gamepad, Trophy, User2 } from 'lucide-react';
+import { useAuth } from '@/modules/auth';
 
 const PublicProfile = () => {
   const { userId } = useParams<{ userId: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        if (!userId) throw new Error('No user ID provided');
+        if (!userId) {
+          throw new Error('No user ID provided');
+        }
 
-        const { data, error } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
 
-        if (error) throw error;
-        if (!data) throw new Error('Profile not found');
+        if (fetchError) {
+          console.error('Error fetching profile:', fetchError);
+          throw new Error('Failed to fetch profile');
+        }
+
+        if (!data) {
+          throw new Error('Profile not found');
+        }
 
         setProfile(data);
+        setError(null);
       } catch (err: any) {
-        console.error('Error fetching profile:', err);
+        console.error('Error in fetchProfile:', err);
         setError(err.message);
+        setProfile(null);
       } finally {
         setLoading(false);
       }
@@ -81,21 +94,21 @@ const PublicProfile = () => {
         <CardHeader>
           <div className="flex items-center space-x-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={profile.profile_image_url || ''} />
+              <AvatarImage src={profile?.profile_image_url || ''} />
               <AvatarFallback>
-                {profile.name?.[0]}{profile.surname?.[0]}
+                {profile?.name?.[0]}{profile?.surname?.[0]}
               </AvatarFallback>
             </Avatar>
             <div>
               <CardTitle className="text-2xl">
-                {profile.name} {profile.surname}
+                {profile?.name} {profile?.surname}
               </CardTitle>
-              <p className="text-gray-500">@{profile.username}</p>
+              <p className="text-gray-500">@{profile?.username}</p>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {profile.bio && (
+          {profile?.bio && (
             <div>
               <h3 className="text-lg font-semibold mb-2">About</h3>
               <p className="text-gray-600">{profile.bio}</p>

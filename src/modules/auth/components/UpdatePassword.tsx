@@ -30,7 +30,6 @@ const UpdatePassword = () => {
   const { updatePassword } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [passwordScore, setPasswordScore] = useState(0);
 
   const form = useForm<UpdatePasswordFormValues>({
     resolver: zodResolver(updatePasswordSchema),
@@ -56,19 +55,6 @@ const UpdatePassword = () => {
   // Watch the password field to calculate strength
   const password = form.watch('password');
 
-  // Update password strength when password changes
-  React.useEffect(() => {
-    // Simple scoring system based on password requirements
-    let score = 0;
-    if (password.length >= 8) score += 1;
-    if (/[A-Z]/.test(password)) score += 1;
-    if (/[a-z]/.test(password)) score += 1;
-    if (/[0-9]/.test(password)) score += 1;
-    if (/[^A-Za-z0-9]/.test(password)) score += 1;
-    
-    setPasswordScore(score);
-  }, [password]);
-
   return (
     <div className="space-y-6">
       {error && (
@@ -89,7 +75,7 @@ const UpdatePassword = () => {
                 <FormControl>
                   <Input type="password" placeholder="Enter your new password" {...field} />
                 </FormControl>
-                <PasswordStrengthIndicator score={passwordScore} />
+                <PasswordStrengthIndicator password={password} />
                 <FormMessage />
               </FormItem>
             )}

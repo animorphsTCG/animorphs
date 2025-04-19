@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
@@ -20,7 +20,6 @@ interface UserProfile {
 
 interface Payment {
   id: string;
-  user_id: string;
   has_paid: boolean;
   payment_date: string | null;
   payment_method: string | null;
@@ -42,11 +41,10 @@ const PaymentManagement = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [users, setUsers] = useState<{id: string, username: string, email: string}[]>([]);
+  const [users, setUsers] = useState<{id: string, username: string, name: string, surname: string, email: string}[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [error, setError] = useState<string | null>(null); // Add the missing error state
+  const [error, setError] = useState<string | null>(null);
   
-  // Define the state variables properly
   const [userId, setUserId] = useState('');
   const [hasPaid, setHasPaid] = useState(false);
   const [paymentDate, setPaymentDate] = useState('');
@@ -63,27 +61,23 @@ const PaymentManagement = () => {
   const fetchPayments = async () => {
     setLoading(true);
     try {
-      // Get all payment records
       const { data: paymentData, error: paymentError } = await supabase
         .from('payment_status')
         .select('*');
 
       if (paymentError) throw paymentError;
 
-      // Get user profiles with all needed fields
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, username, name, surname');
 
       if (profileError) throw profileError;
 
-      // Get user emails
       const { data: emailData, error: emailError } = await supabase
         .rpc('get_user_emails');
 
       if (emailError) throw emailError;
 
-      // Create a mapping of user data
       const userMap = new Map();
       profileData?.forEach(profile => {
         const userEmail = emailData?.find(e => e.id === profile.id);
@@ -95,10 +89,9 @@ const PaymentManagement = () => {
         });
       });
 
-      // Combine payment data with user info
       const combinedData = paymentData?.map(payment => ({
         ...payment,
-        user_info: userMap.get(payment.user_id) || {
+        user_info: userMap.get(payment.id) || {
           username: 'Unknown',
           name: 'Unknown',
           surname: 'Unknown',
@@ -172,7 +165,7 @@ const PaymentManagement = () => {
 
     try {
       const paymentData = {
-        user_id: userId,
+        id: userId,
         has_paid: hasPaid,
         payment_date: paymentDate || null,
         payment_method: paymentMethod || null,
@@ -189,13 +182,12 @@ const PaymentManagement = () => {
       } else {
         operation = supabase
           .from('payment_status')
-          .insert({ ...paymentData });
+          .upsert({ ...paymentData });
       }
 
       const { error: paymentError } = await operation;
       if (paymentError) throw paymentError;
 
-      // Update profile battle_unlocked status when payment is recorded
       if (hasPaid) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -219,7 +211,7 @@ const PaymentManagement = () => {
       console.error('Error saving payment:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save payment data.',
+        description: `Failed to save payment data: ${error.message}`,
         variant: 'destructive',
       });
     }
@@ -227,7 +219,7 @@ const PaymentManagement = () => {
 
   const handleEdit = (payment: Payment) => {
     setSelectedPayment(payment);
-    setUserId(payment.user_id);
+    setUserId(payment.id);
     setHasPaid(payment.has_paid);
     setPaymentDate(payment.payment_date || '');
     setPaymentMethod(payment.payment_method || '');
@@ -324,12 +316,12 @@ const PaymentManagement = () => {
                       <User className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="font-medium">{payment.user_info.name} {payment.user_info.surname}</p>
-                      <p className="text-xs text-muted-foreground">{payment.user_info.username}</p>
+                      <p className="font-medium">{payment.user_info?.name} {payment.user_info?.surname}</p>
+                      <p className="text-xs text-muted-foreground">{payment.user_info?.username}</p>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>{payment.user_info.email}</TableCell>
+                <TableCell>{payment.user_info?.email}</TableCell>
                 <TableCell>
                   {payment.has_paid ? (
                     <Badge variant="default" className="bg-green-500">Yes</Badge>
@@ -364,6 +356,9 @@ const PaymentManagement = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Edit Payment' : 'Add Payment'}</DialogTitle>
+            <DialogDescription>
+              {isEditing ? 'Update payment information for the selected user.' : 'Add payment information for a user.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -377,7 +372,7 @@ const PaymentManagement = () => {
                 <option value="">Select a user</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.username} ({user.email})
+                    {user.name} {user.surname} ({user.email})
                   </option>
                 ))}
               </select>

@@ -1,17 +1,19 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/modules/auth'; // Updated import path
+import { useAuth } from '@/modules/auth';
 import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import AdminProfileButton from '@/modules/admin/components/AdminProfileButton';
+import AdminPanel from '@/modules/admin/components/AdminPanel';
 
 const UserProfile = () => {
   const { userId } = useParams<{ userId: string }>();
   const { user, isLoading } = useAuth();
   const [profile, setProfile] = useState(null);
   const navigate = useNavigate();
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -22,8 +24,6 @@ const UserProfile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       if (userId) {
-        // Placeholder for fetching user profile data
-        // Replace with your actual data fetching logic
         const mockProfile = {
           id: userId,
           username: 'johndoe',
@@ -63,6 +63,7 @@ const UserProfile = () => {
 
   return (
     <div className="container mx-auto py-12 px-4">
+      {showAdminPanel && <AdminPanel />}
       <Card className="max-w-md mx-auto">
         <CardHeader>
           <CardTitle className="text-2xl">User Profile</CardTitle>
@@ -90,6 +91,11 @@ const UserProfile = () => {
               <Badge variant="destructive">Unverified</Badge>
             )}
           </div>
+          {user && user.email?.toLowerCase() === "adanacia23d@gmail.com" && (
+            <div className="pt-4">
+              <AdminProfileButton onAuthenticated={() => setShowAdminPanel(true)} />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

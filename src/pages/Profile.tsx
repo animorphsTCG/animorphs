@@ -11,6 +11,7 @@ import AdminPanel from '@/modules/admin/components/AdminPanel';
 import UserProfileEditor from '@/components/profile/UserProfileEditor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from '@/components/ui/use-toast';
+import AdminProfileButton from '@/modules/admin/components/AdminProfileButton';
 
 const Profile = () => {
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
@@ -106,6 +107,9 @@ const Profile = () => {
           
           <TabsContent value="settings">
             <div className="space-y-8">
+              {user && user.email?.toLowerCase() === "adanacia23d@gmail.com" && (
+                <AdminProfileButton onAuthenticated={() => {}} />
+              )}
               <MusicSettings />
               <MusicPlayer />
             </div>

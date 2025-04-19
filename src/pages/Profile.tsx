@@ -18,6 +18,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const [profileLoading, setProfileLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = React.useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -69,7 +70,7 @@ const Profile = () => {
 
   return (
     <div className="container mx-auto py-12 px-4">
-      {userProfile?.is_admin && <AdminPanel />}
+      {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
       <div className="max-w-4xl mx-auto space-y-8">
         <Tabs defaultValue="profile" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -108,7 +109,7 @@ const Profile = () => {
           <TabsContent value="settings">
             <div className="space-y-8">
               {user && user.email?.toLowerCase() === "adanacia23d@gmail.com" && (
-                <AdminProfileButton onAuthenticated={() => {}} />
+                <AdminProfileButton onAuthenticated={() => setShowAdminPanel(true)} />
               )}
               <MusicSettings />
               <MusicPlayer />

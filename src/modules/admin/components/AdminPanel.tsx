@@ -12,8 +12,12 @@ import PaymentManagement from './PaymentManagement';
 import SubscriptionManagement from './SubscriptionManagement';
 import AnalyticsDashboard from './AnalyticsDashboard';
 
-const AdminPanel = () => {
-  const [isOpen, setIsOpen] = useState(false);
+interface AdminPanelProps {
+  onClose?: () => void;
+}
+
+const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
+  const [isOpen, setIsOpen] = useState(true);
   const { isAdmin, loading } = useAdminStatus();
 
   if (loading) {
@@ -28,12 +32,19 @@ const AdminPanel = () => {
     return null;
   }
 
+  const handleClose = () => {
+    setIsOpen(false);
+    if (onClose) {
+      onClose();
+    }
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4 overflow-auto">
       <Card className="w-full max-w-5xl h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-2xl font-bold">Admin Dashboard</h2>
-          <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
+          <Button variant="ghost" size="icon" onClick={handleClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>

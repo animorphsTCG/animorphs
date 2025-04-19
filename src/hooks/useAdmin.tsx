@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth'; // Updated import path
 import { supabase } from '@/lib/supabase';
@@ -8,6 +7,7 @@ export const useAdmin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -19,6 +19,9 @@ export const useAdmin = () => {
       }
 
       try {
+        setCheckError(null);
+        console.log("Checking admin status for user:", user.id);
+        
         // Store the access token for admin API calls
         setAdminToken(session.access_token);
 
@@ -27,6 +30,8 @@ export const useAdmin = () => {
         
         // First check if current user's email matches admin email
         if (user.email?.toLowerCase() === adminEmail.toLowerCase()) {
+          console.log("Admin access granted based on admin email");
+          
           // Update the profile to ensure the is_admin flag is set
           await supabase
             .from('profiles')
@@ -39,6 +44,7 @@ export const useAdmin = () => {
         }
         
         // Otherwise, check the database for admin status
+        console.log("Checking database for admin status");
         const { data, error } = await supabase
           .from('profiles')
           .select('is_admin')
@@ -46,12 +52,16 @@ export const useAdmin = () => {
           .single();
 
         if (error) {
+          console.error("Error fetching admin status:", error);
+          setCheckError(error.message);
           throw error;
         }
         
+        console.log("Admin check result:", data);
         setIsAdmin(data?.is_admin || false);
       } catch (error) {
         console.error('Error checking admin status:', error);
+        setCheckError("Failed to check admin status");
         setIsAdmin(false);
       } finally {
         setLoading(false);
@@ -61,5 +71,7 @@ export const useAdmin = () => {
     checkAdminStatus();
   }, [user, session]);
 
-  return { isAdmin, loading, adminToken };
+  return { isAdmin, loading, adminToken, checkError };
 };
+
+export default useAdmin;

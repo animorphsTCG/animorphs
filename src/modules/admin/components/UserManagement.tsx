@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
-import { Loader2, Search, RefreshCw } from 'lucide-react';
+import { Loader2, Search, RefreshCw, UserCheck } from 'lucide-react';
 
 const UserManagement = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -22,43 +22,76 @@ const UserManagement = () => {
       setLoading(true);
       setError(null);
       
-      // Get profiles with payment status joined
+      // Use a more reliable approach to join profiles and payment status
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          payment_status(has_paid)
-        `);
+        .select('*');
         
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw new Error("Failed to fetch user profiles");
+      }
 
       // Get user emails using the admin function
       const { data: usersData, error: usersError } = await supabase
         .rpc('get_user_emails');
         
-      if (usersError) throw usersError;
+      if (usersError) {
+        console.error("Error fetching user emails:", usersError);
+        throw new Error("Failed to fetch user emails");
+      }
+      
+      // Get payment statuses
+      const { data: paymentStatuses, error: paymentError } = await supabase
+        .from('payment_status')
+        .select('*');
+        
+      if (paymentError) {
+        console.error("Error fetching payment statuses:", paymentError);
+        throw new Error("Failed to fetch payment statuses");
+      }
       
       // Get music subscriptions
       const { data: musicSubs, error: musicError } = await supabase
         .from('music_subscriptions')
         .select('*');
         
-      if (musicError) throw musicError;
+      if (musicError) {
+        console.error("Error fetching music subscriptions:", musicError);
+        throw new Error("Failed to fetch music subscriptions");
+      }
+
+      // Create lookup maps for faster joining
+      const paymentMap = new Map();
+      paymentStatuses?.forEach(payment => {
+        paymentMap.set(payment.id, payment);
+      });
+      
+      const emailMap = new Map();
+      usersData?.forEach(user => {
+        emailMap.set(user.id, user.email);
+      });
+      
+      const musicSubMap = new Map();
+      musicSubs?.forEach(sub => {
+        musicSubMap.set(sub.user_id, sub);
+      });
 
       // Combine data
       const combined = profiles?.map(profile => {
-        const userEmail = usersData?.find(u => u.id === profile.id);
-        const musicSub = musicSubs?.find(sub => sub.user_id === profile.id);
+        const userEmail = emailMap.get(profile.id);
+        const paymentStatus = paymentMap.get(profile.id);
+        const musicSub = musicSubMap.get(profile.id);
         
         return {
           id: profile.id,
           username: profile.username || 'No username',
-          email: userEmail?.email || 'No email',
+          email: userEmail || 'No email',
           name: profile.name || '',
           surname: profile.surname || '',
           country: profile.country || 'N/A',
           created_at: profile.created_at,
-          has_paid: profile.payment_status?.has_paid || false,
+          has_paid: paymentStatus?.has_paid || false,
           music_subscription: musicSub ? {
             subscription_type: musicSub.subscription_type,
             end_date: musicSub.end_date
@@ -82,7 +115,7 @@ const UserManagement = () => {
   };
 
   const filteredUsers = users.filter(user => {
-    const searchable = `${user.username} ${user.email} ${user.name} ${user.surname}`.toLowerCase();
+    const searchable = `${user.username} ${user.email} ${user.name} ${user.surname} ${user.country}`.toLowerCase();
     return searchable.includes(searchTerm.toLowerCase());
   });
 
@@ -94,7 +127,7 @@ const UserManagement = () => {
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by username, email, or name..."
+              placeholder="Search by username, email, name, or country..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-xs pl-8"
@@ -138,7 +171,7 @@ const UserManagement = () => {
                   <div className="text-sm">{user.email}</div>
                   <div>{user.country}</div>
                   <div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Badge variant={user.has_paid ? "default" : "outline"}>
                         {user.has_paid ? 'Paid' : 'Free'}
                       </Badge>
@@ -148,7 +181,13 @@ const UserManagement = () => {
                     </div>
                   </div>
                   <div>
-                    <Button variant="ghost" size="sm" onClick={() => window.open(`/profile/${user.id}`, '_blank')}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => window.open(`/profile/${user.id}`, '_blank')}
+                      className="flex items-center gap-1"
+                    >
+                      <UserCheck className="h-3.5 w-3.5" />
                       View
                     </Button>
                   </div>

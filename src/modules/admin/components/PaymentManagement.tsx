@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -71,41 +70,46 @@ const PaymentManagement = () => {
 
       if (paymentError) throw paymentError;
 
-      // Fetch profiles
+      // Get user profiles with all needed fields
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, username, name, surname');
 
       if (profileError) throw profileError;
-      
-      // Get user emails using the admin function
+
+      // Get user emails
       const { data: emailData, error: emailError } = await supabase
         .rpc('get_user_emails');
-        
+
       if (emailError) throw emailError;
-      
-      // Create a mapping of profiles and emails by id
+
+      // Create a mapping of user data
       const userMap = new Map();
-      for (const profile of profileData) {
-        const userEmail = emailData.find(e => e.id === profile.id);
+      profileData?.forEach(profile => {
+        const userEmail = emailData?.find(e => e.id === profile.id);
         userMap.set(profile.id, {
           username: profile.username,
-          name: profile.name,
-          surname: profile.surname,
+          name: profile.name || 'Unknown',
+          surname: profile.surname || 'Unknown',
           email: userEmail?.email || 'No email'
         });
-      }
+      });
 
-      // Join payment data with profile and email data
-      const combinedData = paymentData.map((payment) => ({
+      // Combine payment data with user info
+      const combinedData = paymentData?.map(payment => ({
         ...payment,
-        user_info: userMap.get(payment.user_id) || { username: 'Unknown', email: 'Unknown' }
+        user_info: userMap.get(payment.user_id) || {
+          username: 'Unknown',
+          name: 'Unknown',
+          surname: 'Unknown',
+          email: 'Unknown'
+        }
       }));
 
-      setPayments(combinedData);
-    } catch (error) {
+      setPayments(combinedData || []);
+    } catch (error: any) {
       console.error('Error fetching payments:', error);
-      setError(error.message || "Failed to load payment data");
+      setError(error.message);
       toast({
         title: "Error",
         description: "Failed to load payment data",
@@ -120,8 +124,7 @@ const PaymentManagement = () => {
     try {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, username')
-        .order('username');
+        .select('id, username, name, surname');
 
       if (profilesError) throw profilesError;
 
@@ -130,14 +133,16 @@ const PaymentManagement = () => {
 
       if (emailError) throw emailError;
 
-      const transformedUsers = profiles.map(profile => {
-        const userEmail = emailData.find(e => e.id === profile.id);
+      const transformedUsers = profiles?.map(profile => {
+        const userEmail = emailData?.find(e => e.id === profile.id);
         return {
           id: profile.id,
           username: profile.username || 'Unknown',
+          name: profile.name || 'Unknown',
+          surname: profile.surname || 'Unknown',
           email: userEmail?.email || 'Unknown'
         };
-      });
+      }) || [];
 
       setUsers(transformedUsers);
     } catch (error) {
@@ -172,6 +177,7 @@ const PaymentManagement = () => {
         payment_date: paymentDate || null,
         payment_method: paymentMethod || null,
         transaction_id: transactionId || null,
+        updated_at: new Date().toISOString(),
       };
 
       let operation;
@@ -183,18 +189,22 @@ const PaymentManagement = () => {
       } else {
         operation = supabase
           .from('payment_status')
-          .insert(paymentData);
+          .insert({ ...paymentData });
       }
 
-      const { error } = await operation;
-      if (error) throw error;
+      const { error: paymentError } = await operation;
+      if (paymentError) throw paymentError;
 
-      // If payment is marked as paid, update user's battle_unlocked status
+      // Update profile battle_unlocked status when payment is recorded
       if (hasPaid) {
-        await supabase
+        const { error: profileError } = await supabase
           .from('profiles')
-          .update({ battle_unlocked: true })
+          .update({ 
+            battle_unlocked: true 
+          })
           .eq('id', userId);
+
+        if (profileError) throw profileError;
       }
 
       toast({
@@ -205,7 +215,7 @@ const PaymentManagement = () => {
       setDialogOpen(false);
       resetForm();
       fetchPayments();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving payment:', error);
       toast({
         title: 'Error',

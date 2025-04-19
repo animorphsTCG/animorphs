@@ -213,6 +213,7 @@ export type Database = {
         Row: {
           age: number
           ai_points: number
+          battle_unlocked: boolean | null
           bio: string | null
           country: string | null
           created_at: string
@@ -236,6 +237,7 @@ export type Database = {
         Insert: {
           age: number
           ai_points?: number
+          battle_unlocked?: boolean | null
           bio?: string | null
           country?: string | null
           created_at?: string
@@ -259,6 +261,7 @@ export type Database = {
         Update: {
           age?: number
           ai_points?: number
+          battle_unlocked?: boolean | null
           bio?: string | null
           country?: string | null
           created_at?: string

@@ -41,13 +41,7 @@ const PaymentManagement = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [users, setUsers] = useState<{id: string, username: string, email: string}[]>([]);
-
-  // Form state
-  const [userId, setUserId] = useState('');
-  const [hasPaid, setHasPaid] = useState(false);
-  const [paymentDate, setPaymentDate] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [transactionId, setTransactionId] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (isAdmin) {
@@ -66,29 +60,33 @@ const PaymentManagement = () => {
 
       if (paymentError) throw paymentError;
 
-      // Fetch profiles separately
+      // Fetch profiles
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, username');
 
       if (profileError) throw profileError;
       
-      // Create a mapping of profiles by id
-      const profileMap = new Map();
+      // Get user emails using the admin function
+      const { data: emailData, error: emailError } = await supabase
+        .rpc('get_user_emails');
+        
+      if (emailError) throw emailError;
+      
+      // Create a mapping of profiles and emails by id
+      const userMap = new Map();
       for (const profile of profileData) {
-        profileMap.set(profile.id, {
+        const userEmail = emailData.find(e => e.id === profile.id);
+        userMap.set(profile.id, {
           username: profile.username || 'Unknown',
-          email: 'Unknown' // We'll update this later
+          email: userEmail?.email || 'Unknown'
         });
       }
       
-      // Fetch emails from auth.users is not possible directly
-      // We'll use a different approach to get user emails
-      
-      // Join payment data with profile data
+      // Join payment data with profile and email data
       const combinedData = paymentData.map((payment) => ({
         ...payment,
-        user_info: profileMap.get(payment.user_id) || { username: 'Unknown', email: 'Unknown' }
+        user_info: userMap.get(payment.user_id) || { username: 'Unknown', email: 'Unknown' }
       }));
 
       setPayments(combinedData);
@@ -106,20 +104,25 @@ const PaymentManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      // Fetch profiles
-      const { data: profilesData, error: profilesError } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, username');
 
       if (profilesError) throw profilesError;
 
-      // Transform the data - we don't have direct access to emails through the query
-      // so we'll just use placeholder emails
-      const transformedUsers = profilesData.map(user => ({
-        id: user.id,
-        username: user.username || 'Unknown',
-        email: user.id // Using ID as placeholder, emails aren't accessible this way
-      }));
+      const { data: emailData, error: emailError } = await supabase
+        .rpc('get_user_emails');
+
+      if (emailError) throw emailError;
+
+      const transformedUsers = profiles.map(profile => {
+        const userEmail = emailData.find(e => e.id === profile.id);
+        return {
+          id: profile.id,
+          username: profile.username || 'Unknown',
+          email: userEmail?.email || 'Unknown'
+        };
+      });
 
       setUsers(transformedUsers);
     } catch (error) {
@@ -131,6 +134,11 @@ const PaymentManagement = () => {
       });
     }
   };
+
+  const filteredPayments = payments.filter(payment => {
+    const searchable = `${payment.user_info.username} ${payment.user_info.email}`.toLowerCase();
+    return searchable.includes(searchTerm.toLowerCase());
+  });
 
   const handleSave = async () => {
     if (!userId) {
@@ -253,17 +261,25 @@ const PaymentManagement = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Payment Management</h3>
-        <Button onClick={handleAddNew} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Add Payment
-        </Button>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Search by username or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+          <Button onClick={handleAddNew} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" /> Add Payment
+          </Button>
+        </div>
       </div>
       
-      {payments.length > 0 ? (
+      {filteredPayments.length > 0 ? (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>User ID</TableHead>
-              <TableHead>Username</TableHead>
+              <TableHead>User</TableHead>
+              <TableHead>Email</TableHead>
               <TableHead>Paid</TableHead>
               <TableHead>Payment Date</TableHead>
               <TableHead>Method</TableHead>
@@ -272,10 +288,10 @@ const PaymentManagement = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {payments.map((payment) => (
+            {filteredPayments.map((payment) => (
               <TableRow key={payment.id}>
-                <TableCell>{payment.user_id}</TableCell>
-                <TableCell>{payment.user_info?.username}</TableCell>
+                <TableCell>{payment.user_info.username}</TableCell>
+                <TableCell>{payment.user_info.email}</TableCell>
                 <TableCell>
                   {payment.has_paid ? (
                     <Badge variant="default" className="bg-green-500">Yes</Badge>

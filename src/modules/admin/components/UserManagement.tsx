@@ -5,9 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
+import { Loader2 } from 'lucide-react';
 
-// This component was imported but wasn't in the repository
-// Creating a basic version that mirrors functionality from the UserManagement component
 const UserManagement = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,19 +20,57 @@ const UserManagement = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
+      // Get profiles with payment status joined
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*, auth_users:auth.users(email)');
+        .select(`
+          *,
+          payment_status(has_paid)
+        `);
+        
+      if (profilesError) throw profilesError;
+
+      // Get user emails using the admin function
+      const { data: usersData, error: usersError } = await supabase
+        .rpc('get_user_emails');
+        
+      if (usersError) throw usersError;
       
-      if (error) throw error;
-      
-      setUsers(data || []);
+      // Get music subscriptions
+      const { data: musicSubs, error: musicError } = await supabase
+        .from('music_subscriptions')
+        .select('*');
+        
+      if (musicError) throw musicError;
+
+      // Combine data
+      const combined = profiles?.map(profile => {
+        const userEmail = usersData?.find(u => u.id === profile.id);
+        const musicSub = musicSubs?.find(sub => sub.user_id === profile.id);
+        
+        return {
+          id: profile.id,
+          username: profile.username || 'No username',
+          email: userEmail?.email,
+          name: profile.name || '',
+          surname: profile.surname || '',
+          country: profile.country || 'N/A',
+          created_at: profile.created_at,
+          has_paid: profile.payment_status?.has_paid || false,
+          music_subscription: musicSub ? {
+            subscription_type: musicSub.subscription_type,
+            end_date: musicSub.end_date
+          } : null
+        };
+      }) || [];
+
+      setUsers(combined);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load user data",
+        description: "Failed to load user data"
       });
     } finally {
       setLoading(false);
@@ -41,17 +78,17 @@ const UserManagement = () => {
   };
 
   const filteredUsers = users.filter(user => {
-    const searchable = `${user.username} ${user.email}`.toLowerCase();
+    const searchable = `${user.username} ${user.email} ${user.name} ${user.surname}`.toLowerCase();
     return searchable.includes(searchTerm.toLowerCase());
   });
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold">User Management</h3>
+        <h3 className="text-lg font-medium">User Management</h3>
         <div className="flex gap-2">
           <Input
-            placeholder="Search users..."
+            placeholder="Search by username or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-xs"
@@ -65,30 +102,38 @@ const UserManagement = () => {
           </Button>
         </div>
       </div>
-      
+
       {loading ? (
-        <div className="text-center py-4">Loading users...</div>
+        <div className="text-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          <p className="mt-2 text-sm text-muted-foreground">Loading users...</p>
+        </div>
       ) : (
         <div className="border rounded-md">
-          <div className="grid grid-cols-[1fr_1fr_1fr_100px] gap-4 p-2 font-medium bg-muted border-b">
-            <div>User</div>
+          <div className="grid grid-cols-[1fr_1.5fr_1fr_1fr_100px] gap-4 p-2 font-medium bg-muted border-b">
+            <div>Username</div>
             <div>Email</div>
-            <div>Country</div>
+            <div>Location</div>
+            <div>Status</div>
             <div>Actions</div>
           </div>
-          
           {filteredUsers.length > 0 ? (
             <div className="divide-y">
               {filteredUsers.map(user => (
-                <div key={user.id} className="grid grid-cols-[1fr_1fr_1fr_100px] gap-4 p-2 items-center">
-                  <div className="flex flex-col">
-                    <span className="font-medium">{user.username}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {user.name} {user.surname}
-                    </span>
+                <div key={user.id} className="grid grid-cols-[1fr_1.5fr_1fr_1fr_100px] gap-4 p-2 items-center">
+                  <div className="font-medium">{user.username}</div>
+                  <div className="text-sm">{user.email || 'No email'}</div>
+                  <div>{user.country}</div>
+                  <div>
+                    <div className="flex gap-2">
+                      <Badge variant={user.has_paid ? "default" : "outline"}>
+                        {user.has_paid ? 'Paid' : 'Free'}
+                      </Badge>
+                      {user.music_subscription && (
+                        <Badge variant="secondary">Music</Badge>
+                      )}
+                    </div>
                   </div>
-                  <div>{user.auth_users?.email}</div>
-                  <div>{user.country || 'N/A'}</div>
                   <div>
                     <Button variant="ghost" size="sm">
                       View

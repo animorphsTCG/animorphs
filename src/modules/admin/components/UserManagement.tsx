@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 
 const UserManagement = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -87,12 +87,15 @@ const UserManagement = () => {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">User Management</h3>
         <div className="flex gap-2">
-          <Input
-            placeholder="Search by username or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs"
-          />
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by username, email, or name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-xs pl-8"
+            />
+          </div>
           <Button 
             variant="outline" 
             onClick={fetchUsers}

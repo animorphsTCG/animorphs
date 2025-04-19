@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
-import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useAdmin } from '@/hooks/useAdmin';
 import { format } from 'date-fns';
 
@@ -42,6 +43,13 @@ const PaymentManagement = () => {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [users, setUsers] = useState<{id: string, username: string, email: string}[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Add the missing state variables
+  const [userId, setUserId] = useState('');
+  const [hasPaid, setHasPaid] = useState(false);
+  const [paymentDate, setPaymentDate] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [transactionId, setTransactionId] = useState('');
 
   useEffect(() => {
     if (isAdmin) {
@@ -136,7 +144,7 @@ const PaymentManagement = () => {
   };
 
   const filteredPayments = payments.filter(payment => {
-    const searchable = `${payment.user_info.username} ${payment.user_info.email}`.toLowerCase();
+    const searchable = `${payment.user_info?.username} ${payment.user_info?.email}`.toLowerCase();
     return searchable.includes(searchTerm.toLowerCase());
   });
 
@@ -262,12 +270,15 @@ const PaymentManagement = () => {
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Payment Management</h3>
         <div className="flex gap-2">
-          <Input
-            placeholder="Search by username or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
-          />
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by username or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-64 pl-8"
+            />
+          </div>
           <Button onClick={handleAddNew} className="flex items-center gap-2">
             <Plus className="h-4 w-4" /> Add Payment
           </Button>
@@ -290,8 +301,8 @@ const PaymentManagement = () => {
           <TableBody>
             {filteredPayments.map((payment) => (
               <TableRow key={payment.id}>
-                <TableCell>{payment.user_info.username}</TableCell>
-                <TableCell>{payment.user_info.email}</TableCell>
+                <TableCell>{payment.user_info?.username}</TableCell>
+                <TableCell>{payment.user_info?.email}</TableCell>
                 <TableCell>
                   {payment.has_paid ? (
                     <Badge variant="default" className="bg-green-500">Yes</Badge>
@@ -318,7 +329,7 @@ const PaymentManagement = () => {
         </Table>
       ) : (
         <div className="text-center p-8 bg-muted rounded-md">
-          <p>No payment records found.</p>
+          <p>No payment records found matching your search.</p>
         </div>
       )}
 
@@ -339,7 +350,7 @@ const PaymentManagement = () => {
                 <option value="">Select a user</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
-                    {user.username} ({user.id})
+                    {user.username} ({user.email})
                   </option>
                 ))}
               </select>

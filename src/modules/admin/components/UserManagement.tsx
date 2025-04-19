@@ -5,12 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, RefreshCw } from 'lucide-react';
 
 const UserManagement = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -19,6 +20,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       // Get profiles with payment status joined
       const { data: profiles, error: profilesError } = await supabase
@@ -51,7 +53,7 @@ const UserManagement = () => {
         return {
           id: profile.id,
           username: profile.username || 'No username',
-          email: userEmail?.email,
+          email: userEmail?.email || 'No email',
           name: profile.name || '',
           surname: profile.surname || '',
           country: profile.country || 'N/A',
@@ -65,8 +67,10 @@ const UserManagement = () => {
       }) || [];
 
       setUsers(combined);
+      setError(null);
     } catch (error) {
       console.error('Error fetching users:', error);
+      setError('Failed to load user data');
       toast({
         variant: "destructive",
         title: "Error",
@@ -101,6 +105,7 @@ const UserManagement = () => {
             onClick={fetchUsers}
             disabled={loading}
           >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
         </div>
@@ -110,6 +115,11 @@ const UserManagement = () => {
         <div className="text-center py-8">
           <Loader2 className="h-8 w-8 animate-spin mx-auto" />
           <p className="mt-2 text-sm text-muted-foreground">Loading users...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-8 border rounded-md">
+          <p className="text-red-500 mb-4">{error}</p>
+          <Button onClick={fetchUsers}>Try Again</Button>
         </div>
       ) : (
         <div className="border rounded-md">
@@ -125,7 +135,7 @@ const UserManagement = () => {
               {filteredUsers.map(user => (
                 <div key={user.id} className="grid grid-cols-[1fr_1.5fr_1fr_1fr_100px] gap-4 p-2 items-center">
                   <div className="font-medium">{user.username}</div>
-                  <div className="text-sm">{user.email || 'No email'}</div>
+                  <div className="text-sm">{user.email}</div>
                   <div>{user.country}</div>
                   <div>
                     <div className="flex gap-2">
@@ -138,7 +148,7 @@ const UserManagement = () => {
                     </div>
                   </div>
                   <div>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => window.open(`/profile/${user.id}`, '_blank')}>
                       View
                     </Button>
                   </div>

@@ -35,7 +35,7 @@ interface Payment {
 }
 
 const PaymentManagement = () => {
-  const { isAdmin, adminToken } = useAdmin();
+  const { isAdmin, loading: adminLoading, adminToken } = useAdmin();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -44,7 +44,7 @@ const PaymentManagement = () => {
   const [users, setUsers] = useState<{id: string, username: string, email: string}[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Add the missing state variables
+  // Define the state variables properly
   const [userId, setUserId] = useState('');
   const [hasPaid, setHasPaid] = useState(false);
   const [paymentDate, setPaymentDate] = useState('');

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
-import { Loader2, Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Search, User } from 'lucide-react';
 import { useAdmin } from '@/hooks/useAdmin';
 import { format } from 'date-fns';
 
@@ -30,6 +29,8 @@ interface Payment {
   updated_at?: string;
   user_info?: {
     username: string;
+    name: string;
+    surname: string;
     email: string;
   };
 }
@@ -71,7 +72,7 @@ const PaymentManagement = () => {
       // Fetch profiles
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, username');
+        .select('id, username, name, surname');
 
       if (profileError) throw profileError;
       
@@ -86,11 +87,13 @@ const PaymentManagement = () => {
       for (const profile of profileData) {
         const userEmail = emailData.find(e => e.id === profile.id);
         userMap.set(profile.id, {
-          username: profile.username || 'Unknown',
-          email: userEmail?.email || 'Unknown'
+          username: profile.username,
+          name: profile.name,
+          surname: profile.surname,
+          email: userEmail?.email || 'No email'
         });
       }
-      
+
       // Join payment data with profile and email data
       const combinedData = paymentData.map((payment) => ({
         ...payment,
@@ -100,10 +103,11 @@ const PaymentManagement = () => {
       setPayments(combinedData);
     } catch (error) {
       console.error('Error fetching payments:', error);
+      setError(error.message || "Failed to load payment data");
       toast({
-        title: 'Error',
-        description: 'Failed to fetch payment data.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to load payment data",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -114,7 +118,8 @@ const PaymentManagement = () => {
     try {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, username');
+        .select('id, username')
+        .order('username');
 
       if (profilesError) throw profilesError;
 
@@ -301,8 +306,18 @@ const PaymentManagement = () => {
           <TableBody>
             {filteredPayments.map((payment) => (
               <TableRow key={payment.id}>
-                <TableCell>{payment.user_info?.username}</TableCell>
-                <TableCell>{payment.user_info?.email}</TableCell>
+                <TableCell>
+                  <div className="flex items-center space-x-2">
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{payment.user_info.name} {payment.user_info.surname}</p>
+                      <p className="text-xs text-muted-foreground">{payment.user_info.username}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>{payment.user_info.email}</TableCell>
                 <TableCell>
                   {payment.has_paid ? (
                     <Badge variant="default" className="bg-green-500">Yes</Badge>

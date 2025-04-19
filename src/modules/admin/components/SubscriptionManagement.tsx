@@ -31,9 +31,8 @@ const SubscriptionManagement = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<MusicSubscription | null>(null);
-  const [users, setUsers] = useState<{id: string, username: string, email: string}[]>([]);
+  const [users, setUsers] = useState<{id: string, username: string, name: string, surname: string, email: string}[]>([]);
 
-  // Form state
   const [userId, setUserId] = useState('');
   const [subscriptionType, setSubscriptionType] = useState<'monthly' | 'yearly'>('monthly');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -47,7 +46,6 @@ const SubscriptionManagement = () => {
   }, [isAdmin]);
 
   useEffect(() => {
-    // Auto-calculate end date based on subscription type and start date
     if (startDate) {
       const start = new Date(startDate);
       const end = subscriptionType === 'monthly' 
@@ -60,30 +58,26 @@ const SubscriptionManagement = () => {
   const fetchSubscriptions = async () => {
     setLoading(true);
     try {
-      // Get all subscription records
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('music_subscriptions')
         .select('*');
 
       if (subscriptionError) throw subscriptionError;
 
-      // Fetch profiles separately
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, username');
 
       if (profileError) throw profileError;
       
-      // Create a mapping of profiles by id
       const profileMap = new Map();
       for (const profile of profileData) {
         profileMap.set(profile.id, {
           username: profile.username || 'Unknown',
-          email: 'Unknown' // Placeholder
+          email: 'Unknown'
         });
       }
 
-      // Join subscription data with profile data
       const combinedData = subscriptionData.map((subscription) => ({
         ...subscription,
         user_info: profileMap.get(subscription.user_id) || { username: 'Unknown', email: 'Unknown' }
@@ -104,18 +98,27 @@ const SubscriptionManagement = () => {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, username')
-        .order('username');
+        .select('id, username, name, surname');
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
-      const transformedUsers = data.map(user => ({
-        id: user.id,
-        username: user.username || 'Unknown',
-        email: user.id // Using ID as placeholder since we can't access emails directly
-      }));
+      const { data: emailData, error: emailError } = await supabase
+        .rpc('get_user_emails');
+
+      if (emailError) throw emailError;
+
+      const transformedUsers = profiles.map(profile => {
+        const userEmail = emailData.find(e => e.id === profile.id);
+        return {
+          id: profile.id,
+          username: profile.username,
+          name: profile.name,
+          surname: profile.surname,
+          email: userEmail?.email || 'No email'
+        };
+      });
 
       setUsers(transformedUsers);
     } catch (error) {
@@ -161,7 +164,6 @@ const SubscriptionManagement = () => {
       const { error } = await operation;
       if (error) throw error;
 
-      // Update the user's music_unlocked status
       await supabase
         .from('profiles')
         .update({ music_unlocked: true })
@@ -311,19 +313,18 @@ const SubscriptionManagement = () => {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="user">User</Label>
-              <select
-                id="user"
-                className="w-full px-3 py-2 border rounded-md"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-              >
-                <option value="">Select a user</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.username} ({user.id})
-                  </option>
-                ))}
-              </select>
+              <Select value={userId} onValueChange={(value) => setUserId(value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name} {user.surname} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="grid gap-2">

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ const PaymentManagement = () => {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [users, setUsers] = useState<{id: string, username: string, email: string}[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState<string | null>(null); // Add the missing error state
   
   // Define the state variables properly
   const [userId, setUserId] = useState('');

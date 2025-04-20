@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,7 +16,7 @@ export const ThreePlayerBattle = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [lobbyParticipants, setLobbyParticipants] = useState<any[]>([]);
   const [battleStarted, setBattleStarted] = useState(false);
   
   const {
@@ -28,7 +29,7 @@ export const ThreePlayerBattle = () => {
     playerDecks,
     roundWins,
     handleStatSelection,
-    participants
+    participants: battleParticipants
   } = useBattleMultiplayer(battleId || '', '3player');
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export const ThreePlayerBattle = () => {
           throw participantsError;
         }
 
-        setParticipants(participantsData);
+        setLobbyParticipants(participantsData);
         setBattleStarted(battleData.status === 'active');
         setIsLoading(false);
       } catch (error) {
@@ -129,6 +130,10 @@ export const ThreePlayerBattle = () => {
     return <WaitingRoom lobbyId={battleId} />;
   }
 
+  // Use the participants from the battle state for the active game
+  const displayParticipants = battleParticipants && battleParticipants.length > 0 ? 
+    battleParticipants : lobbyParticipants;
+
   return (
     <div className="container mx-auto py-8 px-4">
       <Card className="border-2 border-fantasy-primary bg-black/70">
@@ -158,7 +163,7 @@ export const ThreePlayerBattle = () => {
               <p className="text-lg">
                 {winner === user?.id 
                   ? "You won the tournament!" 
-                  : `Player ${participants.find(p => p.user_id === winner)?.username || 'Unknown'} won!`}
+                  : `Player ${displayParticipants.find(p => p.user_id === winner)?.username || 'Unknown'} won!`}
               </p>
               <Button 
                 onClick={() => navigate('/battle')}
@@ -170,7 +175,7 @@ export const ThreePlayerBattle = () => {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 justify-items-center mb-8">
-                {participants.map((participant, index) => (
+                {displayParticipants.map((participant, index) => (
                   <div key={participant.user_id} className="w-full max-w-xs">
                     <div className="text-center mb-3">
                       <p className="font-medium text-lg">
@@ -222,7 +227,7 @@ export const ThreePlayerBattle = () => {
               {!isUserTurn && !selectedStat && (
                 <div className="text-center bg-fantasy-primary/20 p-4 rounded">
                   <p className="text-lg">
-                    Waiting for {participants.find(p => p.user_id !== user?.id)?.username || 'other player'} to select a stat...
+                    Waiting for {displayParticipants.find(p => p.user_id !== user?.id)?.username || 'other player'} to select a stat...
                   </p>
                 </div>
               )}

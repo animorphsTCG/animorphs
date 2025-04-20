@@ -4,7 +4,10 @@ import { useAuth } from '@/modules/auth';
 import { toast } from '@/components/ui/use-toast';
 import { AnimorphCard } from '@/types';
 
-export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' | '4player' | 'user' | 'public' = 'tournament') => {
+export const useBattleMultiplayer = (
+  battleId: string, 
+  battleType: 'tournament' | '4player' | 'user' | 'public' | '3player' = 'tournament'
+) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [currentRound, setCurrentRound] = useState(1);

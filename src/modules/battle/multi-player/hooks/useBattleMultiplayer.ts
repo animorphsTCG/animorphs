@@ -94,7 +94,6 @@ export const useBattleMultiplayer = (battleId: string, mode: BattleMode = 'stand
     };
 
     fetchBattleState();
-
   }, [battleId, user]);
 
   // Subscribe to battle state changes

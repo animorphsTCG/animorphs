@@ -1,51 +1,54 @@
+
 import React from "react";
 import { AnimorphCard } from "@/types";
-import CardDisplay from "./CardDisplay";
-interface BattleCardDisplayProps {
-  card?: AnimorphCard;
-  isFlipped: boolean;
-  isActive: boolean;
-  roundWins: number;
-  playerName: string;
-  cardCount?: number;
-  onStatSelect?: (stat: string) => void;
-  selectedStat?: string | null;
+import { cn } from "@/lib/utils";
+
+export interface BattleCardDisplayProps {
+  card: AnimorphCard;
+  isRevealed?: boolean;
+  isActive?: boolean;
+  onClick?: () => void;
+  className?: string;
 }
-const BattleCardDisplay: React.FC<BattleCardDisplayProps> = ({
+
+const BattleCardDisplay = ({
   card,
-  isFlipped,
-  isActive,
-  roundWins,
-  playerName,
-  cardCount,
-  onStatSelect,
-  selectedStat
-}) => {
-  const stats = ['power', 'health', 'attack', 'sats', 'size'];
-  return <div className={`relative flex flex-col items-center ${isActive ? 'scale-105 z-10' : ''}`}>
-      <div className="text-center mb-1 font-fantasy">
-        <div className="text-lg">{playerName}</div>
-        <div className="bg-fantasy-accent/20 px-3 py-1 rounded-full text-sm font-bold">
-          Wins: {roundWins}
-          {cardCount !== undefined && <span className="ml-2">Cards: {cardCount}</span>}
+  isRevealed = false,
+  isActive = false,
+  onClick,
+  className
+}: BattleCardDisplayProps) => {
+  // Only use real data, no fallbacks
+  const imageUrl = card.image_url;
+  const cardName = card.nft_name;
+
+  return (
+    <div 
+      className={cn(
+        "fantasy-card cursor-pointer transition-transform hover:scale-105", 
+        isActive && "border-2 border-green-500",
+        className
+      )} 
+      onClick={onClick}
+    >
+      <div className="fantasy-card-inner h-96 w-72 relative overflow-hidden rounded-lg border-2 border-fantasy-primary shadow-lg">
+        <div className="h-full w-full">
+          {isRevealed ? (
+            <img 
+              src={imageUrl} 
+              alt={cardName || `Card #${card.card_number}`} 
+              className="w-full h-full rounded-lg object-cover" 
+              loading="lazy" 
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-800 rounded-lg flex items-center justify-center">
+              <p className="text-gray-400">Card Hidden</p>
+            </div>
+          )}
         </div>
       </div>
-      
-      {isFlipped ? card ? <div className="relative">
-            <CardDisplay card={card} />
-            
-            {isActive && onStatSelect && <div className="absolute -bottom-12 left-0 right-0 flex justify-center gap-2 flex-wrap">
-                {stats.map(stat => <button key={stat} disabled={!!selectedStat} onClick={() => onStatSelect(stat)} className="font-bold text-lg rounded-lg bg-fuchsia-900 hover:bg-fuchsia-800 text-purple-400">
-                    {stat}
-                  </button>)}
-              </div>}
-          </div> : <div className="h-96 w-72 flex items-center justify-center bg-gray-800/50 rounded">
-            <p>No cards left</p>
-          </div> : card ? <div className="h-96 w-72 bg-fantasy-primary/20 rounded shadow-md flex items-center justify-center">
-          <div className="font-fantasy text-xl text-gray-400">Card Back</div>
-        </div> : <div className="h-96 w-72 flex items-center justify-center bg-gray-800/50 rounded">
-          <p>No cards left</p>
-        </div>}
-    </div>;
+    </div>
+  );
 };
+
 export default BattleCardDisplay;

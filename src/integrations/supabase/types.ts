@@ -102,6 +102,7 @@ export type Database = {
           id: string
           max_players: number
           name: string
+          requires_payment: boolean | null
           started_at: string | null
           status: string
           updated_at: string
@@ -116,6 +117,7 @@ export type Database = {
           id?: string
           max_players?: number
           name: string
+          requires_payment?: boolean | null
           started_at?: string | null
           status?: string
           updated_at?: string
@@ -130,6 +132,7 @@ export type Database = {
           id?: string
           max_players?: number
           name?: string
+          requires_payment?: boolean | null
           started_at?: string | null
           status?: string
           updated_at?: string
@@ -214,6 +217,47 @@ export type Database = {
             columns: ["participant_id"]
             isOneToOne: false
             referencedRelation: "battle_participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_results: {
+        Row: {
+          battle_id: string
+          created_at: string | null
+          id: string
+          is_draw: boolean | null
+          lbp_awarded: number | null
+          loser_id: string | null
+          mp_awarded: number | null
+          winner_id: string | null
+        }
+        Insert: {
+          battle_id: string
+          created_at?: string | null
+          id?: string
+          is_draw?: boolean | null
+          lbp_awarded?: number | null
+          loser_id?: string | null
+          mp_awarded?: number | null
+          winner_id?: string | null
+        }
+        Update: {
+          battle_id?: string
+          created_at?: string | null
+          id?: string
+          is_draw?: boolean | null
+          lbp_awarded?: number | null
+          loser_id?: string | null
+          mp_awarded?: number | null
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_results_battle_id_fkey"
+            columns: ["battle_id"]
+            isOneToOne: false
+            referencedRelation: "battle_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -685,6 +729,10 @@ export type Database = {
           id: string
           email: string
         }[]
+      }
+      has_paid_unlock_fee: {
+        Args: { user_id: string }
+        Returns: boolean
       }
       is_admin: {
         Args: Record<PropertyKey, never>

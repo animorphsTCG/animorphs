@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +29,14 @@ const Battle = () => {
   ];
 
   const multiPlayerModes = [
+    {
+      title: "1v1 Multiplayer Battle",
+      description: "Challenge another player to a 1v1 battle (Requires Full Access)",
+      path: "/battle/multiplayer",
+      requiresAuth: true,
+      requiresPayment: true,
+      icon: <Users className="h-5 w-5" />
+    },
     {
       title: "3-Player Battle (Relaxed Tournament)",
       description: "Compete in a three-player relaxed tournament mode",

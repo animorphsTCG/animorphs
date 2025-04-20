@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { Routes as RouterRoutes, Route } from 'react-router-dom';
 import { ProtectedRoute } from '@/modules/auth';
 import { DemoBattle, OneVOneBattle } from '@/modules/battle/single-player';
+import { MultiplayerBattle } from '@/modules/battle/multi-player/components/MultiplayerBattle';
 
 // Pages
 import Index from "./pages/Index";
@@ -63,6 +63,15 @@ export const Routes = () => {
       <Route path="/admin" element={<Admin />} />
       
       <Route path="/profile/:userId" element={<PublicProfile />} />
+      
+      <Route 
+        path="/battle/multiplayer/:battleId" 
+        element={
+          <ProtectedRoute>
+            <MultiplayerBattle />
+          </ProtectedRoute>
+        } 
+      />
       
       <Route path="*" element={<NotFound />} />
     </RouterRoutes>

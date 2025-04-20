@@ -1,15 +1,13 @@
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/modules/auth';
 import { toast } from '@/components/ui/use-toast';
 import { AnimorphCard } from '@/types';
 
-type BattleMode = 'standard' | 'tournament' | 'public' | 'user';
-
-export const useBattleMultiplayer = (battleId: string, mode: BattleMode = 'standard') => {
+export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' | '4player' = 'tournament') => {
   const { user } = useAuth();
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentRound, setCurrentRound] = useState(1);
   const [isUserTurn, setIsUserTurn] = useState(false);
   const [selectedStat, setSelectedStat] = useState<string | null>(null);
@@ -18,13 +16,25 @@ export const useBattleMultiplayer = (battleId: string, mode: BattleMode = 'stand
   const [winner, setWinner] = useState<string | null>(null);
   const [playerDecks, setPlayerDecks] = useState<Record<string, AnimorphCard[]>>({});
   const [roundWins, setRoundWins] = useState<Record<string, number>>({});
+  const [participants, setParticipants] = useState<any[]>([]);
 
-  // Fetch initial battle state
+  // Initial fetch of the battle state
   useEffect(() => {
     if (!battleId || !user) return;
 
     const fetchBattleState = async () => {
       try {
+        setLoading(true);
+        
+        // Get battle session info
+        const { data: battleData, error: battleError } = await supabase
+          .from('battle_sessions')
+          .select('*')
+          .eq('id', battleId)
+          .single();
+
+        if (battleError) throw battleError;
+
         // Get battle state
         const { data: stateData, error: stateError } = await supabase
           .from('battle_state')
@@ -32,20 +42,16 @@ export const useBattleMultiplayer = (battleId: string, mode: BattleMode = 'stand
           .eq('battle_session_id', battleId)
           .single();
 
-        if (stateError) throw stateError;
+        if (stateError && stateError.code !== 'PGRST116') throw stateError;
 
-        setCurrentRound(stateData.current_round);
-        setSelectedStat(stateData.selected_stat);
-        setCardsRevealed(stateData.cards_revealed);
-        setIsUserTurn(stateData.current_turn_user_id === user.id);
-
-        // Get battle participants
-        const { data: participants, error: participantsError } = await supabase
+        // Get participants
+        const { data: participantsData, error: participantsError } = await supabase
           .rpc('get_battle_participants', { battle_id: battleId });
 
         if (participantsError) throw participantsError;
-        setParticipants(participants);
 
+        setParticipants(participantsData);
+        
         // Get player decks
         const { data: decksData, error: decksError } = await supabase
           .from('battle_player_decks')
@@ -54,42 +60,51 @@ export const useBattleMultiplayer = (battleId: string, mode: BattleMode = 'stand
 
         if (decksError) throw decksError;
 
-        // Transform deck data
-        const decks: Record<string, AnimorphCard[]> = {};
-        decksData.forEach((deckInfo) => {
-          const participant = participants.find(p => p.participant_id === deckInfo.participant_id);
-          if (participant) {
-            decks[participant.user_id] = deckInfo.deck_data;
+        // Set state from fetched data
+        if (stateData) {
+          setCurrentRound(stateData.current_round || 1);
+          setCardsRevealed(stateData.cards_revealed || false);
+          setSelectedStat(stateData.selected_stat);
+          setIsUserTurn(stateData.current_turn_user_id === user.id);
+          
+          // Process decks
+          if (decksData && decksData.length > 0) {
+            const processedDecks: Record<string, AnimorphCard[]> = {};
+            
+            decksData.forEach(deck => {
+              const participant = participantsData.find(p => p.participant_id === deck.participant_id);
+              if (participant) {
+                processedDecks[participant.user_id] = deck.deck_data;
+              }
+            });
+            
+            setPlayerDecks(processedDecks);
           }
-        });
-        setPlayerDecks(decks);
-
-        // Calculate round wins
-        const wins: Record<string, number> = {};
-        participants.forEach((p) => {
-          wins[p.user_id] = p.rounds_won || 0;
-        });
-        setRoundWins(wins);
-
-        // Check if game is over
-        const { data: sessionData } = await supabase
-          .from('battle_sessions')
-          .select('status, winner_id')
-          .eq('id', battleId)
-          .single();
-
-        if (sessionData && sessionData.status === 'completed') {
-          setGameOver(true);
-          setWinner(sessionData.winner_id);
         }
 
+        // Process participant wins
+        if (participantsData) {
+          const wins: Record<string, number> = {};
+          participantsData.forEach(p => {
+            wins[p.user_id] = p.rounds_won || 0;
+          });
+          setRoundWins(wins);
+        }
+
+        // Check if game is over
+        if (battleData.status === 'completed') {
+          setGameOver(true);
+          setWinner(battleData.winner_id);
+        }
       } catch (error) {
         console.error('Error fetching battle state:', error);
         toast({
-          title: "Error",
-          description: "Failed to load battle state",
-          variant: "destructive"
+          title: 'Error',
+          description: 'Failed to load battle data',
+          variant: 'destructive'
         });
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -101,111 +116,61 @@ export const useBattleMultiplayer = (battleId: string, mode: BattleMode = 'stand
     if (!battleId) return;
 
     const channel = supabase
-      .channel(`battle:${battleId}`)
+      .channel(`battle_state:${battleId}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
           table: 'battle_state',
           filter: `battle_session_id=eq.${battleId}`
         },
         (payload) => {
           const newState = payload.new as any;
+          
           setCurrentRound(newState.current_round);
           setCardsRevealed(newState.cards_revealed);
           setSelectedStat(newState.selected_stat);
           setIsUserTurn(newState.current_turn_user_id === user?.id);
         }
       )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [battleId, user?.id]);
+
+  // Subscribe to battle actions
+  useEffect(() => {
+    if (!battleId) return;
+
+    const channel = supabase
+      .channel(`battle_actions:${battleId}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'battle_player_decks',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'battle_actions',
           filter: `battle_session_id=eq.${battleId}`
         },
-        async () => {
-          // Re-fetch decks when they change
-          try {
-            const { data: decksData } = await supabase
-              .from('battle_player_decks')
-              .select('*')
-              .eq('battle_session_id', battleId);
-
-            if (decksData) {
-              const decks: Record<string, AnimorphCard[]> = {};
-              decksData.forEach((deckInfo) => {
-                const participant = participants.find(p => p.participant_id === deckInfo.participant_id);
-                if (participant) {
-                  decks[participant.user_id] = deckInfo.deck_data;
-                }
-              });
-              setPlayerDecks(decks);
-            }
-          } catch (error) {
-            console.error('Error updating decks:', error);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'battle_participants',
-          filter: `battle_id=eq.${battleId}`
-        },
-        async () => {
-          // Re-fetch participants when they change
-          try {
-            const { data } = await supabase
-              .rpc('get_battle_participants', { battle_id: battleId });
-
-            if (data) {
-              setParticipants(data);
-              
-              // Update round wins
-              const wins: Record<string, number> = {};
-              data.forEach((p) => {
-                wins[p.user_id] = p.rounds_won || 0;
-              });
-              setRoundWins(wins);
-            }
-          } catch (error) {
-            console.error('Error updating participants:', error);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'battle_sessions',
-          filter: `id=eq.${battleId}`
-        },
         (payload) => {
-          const newSession = payload.new as any;
-          if (newSession.status === 'completed') {
+          const action = payload.new as any;
+          
+          // Process different action types
+          if (action.action_type === 'round_win') {
+            const { winner_id, rounds_won } = action.action_data;
+            
+            // Update round wins
+            setRoundWins(prev => ({
+              ...prev,
+              [winner_id]: rounds_won
+            }));
+          } 
+          else if (action.action_type === 'game_over') {
             setGameOver(true);
-            setWinner(newSession.winner_id);
-
-            if (newSession.winner_id === user?.id) {
-              toast({
-                title: "Victory!",
-                description: "You won the battle!",
-                variant: "default",
-              });
-            } else {
-              const winnerName = participants.find(p => p.user_id === newSession.winner_id)?.username;
-              toast({
-                title: "Battle Ended",
-                description: `${winnerName || 'Another player'} won the battle.`,
-                variant: "default",
-              });
-            }
+            setWinner(action.action_data.winner_id);
           }
         }
       )
@@ -214,69 +179,85 @@ export const useBattleMultiplayer = (battleId: string, mode: BattleMode = 'stand
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [battleId, participants, user?.id]);
+  }, [battleId]);
 
-  // AI behavior for public lobby mode
+  // Subscribe to deck updates
   useEffect(() => {
-    // Only handle AI moves in public mode
-    if (mode !== 'public') return;
-    
-    // If it's an AI's turn
-    const aiParticipant = participants.find(p => p.is_ai);
-    
-    if (aiParticipant && !selectedStat && participants.some(p => 
-      p.user_id !== user?.id && 
-      isUserTurn === false && 
-      p.is_ai === true
-    )) {
-      // Add delay to simulate AI thinking
-      const aiThinkingTimer = setTimeout(() => {
-        // AI selects a random stat
-        const stats = ['power', 'health', 'attack', 'sats', 'size'];
-        const randomStat = stats[Math.floor(Math.random() * stats.length)];
-        
-        // Make the AI selection
-        handleStatSelection(randomStat, aiParticipant.user_id);
-      }, 3000);
-      
-      return () => clearTimeout(aiThinkingTimer);
-    }
-  }, [isUserTurn, participants, selectedStat, mode, user?.id]);
+    if (!battleId) return;
 
-  // Handle stat selection
-  const handleStatSelection = useCallback(async (stat: string, playerId?: string) => {
-    if ((!isUserTurn && !playerId) || !battleId) return;
+    const channel = supabase
+      .channel(`battle_decks:${battleId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'battle_player_decks',
+          filter: `battle_session_id=eq.${battleId}`
+        },
+        (payload) => {
+          const deck = payload.new as any;
+          
+          // Find participant for this deck
+          const participant = participants.find(p => p.participant_id === deck.participant_id);
+          
+          if (participant) {
+            setPlayerDecks(prev => ({
+              ...prev,
+              [participant.user_id]: deck.deck_data
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [battleId, participants]);
+
+  // Function to handle stat selection
+  const handleStatSelection = async (stat: string) => {
+    if (!user || !isUserTurn || !battleId) return;
 
     try {
-      // Find the participant ID for the current user or AI
-      const currentPlayerId = playerId || user?.id;
-      const participant = participants.find(p => p.user_id === currentPlayerId);
-      
-      if (!participant) {
-        throw new Error("Participant not found");
-      }
+      // Record the action
+      const { error: actionError } = await supabase
+        .from('battle_actions')
+        .insert({
+          battle_session_id: battleId,
+          participant_id: participants.find(p => p.user_id === user.id)?.participant_id,
+          action_type: 'select_stat',
+          action_data: { selected_stat: stat }
+        });
 
-      const { error } = await supabase.from('battle_actions').insert({
-        battle_session_id: battleId,
-        participant_id: participant.participant_id,
-        action_type: 'select_stat',
-        action_data: { stat }
-      });
+      if (actionError) throw actionError;
 
-      if (error) throw error;
+      // Update battle state
+      const { error: stateError } = await supabase
+        .from('battle_state')
+        .update({
+          selected_stat: stat,
+          cards_revealed: true
+        })
+        .eq('battle_session_id', battleId);
+
+      if (stateError) throw stateError;
 
       setSelectedStat(stat);
+      setCardsRevealed(true);
     } catch (error) {
       console.error('Error selecting stat:', error);
       toast({
-        title: "Error",
-        description: "Failed to select stat",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to select stat',
+        variant: 'destructive'
       });
     }
-  }, [isUserTurn, battleId, participants, user?.id]);
+  };
 
   return {
+    loading,
     currentRound,
     isUserTurn,
     selectedStat,
@@ -285,6 +266,7 @@ export const useBattleMultiplayer = (battleId: string, mode: BattleMode = 'stand
     winner,
     playerDecks,
     roundWins,
+    participants,
     handleStatSelection
   };
 };

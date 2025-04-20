@@ -9,6 +9,14 @@ export interface BattleCardDisplayProps {
   isActive?: boolean;
   onClick?: () => void;
   className?: string;
+  
+  // Legacy props for backward compatibility
+  isFlipped?: boolean;
+  roundWins?: number;
+  playerName?: string;
+  cardCount?: number;
+  onStatSelect?: (stat: string) => void;
+  selectedStat?: string | null;
 }
 
 const BattleCardDisplay = ({
@@ -16,11 +24,25 @@ const BattleCardDisplay = ({
   isRevealed = false,
   isActive = false,
   onClick,
-  className
+  className,
+  
+  // Legacy props
+  isFlipped,
+  roundWins,
+  playerName,
+  cardCount,
+  onStatSelect,
+  selectedStat
 }: BattleCardDisplayProps) => {
+  // Use isFlipped as fallback for isRevealed for backward compatibility
+  const shouldRevealCard = isRevealed || isFlipped;
+  
   // Only use real data, no fallbacks
   const imageUrl = card.image_url;
   const cardName = card.nft_name;
+  
+  // Stats for the stat selector
+  const stats = ['power', 'health', 'attack', 'sats', 'size'];
 
   return (
     <div 
@@ -31,9 +53,22 @@ const BattleCardDisplay = ({
       )} 
       onClick={onClick}
     >
+      {/* Show player info if using legacy props */}
+      {playerName && (
+        <div className="text-center mb-1 font-fantasy">
+          <div className="text-lg">{playerName}</div>
+          {roundWins !== undefined && (
+            <div className="bg-fantasy-accent/20 px-3 py-1 rounded-full text-sm font-bold">
+              Wins: {roundWins}
+              {cardCount !== undefined && <span className="ml-2">Cards: {cardCount}</span>}
+            </div>
+          )}
+        </div>
+      )}
+      
       <div className="fantasy-card-inner h-96 w-72 relative overflow-hidden rounded-lg border-2 border-fantasy-primary shadow-lg">
         <div className="h-full w-full">
-          {isRevealed ? (
+          {shouldRevealCard ? (
             <img 
               src={imageUrl} 
               alt={cardName || `Card #${card.card_number}`} 
@@ -47,6 +82,22 @@ const BattleCardDisplay = ({
           )}
         </div>
       </div>
+      
+      {/* Stat selector for legacy components */}
+      {isActive && onStatSelect && (
+        <div className="mt-2 flex justify-center gap-2 flex-wrap">
+          {stats.map(stat => (
+            <button 
+              key={stat} 
+              disabled={!!selectedStat} 
+              onClick={() => onStatSelect(stat)} 
+              className="font-bold rounded-lg px-2 py-1 bg-fuchsia-900 hover:bg-fuchsia-800 text-purple-400"
+            >
+              {stat}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

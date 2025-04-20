@@ -51,6 +51,93 @@ export type Database = {
         }
         Relationships: []
       }
+      battle_actions: {
+        Row: {
+          action_data: Json
+          action_type: string
+          battle_session_id: string
+          created_at: string
+          id: string
+          participant_id: string
+        }
+        Insert: {
+          action_data: Json
+          action_type: string
+          battle_session_id: string
+          created_at?: string
+          id?: string
+          participant_id: string
+        }
+        Update: {
+          action_data?: Json
+          action_type?: string
+          battle_session_id?: string
+          created_at?: string
+          id?: string
+          participant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_actions_battle_session_id_fkey"
+            columns: ["battle_session_id"]
+            isOneToOne: false
+            referencedRelation: "battle_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battle_actions_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "battle_participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_lobbies: {
+        Row: {
+          battle_type: string
+          completed_at: string | null
+          created_at: string
+          host_id: string
+          id: string
+          max_players: number
+          name: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          use_music: boolean
+          use_timer: boolean
+        }
+        Insert: {
+          battle_type?: string
+          completed_at?: string | null
+          created_at?: string
+          host_id: string
+          id?: string
+          max_players?: number
+          name: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          use_music?: boolean
+          use_timer?: boolean
+        }
+        Update: {
+          battle_type?: string
+          completed_at?: string | null
+          created_at?: string
+          host_id?: string
+          id?: string
+          max_players?: number
+          name?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          use_music?: boolean
+          use_timer?: boolean
+        }
+        Relationships: []
+      }
       battle_participants: {
         Row: {
           battle_id: string
@@ -89,6 +176,93 @@ export type Database = {
           },
         ]
       }
+      battle_player_decks: {
+        Row: {
+          battle_session_id: string
+          created_at: string
+          current_index: number
+          deck_data: Json
+          id: string
+          participant_id: string
+        }
+        Insert: {
+          battle_session_id: string
+          created_at?: string
+          current_index?: number
+          deck_data: Json
+          id?: string
+          participant_id: string
+        }
+        Update: {
+          battle_session_id?: string
+          created_at?: string
+          current_index?: number
+          deck_data?: Json
+          id?: string
+          participant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_player_decks_battle_session_id_fkey"
+            columns: ["battle_session_id"]
+            isOneToOne: false
+            referencedRelation: "battle_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battle_player_decks_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "battle_participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_rounds: {
+        Row: {
+          battle_session_id: string
+          created_at: string
+          id: string
+          round_data: Json
+          round_number: number
+          selected_stat: string
+          winner_id: string | null
+        }
+        Insert: {
+          battle_session_id: string
+          created_at?: string
+          id?: string
+          round_data: Json
+          round_number: number
+          selected_stat: string
+          winner_id?: string | null
+        }
+        Update: {
+          battle_session_id?: string
+          created_at?: string
+          id?: string
+          round_data?: Json
+          round_number?: number
+          selected_stat?: string
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_rounds_battle_session_id_fkey"
+            columns: ["battle_session_id"]
+            isOneToOne: false
+            referencedRelation: "battle_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battle_rounds_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "battle_participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       battle_sessions: {
         Row: {
           battle_type: string
@@ -115,6 +289,50 @@ export type Database = {
           winner_id?: string | null
         }
         Relationships: []
+      }
+      battle_state: {
+        Row: {
+          battle_session_id: string
+          cards_revealed: boolean
+          current_round: number
+          current_turn_user_id: string | null
+          id: string
+          is_sudden_death: boolean
+          last_updated: string
+          selected_stat: string | null
+          sudden_death_round: number | null
+        }
+        Insert: {
+          battle_session_id: string
+          cards_revealed?: boolean
+          current_round?: number
+          current_turn_user_id?: string | null
+          id?: string
+          is_sudden_death?: boolean
+          last_updated?: string
+          selected_stat?: string | null
+          sudden_death_round?: number | null
+        }
+        Update: {
+          battle_session_id?: string
+          cards_revealed?: boolean
+          current_round?: number
+          current_turn_user_id?: string | null
+          id?: string
+          is_sudden_death?: boolean
+          last_updated?: string
+          selected_stat?: string | null
+          sudden_death_round?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_state_battle_session_id_fkey"
+            columns: ["battle_session_id"]
+            isOneToOne: false
+            referencedRelation: "battle_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       deck_cards: {
         Row: {
@@ -148,6 +366,41 @@ export type Database = {
             columns: ["deck_id"]
             isOneToOne: false
             referencedRelation: "user_decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lobby_participants: {
+        Row: {
+          id: string
+          is_ready: boolean
+          join_time: string
+          lobby_id: string
+          player_number: number
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          is_ready?: boolean
+          join_time?: string
+          lobby_id: string
+          player_number: number
+          user_id: string
+        }
+        Update: {
+          id?: string
+          is_ready?: boolean
+          join_time?: string
+          lobby_id?: string
+          player_number?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_participants_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "battle_lobbies"
             referencedColumns: ["id"]
           },
         ]
@@ -414,6 +667,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_battle_participants: {
+        Args: { battle_id: string }
+        Returns: {
+          participant_id: string
+          user_id: string
+          player_number: number
+          rounds_won: number
+          is_ai: boolean
+          username: string
+          profile_image_url: string
+        }[]
+      }
       get_user_emails: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -423,6 +688,14 @@ export type Database = {
       }
       is_admin: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      user_in_battle: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
+      user_in_lobby: {
+        Args: { user_id: string }
         Returns: boolean
       }
     }

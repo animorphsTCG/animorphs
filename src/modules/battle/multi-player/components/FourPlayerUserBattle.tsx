@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -29,7 +28,7 @@ export const FourPlayerUserBattle = () => {
     playerDecks,
     roundWins,
     handleStatSelection
-  } = useBattleMultiplayer(battleId || '', 'user');
+  } = useBattleMultiplayer(battleId || '', '4player');
 
   useEffect(() => {
     if (!battleId || !user) return;

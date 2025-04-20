@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/modules/auth';
 import { toast } from '@/components/ui/use-toast';
 import { AnimorphCard } from '@/types';
 
-export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' | '4player' = 'tournament') => {
+export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' | '4player' | 'user' | 'public' = 'tournament') => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [currentRound, setCurrentRound] = useState(1);
@@ -18,7 +17,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
   const [roundWins, setRoundWins] = useState<Record<string, number>>({});
   const [participants, setParticipants] = useState<any[]>([]);
 
-  // Initial fetch of the battle state
   useEffect(() => {
     if (!battleId || !user) return;
 
@@ -26,7 +24,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
       try {
         setLoading(true);
         
-        // Get battle session info
         const { data: battleData, error: battleError } = await supabase
           .from('battle_sessions')
           .select('*')
@@ -35,7 +32,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
 
         if (battleError) throw battleError;
 
-        // Get battle state
         const { data: stateData, error: stateError } = await supabase
           .from('battle_state')
           .select('*')
@@ -44,7 +40,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
 
         if (stateError && stateError.code !== 'PGRST116') throw stateError;
 
-        // Get participants
         const { data: participantsData, error: participantsError } = await supabase
           .rpc('get_battle_participants', { battle_id: battleId });
 
@@ -52,7 +47,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
 
         setParticipants(participantsData);
         
-        // Get player decks
         const { data: decksData, error: decksError } = await supabase
           .from('battle_player_decks')
           .select('*')
@@ -60,14 +54,12 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
 
         if (decksError) throw decksError;
 
-        // Set state from fetched data
         if (stateData) {
           setCurrentRound(stateData.current_round || 1);
           setCardsRevealed(stateData.cards_revealed || false);
           setSelectedStat(stateData.selected_stat);
           setIsUserTurn(stateData.current_turn_user_id === user.id);
           
-          // Process decks
           if (decksData && decksData.length > 0) {
             const processedDecks: Record<string, AnimorphCard[]> = {};
             
@@ -82,7 +74,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
           }
         }
 
-        // Process participant wins
         if (participantsData) {
           const wins: Record<string, number> = {};
           participantsData.forEach(p => {
@@ -91,7 +82,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
           setRoundWins(wins);
         }
 
-        // Check if game is over
         if (battleData.status === 'completed') {
           setGameOver(true);
           setWinner(battleData.winner_id);
@@ -111,7 +101,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
     fetchBattleState();
   }, [battleId, user]);
 
-  // Subscribe to battle state changes
   useEffect(() => {
     if (!battleId) return;
 
@@ -141,7 +130,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
     };
   }, [battleId, user?.id]);
 
-  // Subscribe to battle actions
   useEffect(() => {
     if (!battleId) return;
 
@@ -158,11 +146,9 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
         (payload) => {
           const action = payload.new as any;
           
-          // Process different action types
           if (action.action_type === 'round_win') {
             const { winner_id, rounds_won } = action.action_data;
             
-            // Update round wins
             setRoundWins(prev => ({
               ...prev,
               [winner_id]: rounds_won
@@ -181,7 +167,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
     };
   }, [battleId]);
 
-  // Subscribe to deck updates
   useEffect(() => {
     if (!battleId) return;
 
@@ -198,7 +183,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
         (payload) => {
           const deck = payload.new as any;
           
-          // Find participant for this deck
           const participant = participants.find(p => p.participant_id === deck.participant_id);
           
           if (participant) {
@@ -216,12 +200,10 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
     };
   }, [battleId, participants]);
 
-  // Function to handle stat selection
   const handleStatSelection = async (stat: string) => {
     if (!user || !isUserTurn || !battleId) return;
 
     try {
-      // Record the action
       const { error: actionError } = await supabase
         .from('battle_actions')
         .insert({
@@ -233,7 +215,6 @@ export const useBattleMultiplayer = (battleId: string, battleType: 'tournament' 
 
       if (actionError) throw actionError;
 
-      // Update battle state
       const { error: stateError } = await supabase
         .from('battle_state')
         .update({

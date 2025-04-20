@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Routes as RouterRoutes, Route } from 'react-router-dom';
 import { ProtectedRoute } from '@/modules/auth';
 import { DemoBattle, OneVOneBattle } from '@/modules/battle/single-player';
-import { MultiplayerBattle } from '@/modules/battle/multi-player/components/MultiplayerBattle';
+import { MultiplayerBattle, ThreePlayerBattle, FourPlayerPublicBattle, FourPlayerUserBattle } from '@/modules/battle/multi-player';
 
 // Pages
 import Index from "./pages/Index";
@@ -20,7 +21,7 @@ import Admin from "./pages/Admin";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import PublicProfile from './pages/PublicProfile';
-import ThreePlayerBattle from './pages/ThreePlayerBattle';
+import ThreePlayerBattlePage from './pages/ThreePlayerBattle';
 
 export const Routes = () => {
   return (
@@ -69,6 +70,60 @@ export const Routes = () => {
         element={
           <ProtectedRoute>
             <MultiplayerBattle />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/3-player-battle/:battleId" 
+        element={
+          <ProtectedRoute>
+            <ThreePlayerBattle />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/3-player-battle" 
+        element={
+          <ProtectedRoute>
+            <ThreePlayerBattlePage />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/4-player-public-battle/:battleId" 
+        element={
+          <ProtectedRoute>
+            <FourPlayerPublicBattle />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/4-player-public-battle" 
+        element={
+          <ProtectedRoute>
+            <FourPlayerPublicBattle />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/4-player-user-lobby/:battleId" 
+        element={
+          <ProtectedRoute>
+            <FourPlayerUserBattle />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route 
+        path="/4-player-user-lobby" 
+        element={
+          <ProtectedRoute>
+            <FourPlayerUserBattle />
           </ProtectedRoute>
         } 
       />

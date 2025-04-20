@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { toast } from "@/components/ui/use-toast";
+import { supabase } from '@/lib/supabase';
 
 interface BattleLobbyCreatorProps {
   onLobbyCreate?: (lobbyData: any) => void;
@@ -21,8 +22,9 @@ const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }
   const [playerCount, setPlayerCount] = useState<"1v1" | "3player" | "4player">("1v1");
   const [useTimer, setUseTimer] = useState(true);
   const [useMusic, setUseMusic] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   
-  const handleCreateLobby = () => {
+  const handleCreateLobby = async () => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -42,33 +44,104 @@ const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }
       return;
     }
     
-    const lobbyData = {
-      name: lobbyName,
-      playerCount,
-      useTimer,
-      useMusic,
-      hostId: user.id
-    };
+    setIsCreating(true);
     
-    if (onLobbyCreate) {
-      onLobbyCreate(lobbyData);
-    } else {
-      // Default behavior - navigate to appropriate lobby page
-      let route = "";
-      
-      switch (playerCount) {
-        case "1v1":
-          route = "/1v1-battle";
-          break;
-        case "3player": 
-          route = "/3-player-battle";
-          break;
-        case "4player":
-          route = "/4-player-user-lobby";
-          break;
+    try {
+      // Check if user is already in another battle or lobby
+      const { data: userInBattle } = await supabase
+        .rpc('user_in_battle', { user_id: user.id });
+        
+      if (userInBattle) {
+        toast({
+          title: 'Already in battle',
+          description: 'You are already participating in a battle',
+          variant: 'destructive'
+        });
+        setIsCreating(false);
+        return;
       }
       
-      navigate(route, { state: lobbyData });
+      const { data: userInLobby } = await supabase
+        .rpc('user_in_lobby', { user_id: user.id });
+        
+      if (userInLobby) {
+        toast({
+          title: 'Already in lobby',
+          description: 'You are already participating in a lobby',
+          variant: 'destructive'
+        });
+        setIsCreating(false);
+        return;
+      }
+    
+      const maxPlayers = playerCount === '1v1' ? 2 : 
+                        playerCount === '3player' ? 3 : 4;
+                        
+      // Create the lobby
+      const { data: lobby, error: lobbyError } = await supabase
+        .from('battle_lobbies')
+        .insert({
+          name: lobbyName,
+          host_id: user.id,
+          battle_type: playerCount,
+          max_players: maxPlayers,
+          use_timer: useTimer,
+          use_music: useMusic
+        })
+        .select()
+        .single();
+
+      if (lobbyError) throw lobbyError;
+
+      // Add host as first participant
+      const { error: participantError } = await supabase
+        .from('lobby_participants')
+        .insert({
+          lobby_id: lobby.id,
+          user_id: user.id,
+          player_number: 1
+        });
+
+      if (participantError) throw participantError;
+      
+      const lobbyData = {
+        id: lobby.id,
+        name: lobbyName,
+        playerCount,
+        useTimer,
+        useMusic,
+        hostId: user.id
+      };
+      
+      if (onLobbyCreate) {
+        onLobbyCreate(lobbyData);
+      } else {
+        // Navigate to appropriate battle page
+        let route = "";
+        
+        switch (playerCount) {
+          case "1v1":
+            route = "/battle/multiplayer/" + lobby.id;
+            break;
+          case "3player": 
+            route = "/3-player-battle/" + lobby.id;
+            break;
+          case "4player":
+            route = "/4-player-user-lobby/" + lobby.id;
+            break;
+        }
+        
+        navigate(route);
+      }
+    } catch (error) {
+      console.error("Error creating lobby:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create battle lobby. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
     }
   };
   
@@ -157,8 +230,9 @@ const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }
           <Button 
             className="w-full fantasy-button" 
             onClick={handleCreateLobby}
+            disabled={isCreating}
           >
-            Create Battle Lobby
+            {isCreating ? 'Creating...' : 'Create Battle Lobby'}
           </Button>
         </div>
       </CardContent>

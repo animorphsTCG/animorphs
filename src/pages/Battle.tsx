@@ -8,23 +8,34 @@ import BattleLobbyCreator from "@/components/BattleLobbyCreator";
 
 const Battle = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, userProfile, isLoading } = useAuth();
   const [showLobbyCreator, setShowLobbyCreator] = useState(false);
-  
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-80">
+        <div className="text-xl text-fantasy-accent">Loading...</div>
+      </div>
+    );
+  }
+
   const singlePlayerModes = [
     {
       title: "Visitor Demo Battle",
       description: "Try a sample battle against the AI without an account",
       path: "/visitor-demo-battle",
       requiresAuth: false,
-      icon: <Bot className="h-5 w-5" />
+      icon: <Bot className="h-5 w-5" />,
+      requiresPayment: false
     },
     {
       title: "1v1 Battle",
       description: "Challenge the AI to a 1-on-1 battle",
       path: "/1v1-battle",
       requiresAuth: true,
-      icon: <UserPlus className="h-5 w-5" />
+      icon: <UserPlus className="h-5 w-5" />,
+      requiresPayment: false,
+      paymentEnforced: true
     },
   ];
 
@@ -35,31 +46,37 @@ const Battle = () => {
       path: "/battle/multiplayer",
       requiresAuth: true,
       requiresPayment: true,
-      icon: <Users className="h-5 w-5" />
+      icon: <Users className="h-5 w-5" />,
+      paymentEnforced: true
     },
     {
       title: "3-Player Battle (Relaxed Tournament)",
       description: "Compete in a three-player relaxed tournament mode",
       path: "/3-player-battle",
       requiresAuth: true,
-      icon: <Users className="h-5 w-5" />
+      icon: <Users className="h-5 w-5" />,
+      requiresPayment: false
     },
     {
       title: "4-Player Public Lobby (3 Users vs AI)",
       description: "Join forces with two other players against the AI",
       path: "/4-player-public-battle",
       requiresAuth: true,
-      icon: <Bot className="h-5 w-5" />
+      icon: <Bot className="h-5 w-5" />,
+      requiresPayment: false
     },
     {
       title: "4-Player User Lobby",
       description: "Create or join a custom lobby with four human players",
       path: "/4-player-user-lobby",
       requiresAuth: true,
-      icon: <Users className="h-5 w-5" />
+      icon: <Users className="h-5 w-5" />,
+      requiresPayment: false
     },
   ];
-  
+
+  const userHasPaid = userProfile?.has_paid === true;
+
   return (
     <div className="container mx-auto py-12 px-4">
       <h1 className="text-4xl font-fantasy text-fantasy-accent text-center mb-8">Battle Modes</h1>
@@ -93,62 +110,105 @@ const Battle = () => {
             <section>
               <h2 className="text-2xl font-fantasy text-fantasy-accent mb-4">Single Player Modes</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {singlePlayerModes.map((mode, index) => (
-                  <Card key={index} className="border-2 border-fantasy-primary bg-black/70 hover:border-fantasy-accent transition-colors">
-                    <CardHeader>
-                      <div className="flex items-center gap-2">
-                        {mode.icon}
-                        <CardTitle className="text-2xl font-fantasy text-fantasy-accent">{mode.title}</CardTitle>
-                      </div>
-                      <CardDescription>{mode.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Button 
-                        className="w-full fantasy-button"
-                        onClick={() => {
-                          if (mode.requiresAuth && !user) {
-                            navigate('/login');
-                          } else {
-                            navigate(mode.path);
+                {singlePlayerModes.map((mode, index) => {
+                  let showPlayNow = false;
+                  if (
+                    mode.paymentEnforced
+                    && mode.requiresAuth
+                  ) {
+                    if (user && userHasPaid) {
+                      showPlayNow = true;
+                    }
+                  } else if (mode.requiresAuth) {
+                    showPlayNow = !!user;
+                  } else {
+                    showPlayNow = true;
+                  }
+
+                  return (
+                    <Card key={index} className="border-2 border-fantasy-primary bg-black/70 hover:border-fantasy-accent transition-colors">
+                      <CardHeader>
+                        <div className="flex items-center gap-2">
+                          {mode.icon}
+                          <CardTitle className="text-2xl font-fantasy text-fantasy-accent">{mode.title}</CardTitle>
+                        </div>
+                        <CardDescription>{mode.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          className="w-full fantasy-button"
+                          onClick={() => {
+                            if (mode.requiresAuth && !user) {
+                              navigate('/login');
+                            } else if (mode.paymentEnforced && !userHasPaid) {
+                              navigate('/profile');
+                            } else {
+                              navigate(mode.path);
+                            }
+                          }}
+                        >
+                          {mode.requiresAuth && !user
+                            ? "Login to Play"
+                            : (mode.paymentEnforced && !userHasPaid)
+                              ? "Unlock with Payment"
+                              : "Play Now"
                           }
-                        }}
-                      >
-                        {mode.requiresAuth && !user ? "Login to Play" : "Play Now"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </section>
 
             <section>
               <h2 className="text-2xl font-fantasy text-fantasy-accent mb-4">Multiplayer Modes</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {multiPlayerModes.map((mode, index) => (
-                  <Card key={index} className="border-2 border-fantasy-primary bg-black/70 hover:border-fantasy-accent transition-colors">
-                    <CardHeader>
-                      <div className="flex items-center gap-2">
-                        {mode.icon}
-                        <CardTitle className="text-2xl font-fantasy text-fantasy-accent">{mode.title}</CardTitle>
-                      </div>
-                      <CardDescription>{mode.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Button 
-                        className="w-full fantasy-button"
-                        onClick={() => {
-                          if (mode.requiresAuth && !user) {
-                            navigate('/login');
-                          } else {
-                            navigate(mode.path);
+                {multiPlayerModes.map((mode, index) => {
+                  let showPlayNow = false;
+                  if (mode.paymentEnforced) {
+                    if (user && userHasPaid) {
+                      showPlayNow = true;
+                    }
+                  } else if (mode.requiresAuth) {
+                    showPlayNow = !!user;
+                  } else {
+                    showPlayNow = true;
+                  }
+
+                  return (
+                    <Card key={index} className="border-2 border-fantasy-primary bg-black/70 hover:border-fantasy-accent transition-colors">
+                      <CardHeader>
+                        <div className="flex items-center gap-2">
+                          {mode.icon}
+                          <CardTitle className="text-2xl font-fantasy text-fantasy-accent">{mode.title}</CardTitle>
+                        </div>
+                        <CardDescription>{mode.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button
+                          className="w-full fantasy-button"
+                          onClick={() => {
+                            if (mode.requiresAuth && !user) {
+                              navigate('/login');
+                            } else if (mode.paymentEnforced && !userHasPaid) {
+                              navigate('/profile');
+                            } else {
+                              navigate(mode.path);
+                            }
+                          }}
+                        >
+                          {mode.requiresAuth && !user
+                            ? "Login to Play"
+                            : (mode.paymentEnforced && !userHasPaid)
+                              ? "Unlock with Payment"
+                              : "Play Now"
                           }
-                        }}
-                      >
-                        {mode.requiresAuth && !user ? "Login to Play" : "Play Now"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </section>
           </div>

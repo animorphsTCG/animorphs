@@ -1,4 +1,3 @@
-
 /**
  * Enhanced monitoring utilities for tracking application performance
  */
@@ -207,16 +206,7 @@ const metrics = {
  * @param operation Name of the operation being measured
  */
 export function measure<T>(operation: string) {
-  return function(
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ): PropertyDescriptor;
-  
-  return function(
-    target: Function
-  ): Function;
-  
+  // Implementation that handles both function and method decorators
   return function(
     targetOrDescriptor: any,
     propertyKey?: string,

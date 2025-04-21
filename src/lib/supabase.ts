@@ -22,7 +22,7 @@ const createEnhancedClient = () => {
     // Global error handler
     global: {
       fetch: (...args) => {
-        return fetch(...args);
+        return fetch.apply(null, args);
       }
     }
   });

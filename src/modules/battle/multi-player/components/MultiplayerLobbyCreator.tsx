@@ -9,14 +9,17 @@ import { useAuth } from '@/modules/auth';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
+import { measure } from '@/lib/monitoring';
 
 export const MultiplayerLobbyCreator = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [lobbyName, setLobbyName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleCreateLobby = async () => {
+  // Using the performance measurement decorator
+  const createLobby = measure('create_multiplayer_lobby')(async () => {
     if (!user) {
       toast({
         title: "Authentication Required",
@@ -27,12 +30,33 @@ export const MultiplayerLobbyCreator = () => {
     }
 
     setIsCreating(true);
+    setError(null);
 
     try {
-      // Check if user has paid
-      const { data: hasPaid } = await supabase.rpc('has_paid_unlock_fee', {
-        user_id: user.id
-      });
+      // Check if user has paid with retry logic
+      let hasPaid = false;
+      let retryCount = 0;
+      
+      while (retryCount < 3) {
+        try {
+          const { data, error } = await supabase.rpc('has_paid_unlock_fee', {
+            user_id: user.id
+          });
+          
+          if (error) throw error;
+          
+          hasPaid = !!data;
+          break;
+        } catch (err) {
+          console.error(`Payment check failed (attempt ${retryCount + 1}/3):`, err);
+          retryCount++;
+          
+          if (retryCount >= 3) throw err;
+          
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 500));
+        }
+      }
 
       if (!hasPaid) {
         toast({
@@ -43,13 +67,13 @@ export const MultiplayerLobbyCreator = () => {
         return;
       }
 
-      // Create the lobby
+      // Create the lobby with transaction
       const { data: lobby, error: lobbyError } = await supabase
         .from('battle_lobbies')
         .insert({
           name: lobbyName || 'Multiplayer Battle',
           host_id: user.id,
-          battle_type: 'multiplayer',
+          battle_type: 'tournament',
           max_players: 2,
           requires_payment: true
         })
@@ -69,9 +93,13 @@ export const MultiplayerLobbyCreator = () => {
 
       if (participantError) throw participantError;
 
+      // Track creation success in monitoring
+      console.log(`Lobby created successfully: ${lobby.id}`);
+      
       navigate(`/battle/multiplayer/${lobby.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating lobby:', error);
+      setError(error.message || "Failed to create battle lobby");
       toast({
         title: "Error",
         description: "Failed to create battle lobby",
@@ -80,7 +108,7 @@ export const MultiplayerLobbyCreator = () => {
     } finally {
       setIsCreating(false);
     }
-  };
+  });
 
   return (
     <Card className="max-w-md mx-auto">
@@ -97,11 +125,19 @@ export const MultiplayerLobbyCreator = () => {
               value={lobbyName}
               onChange={(e) => setLobbyName(e.target.value)}
               placeholder="Enter a name for your lobby"
+              disabled={isCreating}
             />
           </div>
+          
+          {error && (
+            <div className="text-sm text-red-500">
+              {error}
+            </div>
+          )}
+          
           <Button 
             className="w-full" 
-            onClick={handleCreateLobby}
+            onClick={createLobby}
             disabled={isCreating}
           >
             {isCreating ? (

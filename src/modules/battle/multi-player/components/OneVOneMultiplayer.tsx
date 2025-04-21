@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,7 +25,7 @@ export const OneVOneMultiplayer = () => {
     roundWins,
     participants,
     handleStatSelection
-  } = useBattleMultiplayer(battleId || '', 'multiplayer');
+  } = useBattleMultiplayer(battleId || '', 'tournament');
 
   if (!battleId) {
     return <div>Invalid battle ID</div>;

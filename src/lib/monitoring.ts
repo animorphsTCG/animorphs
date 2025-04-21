@@ -1,5 +1,6 @@
+
 /**
- * Monitoring utilities for tracking application performance
+ * Enhanced monitoring utilities for tracking application performance
  */
 
 interface PerformanceData {
@@ -10,12 +11,36 @@ interface PerformanceData {
   metadata?: Record<string, any>;
 }
 
-// Simple in-memory metrics storage
+interface RealtimeMetrics {
+  connections: number;
+  disconnections: number;
+  messagesSent: number;
+  messagesReceived: number;
+  errors: number;
+  lastError?: string;
+  lastConnectionTime?: number;
+  lastDisconnectionTime?: number;
+}
+
+// Expanded in-memory metrics storage
 const metrics = {
   operations: [] as PerformanceData[],
   maxStoredMetrics: 1000,
   errorCount: 0,
   slowOperationsThreshold: 1000, // ms
+  
+  // Realtime specific metrics
+  realtime: {
+    connections: 0,
+    disconnections: 0,
+    messagesSent: 0,
+    messagesReceived: 0,
+    errors: 0,
+    lastError: undefined as string | undefined,
+    lastConnectionTime: undefined as number | undefined,
+    lastDisconnectionTime: undefined as number | undefined,
+    channelStats: new Map<string, RealtimeMetrics>()
+  },
   
   // Add a new performance record
   record(data: PerformanceData): void {
@@ -35,6 +60,80 @@ const metrics = {
     if (data.duration > this.slowOperationsThreshold) {
       console.warn(`Slow operation detected: ${data.operation} took ${data.duration}ms`, data.metadata || {});
     }
+  },
+  
+  // Track realtime connection events
+  trackRealtimeConnection(channelId: string): void {
+    this.realtime.connections++;
+    this.realtime.lastConnectionTime = Date.now();
+    
+    // Update per-channel stats
+    const channelStats = this.realtime.channelStats.get(channelId) || this.createEmptyChannelStats();
+    channelStats.connections++;
+    channelStats.lastConnectionTime = Date.now();
+    this.realtime.channelStats.set(channelId, channelStats);
+    
+    // Log for monitoring
+    console.log(`Realtime connection established for channel: ${channelId}`);
+  },
+  
+  // Track realtime disconnection events
+  trackRealtimeDisconnection(channelId: string, reason?: string): void {
+    this.realtime.disconnections++;
+    this.realtime.lastDisconnectionTime = Date.now();
+    
+    // Update per-channel stats
+    const channelStats = this.realtime.channelStats.get(channelId) || this.createEmptyChannelStats();
+    channelStats.disconnections++;
+    channelStats.lastDisconnectionTime = Date.now();
+    this.realtime.channelStats.set(channelId, channelStats);
+    
+    // Log for monitoring
+    console.log(`Realtime disconnection for channel: ${channelId}${reason ? ` (${reason})` : ''}`);
+  },
+  
+  // Track realtime message events
+  trackRealtimeMessage(channelId: string, direction: 'sent' | 'received', messageType?: string): void {
+    if (direction === 'sent') {
+      this.realtime.messagesSent++;
+    } else {
+      this.realtime.messagesReceived++;
+    }
+    
+    // Update per-channel stats
+    const channelStats = this.realtime.channelStats.get(channelId) || this.createEmptyChannelStats();
+    if (direction === 'sent') {
+      channelStats.messagesSent++;
+    } else {
+      channelStats.messagesReceived++;
+    }
+    this.realtime.channelStats.set(channelId, channelStats);
+  },
+  
+  // Track realtime errors
+  trackRealtimeError(channelId: string, error: string): void {
+    this.realtime.errors++;
+    this.realtime.lastError = error;
+    
+    // Update per-channel stats
+    const channelStats = this.realtime.channelStats.get(channelId) || this.createEmptyChannelStats();
+    channelStats.errors++;
+    channelStats.lastError = error;
+    this.realtime.channelStats.set(channelId, channelStats);
+    
+    // Log for monitoring
+    console.error(`Realtime error for channel: ${channelId} - ${error}`);
+  },
+  
+  // Helper to create empty channel stats
+  createEmptyChannelStats(): RealtimeMetrics {
+    return {
+      connections: 0,
+      disconnections: 0,
+      messagesSent: 0,
+      messagesReceived: 0,
+      errors: 0
+    };
   },
   
   // Get metrics summary
@@ -66,11 +165,25 @@ const metrics = {
       errorRate: (stats.errors / stats.count) * 100
     }));
     
+    // Include realtime stats
+    const realtimeStats = {
+      connections: this.realtime.connections,
+      disconnections: this.realtime.disconnections,
+      messagesSent: this.realtime.messagesSent,
+      messagesReceived: this.realtime.messagesReceived,
+      errors: this.realtime.errors,
+      channels: Array.from(this.realtime.channelStats.entries()).map(([channel, stats]) => ({
+        channel,
+        ...stats
+      }))
+    };
+    
     return {
       total,
       avgDuration,
       errorRate,
-      operations: operationStats
+      operations: operationStats,
+      realtime: realtimeStats
     };
   },
   
@@ -78,6 +191,14 @@ const metrics = {
   clear(): void {
     this.operations = [];
     this.errorCount = 0;
+    this.realtime = {
+      connections: 0,
+      disconnections: 0,
+      messagesSent: 0,
+      messagesReceived: 0,
+      errors: 0,
+      channelStats: new Map()
+    };
   }
 };
 
@@ -90,35 +211,116 @@ export function measure<T>(operation: string) {
     target: any,
     propertyKey: string,
     descriptor: PropertyDescriptor
+  ): PropertyDescriptor;
+  
+  return function(
+    target: Function
+  ): Function;
+  
+  return function(
+    targetOrDescriptor: any,
+    propertyKey?: string,
+    descriptor?: PropertyDescriptor
   ) {
-    const originalMethod = descriptor.value;
-    
-    descriptor.value = async function(...args: any[]) {
-      const start = performance.now();
-      let success = true;
-      
-      try {
-        const result = await originalMethod.apply(this, args);
-        return result;
-      } catch (error) {
-        success = false;
-        throw error;
-      } finally {
-        const duration = performance.now() - start;
+    // For function decorators
+    if (typeof targetOrDescriptor === 'function') {
+      return async function(...args: any[]) {
+        const start = performance.now();
+        let success = true;
         
-        // Record the performance data
-        metrics.record({
-          timestamp: Date.now(),
-          duration,
-          operation,
-          success,
-          metadata: { args: args.map(arg => typeof arg) }
-        });
-      }
-    };
+        try {
+          const result = await targetOrDescriptor.apply(this, args);
+          return result;
+        } catch (error) {
+          success = false;
+          throw error;
+        } finally {
+          const duration = performance.now() - start;
+          
+          // Record the performance data
+          metrics.record({
+            timestamp: Date.now(),
+            duration,
+            operation,
+            success,
+            metadata: { args: args.map(arg => typeof arg) }
+          });
+        }
+      };
+    }
     
-    return descriptor;
+    // For method decorators
+    if (descriptor) {
+      const originalMethod = descriptor.value;
+      
+      descriptor.value = async function(...args: any[]) {
+        const start = performance.now();
+        let success = true;
+        
+        try {
+          const result = await originalMethod.apply(this, args);
+          return result;
+        } catch (error) {
+          success = false;
+          throw error;
+        } finally {
+          const duration = performance.now() - start;
+          
+          // Record the performance data
+          metrics.record({
+            timestamp: Date.now(),
+            duration,
+            operation,
+            success,
+            metadata: { args: args.map(arg => typeof arg) }
+          });
+        }
+      };
+      
+      return descriptor;
+    }
+    
+    return targetOrDescriptor;
   };
+}
+
+/**
+ * Enhanced Supabase channel wrapper to track stats
+ */
+export function monitorChannel(channel: any, channelId: string) {
+  // Original functions
+  const originalSubscribe = channel.subscribe;
+  const originalOn = channel.on;
+  const originalSend = channel.send;
+  
+  // Override subscribe
+  channel.subscribe = function(...args: any[]) {
+    metrics.trackRealtimeConnection(channelId);
+    return originalSubscribe.apply(this, args);
+  };
+  
+  // Override on for message tracking
+  channel.on = function(event: string, ...rest: any[]) {
+    const originalHandler = rest[rest.length - 1];
+    
+    if (typeof originalHandler === 'function') {
+      // Replace the handler with our own
+      rest[rest.length - 1] = function(...handlerArgs: any[]) {
+        metrics.trackRealtimeMessage(channelId, 'received', event);
+        return originalHandler.apply(this, handlerArgs);
+      };
+    }
+    
+    return originalOn.apply(this, [event, ...rest]);
+  };
+  
+  // Override send
+  channel.send = function(...args: any[]) {
+    metrics.trackRealtimeMessage(channelId, 'sent');
+    return originalSend.apply(this, args);
+  };
+  
+  return channel;
 }
 
 /**

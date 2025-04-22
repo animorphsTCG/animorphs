@@ -1,15 +1,61 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { UserPlus, Users, Trophy, Bot, Plus } from "lucide-react";
+import { UserPlus, Users, Trophy, Bot, Plus, RefreshCw } from "lucide-react";
 import BattleLobbyCreator from "@/components/BattleLobbyCreator";
+import { supabase } from "@/lib/supabase";
+import { toast } from "@/components/ui/use-toast";
 
 const Battle = () => {
   const navigate = useNavigate();
-  const { user, userProfile, isLoading } = useAuth();
+  const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const [showLobbyCreator, setShowLobbyCreator] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Check payment status via RPC for extra reliability
+  const verifyPaymentStatus = async () => {
+    if (!user?.id) return false;
+    
+    try {
+      setIsRefreshing(true);
+      const { data, error } = await supabase.rpc('check_paid', { user_id: user.id });
+      
+      if (error) {
+        console.error('Failed to verify payment status:', error);
+        return false;
+      }
+      
+      // Refresh profile if payment status doesn't match
+      if (data !== userProfile?.has_paid) {
+        await refreshProfile();
+        toast({ 
+          title: "Profile updated", 
+          description: "Your payment status has been refreshed."
+        });
+      }
+      
+      return data;
+    } catch (err) {
+      console.error('Error checking payment status:', err);
+      return false;
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    await verifyPaymentStatus();
+  };
+
+  useEffect(() => {
+    // Verify payment status on component mount
+    if (user && userProfile) {
+      verifyPaymentStatus();
+    }
+  }, [user, userProfile]);
 
   if (isLoading) {
     return (
@@ -104,6 +150,18 @@ const Battle = () => {
             >
               <Plus className="mr-2 h-4 w-4" /> Create Custom Battle Lobby
             </Button>
+            
+            {user && userProfile && (
+              <Button
+                variant="outline"
+                className="ml-2"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} /> 
+                {isRefreshing ? 'Refreshing...' : 'Refresh Status'}
+              </Button>
+            )}
           </div>
           
           <div className="space-y-8">
@@ -136,7 +194,7 @@ const Battle = () => {
                       </CardHeader>
                       <CardContent>
                         <Button 
-                          className="w-full fantasy-button"
+                          className={`w-full ${showPlayNow ? 'fantasy-button' : 'bg-gray-600 hover:bg-gray-700'}`}
                           onClick={() => {
                             if (mode.requiresAuth && !user) {
                               navigate('/login');
@@ -187,7 +245,7 @@ const Battle = () => {
                       </CardHeader>
                       <CardContent>
                         <Button
-                          className="w-full fantasy-button"
+                          className={`w-full ${showPlayNow ? 'fantasy-button' : 'bg-gray-600 hover:bg-gray-700'}`}
                           onClick={() => {
                             if (mode.requiresAuth && !user) {
                               navigate('/login');

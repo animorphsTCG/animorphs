@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Animorphs Demo Battle Host</title>
+  <style>
+    /* fill the screen */
+    html, body { margin:0; padding:0; height:100%; overflow:hidden; }
+    #demoFrame { position:absolute; top:0; left:0; width:100%; height:100%; border:none; }
+  </style>
+</head>
+<body>
+  <!-- sandbox blocks top‑level nav but allows game scripts -->
+  <iframe
+    id="demoFrame"
+    src="https://animorphs.mythicmasters.org.za/visitor-demo-battle"
+    sandbox="allow-scripts allow-same-origin"
+    allow="fullscreen"
+    title="Animorphs Demo Battle"
+  ></iframe>
+
+  <script>
+    (function() {
+      const iframe = document.getElementById('demoFrame');
+      const original = iframe.src;
+      let firstLoad = true;
+
+      // After the first load, any further load event means the user or game tried to navigate.
+      iframe.addEventListener('load', () => {
+        if (firstLoad) { firstLoad = false; return; }
+        // snap back to the real demo URL
+        iframe.src = original;
+      });
+    })();
+  </script>
+</body>
+</html>

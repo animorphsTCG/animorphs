@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,12 +8,17 @@ import BattleLobbyCreator from "@/components/BattleLobbyCreator";
 
 const Battle = () => {
   const navigate = useNavigate();
-  const { user, userProfile, isLoading } = useAuth();
+  const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const [showLobbyCreator, setShowLobbyCreator] = useState(false);
 
   const userHasPaid = userProfile?.has_paid === true;
 
-  // On mount: no longer need to poll/refresh or setup verify logic
+  useEffect(() => {
+    if (user && !isLoading) {
+      refreshProfile();
+      console.log("Battle page - User payment status:", userHasPaid ? "Paid" : "Not paid");
+    }
+  }, [user, isLoading]);
 
   if (isLoading) {
     return (
@@ -24,7 +28,6 @@ const Battle = () => {
     );
   }
 
-  // Set up game modes (correct paymentEnforced usage!)
   const singlePlayerModes = [
     {
       title: "Visitor Demo Battle",
@@ -79,15 +82,14 @@ const Battle = () => {
     }
   ];
 
-  // Utility logic for button label and navigation
-  const getButtonLabel = (mode: any) => {
+  const getButtonLabel = (mode) => {
     if (!mode.requiresAuth && !mode.paymentEnforced) return "Play Now";
     if (mode.requiresAuth && !user) return "Login to Play";
     if (mode.paymentEnforced && !userHasPaid) return "Unlock with Payment";
     return "Play Now";
   };
 
-  const handleModeClick = (mode: any) => {
+  const handleModeClick = (mode) => {
     if (mode.requiresAuth && !user) return navigate('/login');
     if (mode.paymentEnforced && !userHasPaid) return navigate('/profile');
     navigate(mode.path);
@@ -96,6 +98,15 @@ const Battle = () => {
   return (
     <div className="container mx-auto py-12 px-4">
       <h1 className="text-4xl font-fantasy text-fantasy-accent text-center mb-8">Battle Modes</h1>
+      {user && userProfile && (
+        <div className="text-center mb-4">
+          <p className="text-sm">
+            Account status: <span className={userHasPaid ? "text-green-500 font-bold" : "text-yellow-500"}>
+              {userHasPaid ? "Full Access" : "Basic Access"}
+            </span>
+          </p>
+        </div>
+      )}
       {showLobbyCreator ? (
         <div className="max-w-2xl mx-auto">
           <BattleLobbyCreator />

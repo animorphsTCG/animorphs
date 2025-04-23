@@ -43,6 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log("Fetching user profile for:", userId);
       setProfileError(null);
       const { data, error } = await supabase
         .from('profiles')
@@ -51,31 +52,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
+        console.error("Error fetching profile:", error);
         setProfileError(error.message);
         return null;
       }
       
       if (data) {
-        // Always check payment status using the check_paid RPC
+        // Use has_paid_unlock_fee to check payment status
         try {
-          const { data: paymentStatus, error: paymentError } = await supabase.rpc('check_paid', { user_id: userId });
+          console.log("Checking payment status for user:", userId);
+          const { data: hasPaid, error: paymentError } = await supabase.rpc('has_paid_unlock_fee', { user_id: userId });
+          
+          if (paymentError) {
+            console.error("Error checking payment status:", paymentError);
+            // Still return profile without payment status
+            setUserProfile(data);
+            return data;
+          }
+          
+          console.log("Payment status result:", hasPaid);
+          
           // Add the has_paid property to the profile
           const completeProfile = {
             ...data,
-            has_paid: paymentStatus || false
+            has_paid: hasPaid || false
           };
+          
           setUserProfile(completeProfile);
 
+          // Setup realtime listener and polling fallback
           setupRealtimeListener(userId);
           setupPollingFallback(userId);
+          
           return completeProfile;
         } catch (paymentError) {
+          console.error("Exception checking payment:", paymentError);
           setUserProfile(data);
           return data;
         }
       }
       return null;
     } catch (error) {
+      console.error("Failed to fetch profile data:", error);
       setProfileError('Failed to fetch profile data');
       return null;
     }
@@ -83,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshProfile = async () => {
     if (user?.id) {
+      console.log("Refreshing profile for user:", user.id);
       return await fetchUserProfile(user.id);
     }
     return null;
@@ -97,6 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       paymentChannelRef.current = null;
     }
 
+    console.log("Setting up realtime listener for payment status changes, user:", userId);
     const channel = supabase
       .channel(`payment-status-${userId}`)
       .on('postgres_changes',
@@ -107,6 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           filter: `id=eq.${userId}`
         },
         (payload) => {
+          console.log("Payment status changed:", payload);
           setUserProfile(prev =>
             prev ? { ...prev, has_paid: payload.new.has_paid } : prev
           );
@@ -119,10 +140,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       )
       .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
         if (status === 'SUBSCRIBED') {
-          console.log('Listening for payment changes');
+          console.log('Successfully subscribed to payment changes');
         } else {
           // fallback setup
+          console.log('Failed to subscribe to realtime, using polling fallback');
           setupPollingFallback(userId);
         }
       });
@@ -136,11 +159,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
+    
+    console.log("Setting up polling fallback for user:", userId);
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        const { data } = await supabase.rpc('check_paid', { user_id: userId });
+        const { data, error } = await supabase.rpc('has_paid_unlock_fee', { user_id: userId });
+        
+        if (error) {
+          console.error("Polling error:", error);
+          return;
+        }
+        
         if (typeof data === 'boolean' && userProfile && data !== userProfile.has_paid) {
+          console.log("Polling detected payment status change:", data);
           setUserProfile(prev => prev ? { ...prev, has_paid: data } : prev);
+          
           if (data) {
             toast({
               title: "Payment Status Updated",
@@ -149,10 +182,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch (error) {
-        // Log silently
         console.log('Payment polling error', error);
       }
-    }, 60000);
+    }, 60000); // Check every minute
   };
 
   // Clean up subscriptions and polling on unmount
@@ -173,10 +205,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener FIRST to avoid missing events
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        console.log("Auth state changed:", event);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
         if (event === 'SIGNED_IN' && currentSession?.user) {
+          // Use setTimeout to prevent potential race conditions
           setTimeout(() => {
             fetchUserProfile(currentSession.user.id);
           }, 0);
@@ -201,6 +235,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log("Got session:", currentSession ? 'yes' : 'no');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,20 +5,21 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { UserPlus, Users, Trophy, Bot, Plus } from "lucide-react";
 import BattleLobbyCreator from "@/components/BattleLobbyCreator";
+import { toast } from "@/components/ui/use-toast";
 
 const Battle = () => {
   const navigate = useNavigate();
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const [showLobbyCreator, setShowLobbyCreator] = useState(false);
   
-  // Ensure userHasPaid is always a boolean
   const userHasPaid = userProfile?.has_paid === true;
 
   useEffect(() => {
     if (user && !isLoading) {
-      // Always refresh profile when landing on this page
       refreshProfile();
-      console.log("Battle page - User payment status:", userHasPaid ? "Paid" : "Not paid");
+      console.log("Battle page - User:", user.id);
+      console.log("Battle page - User profile:", userProfile);
+      console.log("Battle page - Payment status:", userHasPaid ? "Paid" : "Not paid");
     }
   }, [user, isLoading]);
 
@@ -86,15 +86,34 @@ const Battle = () => {
   ];
 
   const getButtonLabel = (mode) => {
-    if (!mode.requiresAuth && !mode.paymentEnforced) return "Play Now";
-    if (mode.requiresAuth && !user) return "Login to Play";
-    if (mode.paymentEnforced && !userHasPaid) return "Unlock with Payment";
-    return "Play Now";
+    if (!mode.requiresAuth && !mode.paymentEnforced) {
+      return "Play Now"; // Free mode, no auth required
+    }
+    
+    if (mode.requiresAuth && !user) {
+      return "Login to Play"; // Auth required but not logged in
+    }
+    
+    if (mode.paymentEnforced && !userHasPaid) {
+      return "Unlock with Payment"; // Payment required but not paid
+    }
+    
+    return "Play Now"; // Auth requirements met and payment requirements met (or not needed)
   };
 
   const handleModeClick = (mode) => {
-    if (mode.requiresAuth && !user) return navigate('/login');
-    if (mode.paymentEnforced && !userHasPaid) return navigate('/profile');
+    if (mode.requiresAuth && !user) {
+      return navigate('/login');
+    }
+    
+    if (mode.paymentEnforced && !userHasPaid) {
+      toast({
+        title: "Payment Required",
+        description: "This game mode requires full access. Please upgrade your account.",
+      });
+      return navigate('/profile');
+    }
+    
     navigate(mode.path);
   };
 

@@ -22,12 +22,17 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
   onSongSelect,
   selectedSongs,
 }) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [songs, setSongs] = useState<Song[]>([]);
   const [playingPreview, setPlayingPreview] = useState<string | null>(null);
   const [previewPlayer, setPreviewPlayer] = useState<any | null>(null);
   const [ytApiReady, setYtApiReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Check if user has a music subscription
+  const hasMusicSubscription = userProfile?.music_subscription || false;
+  // For non-subscribers, check if they've reached the 5 song limit
+  const reachedSongLimit = !hasMusicSubscription && selectedSongs.length >= 5;
 
   useEffect(() => {
     if (open) {
@@ -182,21 +187,28 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
     if (!user) return;
 
     try {
-      if (selectedSongs.length >= 5 && !selectedSongs.includes(songId)) {
+      // Check if song is already selected (for toggling off)
+      const isSelected = selectedSongs.includes(songId);
+      
+      // If trying to add a new song but already at limit (for non-subscribers)
+      if (!isSelected && reachedSongLimit && !hasMusicSubscription) {
         toast({
           variant: "destructive",
           title: "Selection limit reached",
-          description: "You can only select up to 5 free songs. Subscribe for unlimited access!",
+          description: "You can only select up to 5 songs without a subscription. Upgrade for unlimited access!",
         });
         return;
       }
 
+      // Proceed with selection/deselection
       onSongSelect(songId);
+      
     } catch (error) {
+      console.error("Error selecting song:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to select song",
+        description: "Failed to update song selection",
       });
     }
   };
@@ -207,6 +219,18 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
         <DialogHeader>
           <DialogTitle>Browse Available Songs</DialogTitle>
         </DialogHeader>
+        
+        {!hasMusicSubscription && (
+          <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-3 mb-3">
+            <p className="text-sm">
+              Free users can select up to 5 songs. 
+              {reachedSongLimit && " You've reached your limit."} 
+              <Button variant="link" className="text-amber-400 p-0 h-auto" onClick={() => onOpenChange(false)}>
+                Subscribe for unlimited music
+              </Button>
+            </p>
+          </div>
+        )}
         
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-8">
@@ -244,7 +268,7 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
                       <Button
                         variant={selectedSongs.includes(song.id) ? "secondary" : "outline"}
                         onClick={() => handleSongSelect(song.id)}
-                        disabled={selectedSongs.length >= 5 && !selectedSongs.includes(song.id)}
+                        disabled={!hasMusicSubscription && reachedSongLimit && !selectedSongs.includes(song.id)}
                       >
                         {selectedSongs.includes(song.id) ? (
                           <Check className="h-4 w-4 mr-2" />

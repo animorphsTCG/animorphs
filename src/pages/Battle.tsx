@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,13 @@ const Battle = () => {
   const navigate = useNavigate();
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const [showLobbyCreator, setShowLobbyCreator] = useState(false);
-
+  
+  // Ensure userHasPaid is always a boolean
   const userHasPaid = userProfile?.has_paid === true;
 
   useEffect(() => {
     if (user && !isLoading) {
+      // Always refresh profile when landing on this page
       refreshProfile();
       console.log("Battle page - User payment status:", userHasPaid ? "Paid" : "Not paid");
     }

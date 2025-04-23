@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, Users, LogOut, UserCircle, Gamepad } from "lucide-react";
+import { Menu, X, User, Users, LogOut, UserCircle, Gamepad, Swords } from "lucide-react";
 import { useAuth } from "@/modules/auth";
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ import {
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, signOut, isLoading } = useAuth();
+  const { user, userProfile, signOut, isLoading } = useAuth();
   const navigate = useNavigate();
 
   const toggleMenu = () => {
@@ -26,6 +26,9 @@ const Navbar = () => {
     navigate(route);
     setIsMenuOpen(false);
   };
+
+  // Check if the user has paid to determine if multiplayer link should be shown
+  const showMultiplayerLink = user && userProfile?.has_paid === true;
 
   return (
     <nav className="bg-black/80 backdrop-blur-sm sticky top-0 z-50 border-b border-fantasy-accent/30">
@@ -53,6 +56,12 @@ const Navbar = () => {
             {user && (
               <Link to="/battle" className="text-white hover:text-fantasy-accent transition-colors font-medium">
                 Battle
+              </Link>
+            )}
+
+            {showMultiplayerLink && (
+              <Link to="/multiplayer" className="text-white hover:text-fantasy-accent transition-colors font-medium flex items-center">
+                <Swords className="mr-1 h-4 w-4" /> Multiplayer
               </Link>
             )}
             
@@ -121,6 +130,18 @@ const Navbar = () => {
             <Link to="/visitor-demo-battle" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
               <Gamepad className="mr-2 h-4 w-4" /> Demo Battle
             </Link>
+
+            {user && (
+              <Link to="/battle" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
+                <Gamepad className="mr-2 h-4 w-4" /> Battle
+              </Link>
+            )}
+
+            {showMultiplayerLink && (
+              <Link to="/multiplayer" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
+                <Swords className="mr-2 h-4 w-4" /> Multiplayer
+              </Link>
+            )}
             
             {user && (
               <>

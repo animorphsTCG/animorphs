@@ -15,6 +15,7 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentCancelled from "./pages/PaymentCancelled";
 import Battle from "./pages/Battle";
+import Multiplayer from "./pages/Multiplayer";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
@@ -41,6 +42,14 @@ export const Routes = () => {
         element={
           <ProtectedRoute>
             <Battle />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/multiplayer" 
+        element={
+          <ProtectedRoute>
+            <Multiplayer />
           </ProtectedRoute>
         } 
       />

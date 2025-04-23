@@ -29,8 +29,8 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
   const [ytApiReady, setYtApiReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Check if user has a music subscription
-  const hasMusicSubscription = userProfile?.music_subscription || false;
+  // Check if user has a music subscription - using the correct property from userProfile
+  const hasMusicSubscription = userProfile?.music_unlocked || false;
   // For non-subscribers, check if they've reached the 5 song limit
   const reachedSongLimit = !hasMusicSubscription && selectedSongs.length >= 5;
 

@@ -10,7 +10,7 @@ import SettingsControls from './SettingsControls';
 import SongCollection from './SongCollection';
 
 const MusicSettings: React.FC = () => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [selectedSongs, setSelectedSongs] = useState<string[]>([]);
   const [showSongBrowser, setShowSongBrowser] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
@@ -18,17 +18,68 @@ const MusicSettings: React.FC = () => {
     subscription_type: 'monthly' | 'yearly';
     end_date: string;
   } | null>(null);
+  const [hasSubscription, setHasSubscription] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchUserData();
     }
-  }, [user]);
+  }, [user, userProfile]);
+
+  // Check if user has a music subscription
+  const checkMusicSubscription = async (userId: string) => {
+    try {
+      console.log("Checking music subscription status in MusicSettings for user:", userId);
+      
+      // First check if music_unlocked is true in the profile
+      if (userProfile?.music_unlocked) {
+        console.log("User has music_unlocked in profile");
+        return true;
+      }
+      
+      // Then check for an active subscription in the music_subscriptions table
+      const { data, error } = await supabase
+        .from('music_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+        
+      if (error) {
+        if (error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error("Error checking music subscription:", error);
+        }
+        return false;
+      }
+      
+      if (data) {
+        const endDate = new Date(data.end_date);
+        const now = new Date();
+        
+        if (endDate > now) {
+          console.log("User has active music subscription until:", endDate.toISOString());
+          return true;
+        } else {
+          console.log("User has expired music subscription:", endDate.toISOString());
+        }
+      }
+      
+      return false;
+    } catch (err) {
+      console.error("Error in checkMusicSubscription:", err);
+      return false;
+    }
+  };
 
   const fetchUserData = async () => {
     if (!user) return;
 
     try {
+      // Check subscription status
+      const hasMusicSub = await checkMusicSubscription(user.id);
+      setHasSubscription(hasMusicSub);
+      
+      console.log("Music subscription status in MusicSettings:", hasMusicSub);
+      
       const { data: selections, error: selectionsError } = await supabase
         .from('user_song_selections')
         .select('song_id')
@@ -124,6 +175,7 @@ const MusicSettings: React.FC = () => {
         <SongCollection 
           selectedSongs={selectedSongs}
           subscription={subscription}
+          hasSubscription={hasSubscription}
           onBrowseSongs={() => setShowSongBrowser(true)}
           onUpgrade={() => setShowSubscription(true)}
         />
@@ -133,6 +185,7 @@ const MusicSettings: React.FC = () => {
           onOpenChange={setShowSongBrowser}
           onSongSelect={handleSongSelect}
           selectedSongs={selectedSongs}
+          hasSubscription={hasSubscription}
         />
 
         <MusicSubscription
@@ -152,4 +205,3 @@ const MusicSettings: React.FC = () => {
 };
 
 export default MusicSettings;
-

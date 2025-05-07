@@ -8,6 +8,7 @@ interface SongCollectionProps {
     subscription_type: 'monthly' | 'yearly';
     end_date: string;
   } | null;
+  hasSubscription?: boolean;
   onBrowseSongs: () => void;
   onUpgrade: () => void;
 }
@@ -15,6 +16,7 @@ interface SongCollectionProps {
 const SongCollection: React.FC<SongCollectionProps> = ({
   selectedSongs,
   subscription,
+  hasSubscription = false,
   onBrowseSongs,
   onUpgrade
 }) => {
@@ -26,11 +28,11 @@ const SongCollection: React.FC<SongCollectionProps> = ({
           <Button
             variant="outline"
             onClick={onBrowseSongs}
-            disabled={selectedSongs.length >= 5 && !subscription}
+            disabled={selectedSongs.length >= 5 && !hasSubscription}
           >
             Browse Songs
           </Button>
-          {!subscription && (
+          {!hasSubscription && (
             <Button
               variant="default"
               onClick={onUpgrade}
@@ -41,16 +43,30 @@ const SongCollection: React.FC<SongCollectionProps> = ({
         </div>
       </div>
 
-      {!subscription && selectedSongs.length < 5 && (
+      {!hasSubscription && selectedSongs.length < 5 && (
         <p className="text-sm text-muted-foreground">
           Select up to 5 free songs for your collection
         </p>
       )}
 
-      {subscription && (
+      {hasSubscription && (
+        <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-lg">
+          <p className="text-sm text-emerald-400">
+            {subscription ? 
+              `${subscription.subscription_type === 'monthly' ? 'Monthly' : 'Yearly'} subscription active until ${new Date(subscription.end_date).toLocaleDateString()}` : 
+              "Music subscription active"
+            }
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            You have access to all songs
+          </p>
+        </div>
+      )}
+      
+      {subscription && !hasSubscription && (
         <div className="bg-muted/50 p-3 rounded-lg">
           <p className="text-sm">
-            {subscription.subscription_type === 'monthly' ? 'Monthly' : 'Yearly'} subscription active
+            {subscription.subscription_type === 'monthly' ? 'Monthly' : 'Yearly'} subscription
           </p>
           <p className="text-xs text-muted-foreground">
             Expires: {new Date(subscription.end_date).toLocaleDateString()}
@@ -62,4 +78,3 @@ const SongCollection: React.FC<SongCollectionProps> = ({
 };
 
 export default SongCollection;
-

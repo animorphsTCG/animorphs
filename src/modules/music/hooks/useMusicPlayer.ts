@@ -6,14 +6,14 @@ import { toast } from '@/components/ui/use-toast';
 import { Song } from '@/types/music';
 
 export const useMusicPlayer = () => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [volume, setVolume] = useState(50);
   const [isMuted, setIsMuted] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ytApiReady, setYtApiReady] = useState(false);
@@ -23,7 +23,51 @@ export const useMusicPlayer = () => {
   useEffect(() => {
     loadYouTubeApi();
     fetchMusicData();
-  }, [user]);
+  }, [user, userProfile]);
+
+  // Check if user has a music subscription
+  const checkMusicSubscription = async (userId: string) => {
+    try {
+      console.log("Checking music subscription for user:", userId);
+      
+      // First check if music_unlocked is true in the profile
+      if (userProfile?.music_unlocked) {
+        console.log("User has music_unlocked in profile");
+        return true;
+      }
+      
+      // Then check for an active subscription in the music_subscriptions table
+      const { data, error } = await supabase
+        .from('music_subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+        
+      if (error) {
+        if (error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error("Error checking music subscription:", error);
+        }
+        return false;
+      }
+      
+      if (data) {
+        const endDate = new Date(data.end_date);
+        const now = new Date();
+        
+        if (endDate > now) {
+          console.log("User has active music subscription until:", endDate.toISOString());
+          return true;
+        } else {
+          console.log("User has expired music subscription:", endDate.toISOString());
+        }
+      }
+      
+      return false;
+    } catch (err) {
+      console.error("Error in checkMusicSubscription:", err);
+      return false;
+    }
+  };
 
   const loadYouTubeApi = () => {
     if (window.YT) {
@@ -96,6 +140,13 @@ export const useMusicPlayer = () => {
               musicEnabled: userSettings.music_enabled
             };
           }
+
+          // Check if user has music subscription
+          const hasMusicSub = await checkMusicSubscription(user.id);
+          setHasSubscription(hasMusicSub);
+          setIsPreviewMode(!hasMusicSub);
+          console.log("Music subscription status:", hasMusicSub, "isPreviewMode:", !hasMusicSub);
+          
         } catch (err) {
           console.error("Error fetching user-specific music data:", err);
           setError("Failed to fetch your music settings");
@@ -143,7 +194,6 @@ export const useMusicPlayer = () => {
 
       setVolume(settings.volume);
       setIsMuted(!settings.musicEnabled);
-      setIsPreviewMode(!hasSubscription);
       
     } catch (error) {
       console.error("Unexpected error fetching music data:", error);

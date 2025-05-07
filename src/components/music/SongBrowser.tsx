@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Play, Pause, Check, Loader2 } from "lucide-react";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/modules/auth"; // Updated import
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { Song } from "@/types/music";
@@ -14,6 +14,7 @@ interface SongBrowserProps {
   onOpenChange: (open: boolean) => void;
   onSongSelect: (songId: string) => void;
   selectedSongs: string[];
+  hasSubscription?: boolean;
 }
 
 const SongBrowser: React.FC<SongBrowserProps> = ({
@@ -21,16 +22,18 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
   onOpenChange,
   onSongSelect,
   selectedSongs,
+  hasSubscription = false
 }) => {
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
   const [songs, setSongs] = useState<Song[]>([]);
   const [playingPreview, setPlayingPreview] = useState<string | null>(null);
   const [previewPlayer, setPreviewPlayer] = useState<any | null>(null);
   const [ytApiReady, setYtApiReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Check if user has a music subscription - using the correct property from userProfile
-  const hasMusicSubscription = userProfile?.music_unlocked || false;
+  // Check if user has a music subscription (using passed prop)
+  const hasMusicSubscription = hasSubscription;
+  
   // For non-subscribers, check if they've reached the 5 song limit
   const reachedSongLimit = !hasMusicSubscription && selectedSongs.length >= 5;
 
@@ -187,6 +190,10 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
     if (!user) return;
 
     try {
+      console.log("Attempting to select song. Subscription status:", hasMusicSubscription);
+      console.log("Selected song count:", selectedSongs.length);
+      console.log("Song limit reached:", reachedSongLimit);
+      
       // Check if song is already selected (for toggling off)
       const isSelected = selectedSongs.includes(songId);
       

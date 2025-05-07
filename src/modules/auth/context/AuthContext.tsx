@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -37,9 +37,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const navigate = useNavigate();
+  
+  // Store channel and polling fallback
+  const paymentChannelRef = useRef<any>(null);
+  const pollingIntervalRef = useRef<any>(null);
+  const retryCountRef = useRef<number>(0);
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log("Fetching user profile for:", userId);
       setProfileError(null);
       const { data, error } = await supabase
         .from('profiles')
@@ -48,36 +54,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
+        console.error("Error fetching profile:", error);
         setProfileError(error.message);
         return null;
       }
       
-      // If the profile was found, check if they have paid
       if (data) {
+        // Check payment status with retry mechanism
         try {
-          const { data: paymentData } = await supabase
-            .from('payment_status')
-            .select('has_paid')
-            .eq('id', userId)
-            .single();
+          console.log("Checking payment status for user:", userId);
+          
+          let hasPaid = false;
+          let paymentError = null;
+          
+          // Try up to 3 times with exponential backoff
+          for (let attempt = 0; attempt < 3; attempt++) {
+            if (attempt > 0) {
+              console.log(`Payment status check attempt ${attempt + 1}/3`);
+              // Wait with exponential backoff before retrying
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 500));
+            }
             
+            try {
+              const { data: paymentData, error: paymentCheckError } = await supabase
+                .from('payment_status')
+                .select('has_paid')
+                .eq('id', userId)
+                .single();
+                
+              if (!paymentCheckError && paymentData) {
+                console.log("Payment status found:", paymentData);
+                hasPaid = paymentData.has_paid;
+                paymentError = null;
+                break; // Success, exit retry loop
+              } else {
+                paymentError = paymentCheckError;
+              }
+            } catch (err) {
+              console.error(`Payment check error (attempt ${attempt + 1})`, err);
+              paymentError = err;
+            }
+          }
+          
+          if (paymentError) {
+            console.warn("All payment status check attempts failed:", paymentError);
+          }
+          
           // Add the has_paid property to the profile
           const completeProfile = {
             ...data,
-            has_paid: paymentData?.has_paid || false
+            has_paid: hasPaid
           };
           
+          console.log("Setting user profile with payment status:", completeProfile);
           setUserProfile(completeProfile);
+
+          // Setup realtime listener for payment status changes
+          setupRealtimeListener(userId);
+          
+          // Setup polling fallback for real-time reliability
+          setupPollingFallback(userId);
+          
           return completeProfile;
         } catch (paymentError) {
-          console.error('Error checking payment status:', paymentError);
-          // Still return the profile even if payment status check fails
+          console.error("Exception checking payment:", paymentError);
           setUserProfile(data);
           return data;
         }
       }
-      
       return null;
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
@@ -88,19 +132,116 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshProfile = async () => {
     if (user?.id) {
+      console.log("Refreshing profile for user:", user.id);
       return await fetchUserProfile(user.id);
     }
     return null;
   };
 
+  /* ---- REALTIME ---- */
+  // Set up realtime listener for payment status changes
+  const setupRealtimeListener = (userId: string) => {
+    // Remove old channel if any
+    if (paymentChannelRef.current) {
+      supabase.removeChannel(paymentChannelRef.current);
+      paymentChannelRef.current = null;
+    }
+
+    console.log("Setting up realtime listener for payment status changes, user:", userId);
+    const channel = supabase
+      .channel(`payment-status-${userId}`)
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'payment_status',
+          filter: `id=eq.${userId}`
+        },
+        (payload) => {
+          console.log("Payment status changed:", payload);
+          setUserProfile(prev =>
+            prev ? { ...prev, has_paid: payload.new.has_paid } : prev
+          );
+          if (payload.new.has_paid) {
+            toast({
+              title: "Payment Status Updated",
+              description: "Your account now has full access to all game modes!",
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+        if (status !== 'SUBSCRIBED') {
+          // Fallback setup if subscription fails
+          console.log('Failed to subscribe to realtime, using polling fallback');
+          setupPollingFallback(userId);
+        }
+      });
+
+    paymentChannelRef.current = channel;
+  };
+
+  // Optional: polling fallback if Realtime is not working
+  const setupPollingFallback = (userId: string) => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    
+    console.log("Setting up polling fallback for user:", userId);
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('payment_status')
+          .select('has_paid')
+          .eq('id', userId)
+          .single();
+        
+        if (error) {
+          console.error("Polling error:", error);
+          return;
+        }
+        
+        if (userProfile && data && data.has_paid !== userProfile.has_paid) {
+          console.log("Polling detected payment status change:", data);
+          setUserProfile(prev => prev ? { ...prev, has_paid: data.has_paid } : prev);
+          
+          if (data.has_paid) {
+            toast({
+              title: "Payment Status Updated",
+              description: "Your account now has full access to all game modes!",
+            });
+          }
+        }
+      } catch (error) {
+        console.log('Payment polling error', error);
+      }
+    }, 30000); // Check every 30 seconds
+  };
+
+  // Clean up subscriptions and polling on unmount
   useEffect(() => {
-    // Set up auth state listener FIRST
+    return () => {
+      if (paymentChannelRef.current) {
+        supabase.removeChannel(paymentChannelRef.current);
+        paymentChannelRef.current = null;
+      }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // Set up auth state listener FIRST to avoid missing events
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log('Auth state changed:', event);
+        console.log("Auth state changed:", event);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-        
+
         if (event === 'SIGNED_IN' && currentSession?.user) {
           // Use setTimeout to prevent potential race conditions
           setTimeout(() => {
@@ -109,7 +250,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           toast({ title: 'Signed in successfully' });
           navigate(`/profile/${currentSession.user.id}`);
         } else if (event === 'SIGNED_OUT') {
+          // Clean up userProfile and channels
           setUserProfile(null);
+          if (paymentChannelRef.current) {
+            supabase.removeChannel(paymentChannelRef.current);
+            paymentChannelRef.current = null;
+          }
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
           toast({ title: 'Signed out successfully' });
           navigate('/login');
         } else if (event === 'PASSWORD_RECOVERY') {
@@ -120,10 +270,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log('Got session:', currentSession ? 'yes' : 'no');
+      console.log("Got session:", currentSession ? 'yes' : 'no');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      
+
       if (currentSession?.user) {
         fetchUserProfile(currentSession.user.id)
           .finally(() => setIsLoading(false));

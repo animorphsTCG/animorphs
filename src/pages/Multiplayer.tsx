@@ -7,14 +7,15 @@ import { toast } from "@/components/ui/use-toast";
 import { AnimorphCard } from "@/types";
 import { fetchAnimorphCards } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { Loader2, Check, X, Users, Clock } from "lucide-react";
+import { useAuth } from "@/modules/auth/context/AuthContext"; // Use the correct import
+import { Loader2, Check, X, Users, Clock, AlertCircle } from "lucide-react";
 
 const Multiplayer = () => {
   const navigate = useNavigate();
-  const { user, userProfile, isLoading } = useAuth();
+  const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const [allCards, setAllCards] = useState<AnimorphCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const [selectedCards, setSelectedCards] = useState<AnimorphCard[]>([]);
   const [inQueue, setInQueue] = useState(false);
   const [queueTime, setQueueTime] = useState(0);
@@ -42,17 +43,61 @@ const Multiplayer = () => {
     loadCards();
   }, []);
   
-  // Check if user is paid
+  // Check if user is paid with explicit verification
   useEffect(() => {
-    if (!isLoading && (!user || !userProfile?.has_paid)) {
-      toast({
-        title: "Access Denied",
-        description: "Multiplayer is only available for paid users.",
-        variant: "destructive",
-      });
-      navigate('/battle');
+    // Only run payment verification if user is logged in but not yet confirmed as paid
+    if (!isLoading && user && userProfile && !userProfile.has_paid) {
+      const verifyPaymentStatus = async () => {
+        setCheckingPayment(true);
+        console.log("Verifying payment status explicitly...");
+        
+        try {
+          // Explicit check against payment_status table
+          const { data, error } = await supabase
+            .from('payment_status')
+            .select('has_paid')
+            .eq('id', user.id)
+            .single();
+            
+          if (error) {
+            console.error("Error verifying payment status:", error);
+            throw error;
+          }
+          
+          const isPaid = data?.has_paid || false;
+          console.log("Explicit payment verification result:", isPaid);
+          
+          // If payment status doesn't match our current userProfile
+          if (isPaid !== !!userProfile?.has_paid) {
+            console.log("Payment status mismatch detected. Refreshing profile...");
+            await refreshProfile();
+          }
+          
+          if (!isPaid) {
+            console.log("User does not have paid access");
+            toast({
+              title: "Access Denied",
+              description: "Multiplayer is only available for paid users.",
+              variant: "destructive",
+            });
+            navigate('/battle');
+          }
+        } catch (error) {
+          console.error("Payment verification failed:", error);
+          toast({
+            title: "Error",
+            description: "There was a problem verifying your access. Please try again.",
+            variant: "destructive",
+          });
+          navigate('/battle');
+        } finally {
+          setCheckingPayment(false);
+        }
+      };
+      
+      verifyPaymentStatus();
     }
-  }, [user, userProfile, isLoading, navigate]);
+  }, [user, userProfile, isLoading, navigate, refreshProfile]);
   
   // Handle card selection
   const toggleCardSelection = (card: AnimorphCard) => {
@@ -256,10 +301,44 @@ const Multiplayer = () => {
     };
   }, [queueInterval, realtimeChannel]);
   
-  if (loading || isLoading) {
+  // If loading or checking payment, show loading state
+  if (loading || isLoading || checkingPayment) {
     return (
       <div className="container mx-auto py-12 px-4 flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-fantasy-accent" />
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-12 w-12 animate-spin text-fantasy-accent mb-2" />
+          <p className="text-lg text-fantasy-accent">
+            {loading ? "Loading cards..." : 
+             checkingPayment ? "Verifying payment status..." : 
+             "Loading..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Display access denied if user is not paid
+  if (userProfile && !userProfile.has_paid) {
+    return (
+      <div className="container mx-auto py-12 px-4">
+        <Card className="border-2 border-red-500 bg-black/70">
+          <CardHeader>
+            <CardTitle className="text-3xl font-fantasy text-red-500 flex items-center">
+              <AlertCircle className="mr-2 h-6 w-6" /> Access Denied
+            </CardTitle>
+            <CardDescription>
+              Multiplayer is only available for users who have purchased the full game.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4">
+              Please upgrade your account to access multiplayer features.
+            </p>
+            <Button className="fantasy-button" onClick={() => navigate('/battle')}>
+              Return to Battle Menu
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

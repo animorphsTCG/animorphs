@@ -1,9 +1,8 @@
-
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, User, Users, LogOut, UserCircle, Gamepad, Swords } from "lucide-react";
-import { useAuth } from "@/modules/auth";
+import { useAuth } from "@/modules/auth/context/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,

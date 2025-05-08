@@ -135,7 +135,7 @@ export const useOnlineUsers = () => {
       clearInterval(fetchInterval);
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user]); // Only depend on user to prevent unnecessary re-renders
   
   return { onlineUsers, loading, error };
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,26 +10,21 @@ import { supabase } from "@/lib/supabase";
 
 const Battle = () => {
   const navigate = useNavigate();
-  const { user, userProfile, isLoading, refreshProfile } = useAuth();
+  const { user, userProfile, isLoading } = useAuth();
   const [showLobbyCreator, setShowLobbyCreator] = useState(false);
-  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
   
   const userHasPaid = userProfile?.has_paid === true;
 
   useEffect(() => {
     if (user && !isLoading) {
-      // Refresh profile when the component mounts to ensure payment status is up-to-date
-      setIsRefreshingProfile(true);
-      refreshProfile().then(() => {
-        setIsRefreshingProfile(false);
-        console.log("Battle page - User:", user.id);
-        console.log("Battle page - User profile:", userProfile);
-        console.log("Battle page - Payment status:", userProfile?.has_paid ? "Paid" : "Not paid");
-      });
+      // Only log user data for debugging but don't trigger a refresh
+      console.log("Battle page - User:", user.id);
+      console.log("Battle page - User profile:", userProfile);
+      console.log("Battle page - Payment status:", userProfile?.has_paid ? "Paid" : "Not paid");
     }
-  }, [user, isLoading, refreshProfile]);
+  }, [user, isLoading, userProfile]); // Add userProfile to dependencies to properly react to changes
 
-  if (isLoading || isRefreshingProfile) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-80">
         <div className="text-xl text-fantasy-accent">Loading...</div>

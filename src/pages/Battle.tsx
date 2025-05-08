@@ -1,29 +1,36 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { useAuth } from "@/modules/auth"; // Updated import from modules
 import { UserPlus, Users, Trophy, Bot, Plus } from "lucide-react";
 import BattleLobbyCreator from "@/components/BattleLobbyCreator";
 import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase";
 
 const Battle = () => {
   const navigate = useNavigate();
   const { user, userProfile, isLoading, refreshProfile } = useAuth();
   const [showLobbyCreator, setShowLobbyCreator] = useState(false);
+  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
   
   const userHasPaid = userProfile?.has_paid === true;
 
   useEffect(() => {
     if (user && !isLoading) {
-      refreshProfile();
-      console.log("Battle page - User:", user.id);
-      console.log("Battle page - User profile:", userProfile);
-      console.log("Battle page - Payment status:", userHasPaid ? "Paid" : "Not paid");
+      // Refresh profile when the component mounts to ensure payment status is up-to-date
+      setIsRefreshingProfile(true);
+      refreshProfile().then(() => {
+        setIsRefreshingProfile(false);
+        console.log("Battle page - User:", user.id);
+        console.log("Battle page - User profile:", userProfile);
+        console.log("Battle page - Payment status:", userProfile?.has_paid ? "Paid" : "Not paid");
+      });
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, refreshProfile]);
 
-  if (isLoading) {
+  if (isLoading || isRefreshingProfile) {
     return (
       <div className="flex justify-center items-center h-80">
         <div className="text-xl text-fantasy-accent">Loading...</div>
@@ -147,7 +154,28 @@ const Battle = () => {
           <div className="mb-8 flex justify-center">
             <Button
               className="fantasy-button"
-              onClick={() => setShowLobbyCreator(true)}
+              onClick={() => {
+                if (!user) {
+                  toast({
+                    title: "Login Required",
+                    description: "You need to be logged in to create a battle lobby",
+                  });
+                  navigate('/login');
+                  return;
+                }
+                
+                if (!userHasPaid) {
+                  toast({
+                    title: "Full Access Required",
+                    description: "You need full access to create custom battle lobbies",
+                    variant: "destructive"
+                  });
+                  navigate('/profile');
+                  return;
+                }
+                
+                setShowLobbyCreator(true);
+              }}
             >
               <Plus className="mr-2 h-4 w-4" /> Create Custom Battle Lobby
             </Button>

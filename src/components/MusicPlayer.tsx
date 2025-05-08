@@ -12,12 +12,8 @@ import YouTubeEmbed from "./music/YouTubeEmbed";
 import { Button } from "@/components/ui/button";
 import { useMusicPlayer } from "@/modules/music/hooks/useMusicPlayer";
 
-declare global {
-  interface Window {
-    onYouTubeIframeAPIReady: () => void;
-    YT: any;
-  }
-}
+// Removed redundant declaration that was causing the type conflict
+// The global YouTube type definitions are now only defined in src/types/youtube.d.ts
 
 const MusicPlayer: React.FC = () => {
   const {

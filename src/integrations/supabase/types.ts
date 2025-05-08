@@ -93,6 +93,53 @@ export type Database = {
           },
         ]
       }
+      battle_invites: {
+        Row: {
+          battle_type: string
+          created_at: string
+          id: string
+          invited_by: string
+          is_accepted: boolean
+          is_rejected: boolean
+          lobby_id: string
+          lobby_name: string
+          responded_at: string | null
+          user_id: string
+        }
+        Insert: {
+          battle_type: string
+          created_at?: string
+          id?: string
+          invited_by: string
+          is_accepted?: boolean
+          is_rejected?: boolean
+          lobby_id: string
+          lobby_name: string
+          responded_at?: string | null
+          user_id: string
+        }
+        Update: {
+          battle_type?: string
+          created_at?: string
+          id?: string
+          invited_by?: string
+          is_accepted?: boolean
+          is_rejected?: boolean
+          lobby_id?: string
+          lobby_name?: string
+          responded_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_invites_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "battle_lobbies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       battle_lobbies: {
         Row: {
           battle_type: string
@@ -650,6 +697,27 @@ export type Database = {
           music_enabled?: boolean
           user_id?: string
           volume_level?: number
+        }
+        Relationships: []
+      }
+      user_presence: {
+        Row: {
+          created_at: string
+          last_seen: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          last_seen?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          last_seen?: string
+          status?: string
+          user_id?: string
         }
         Relationships: []
       }

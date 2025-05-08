@@ -73,17 +73,19 @@ export const useOnlineUsers = () => {
           throw error;
         }
         
-        const formattedUsers: OnlineUser[] = data.map(item => ({
-          id: item.user_id,
-          username: item.profiles?.username || 'Unknown User',
-          profile_image_url: item.profiles?.profile_image_url,
-          status: item.status,
-          has_paid: item.payment_status?.has_paid || false,
-          last_seen: item.last_seen
-        }));
-        
-        setOnlineUsers(formattedUsers);
-      } catch (err) {
+        if (data) {
+          const formattedUsers: OnlineUser[] = data.map(item => ({
+            id: item.user_id,
+            username: item.profiles?.username || 'Unknown User',
+            profile_image_url: item.profiles?.profile_image_url,
+            status: item.status,
+            has_paid: item.payment_status?.has_paid || false,
+            last_seen: item.last_seen
+          }));
+          
+          setOnlineUsers(formattedUsers);
+        }
+      } catch (err: any) {
         console.error("Error fetching online users:", err);
         setError(err.message || 'Failed to load online users');
       } finally {

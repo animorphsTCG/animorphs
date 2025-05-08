@@ -12,6 +12,20 @@ export interface OnlineUser {
   last_seen: string;
 }
 
+// Define TypeScript interface for the Supabase query result
+interface UserPresenceRow {
+  user_id: string;
+  last_seen: string;
+  status: 'online' | 'away' | 'busy';
+  profiles: {
+    username: string;
+    profile_image_url: string | null;
+  } | null;
+  payment_status: {
+    has_paid: boolean;
+  } | null;
+}
+
 export const useOnlineUsers = () => {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
@@ -74,7 +88,10 @@ export const useOnlineUsers = () => {
         }
         
         if (data) {
-          const formattedUsers: OnlineUser[] = data.map(item => ({
+          // Safely cast the data to the correct type
+          const typedData = data as unknown as UserPresenceRow[];
+          
+          const formattedUsers: OnlineUser[] = typedData.map(item => ({
             id: item.user_id,
             username: item.profiles?.username || 'Unknown User',
             profile_image_url: item.profiles?.profile_image_url,

@@ -79,10 +79,12 @@ export const useBattleLobby = (lobbyId?: string) => {
         
       if (membersError) throw membersError;
       
+      // Fix here: Correctly handle the profiles data structure
       const formattedMembers: LobbyMember[] = membersData.map(member => ({
         id: member.user_id,
-        username: member.profiles?.username || 'Unknown Player',
-        profile_image_url: member.profiles?.profile_image_url || null,
+        // Fix: Access profile data correctly with proper type handling
+        username: member.profiles ? member.profiles.username || 'Unknown Player' : 'Unknown Player',
+        profile_image_url: member.profiles ? member.profiles.profile_image_url || null : null,
         player_number: member.player_number,
         is_ready: member.is_ready,
         is_host: member.user_id === lobbyData.host_id,

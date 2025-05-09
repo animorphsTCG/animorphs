@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -8,8 +7,8 @@ import { AnimorphCard } from "@/types";
 import { fetchAnimorphCards } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/modules/auth/context/AuthContext"; // Use the correct import
-import { useMatchmaking } from "@/modules/battle/multi-player/hooks/useMatchmaking";
 import { Loader2, Check, X, Users, Clock, AlertCircle } from "lucide-react";
+import { BattleQueueUI } from "@/modules/battle/multi-player";
 
 const Multiplayer = () => {
   const navigate = useNavigate();
@@ -18,7 +17,7 @@ const Multiplayer = () => {
   const [loading, setLoading] = useState(true);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [selectedCards, setSelectedCards] = useState<AnimorphCard[]>([]);
-  const matchmaking = useMatchmaking();
+  const [showQueue, setShowQueue] = useState(false);
   
   // Format queue time
   const formatTime = (seconds: number) => {
@@ -100,8 +99,6 @@ const Multiplayer = () => {
   
   // Handle card selection
   const toggleCardSelection = (card: AnimorphCard) => {
-    if (matchmaking.inQueue) return; // Can't change deck when in queue
-    
     if (selectedCards.some(c => c.id === card.id)) {
       setSelectedCards(selectedCards.filter(c => c.id !== card.id));
     } else {
@@ -116,32 +113,18 @@ const Multiplayer = () => {
     }
   };
   
-  // Join/leave battle queue
-  const toggleQueue = async () => {
-    if (matchmaking.inQueue) {
-      await matchmaking.leaveQueue();
-    } else {
-      if (selectedCards.length !== 10) {
-        toast({
-          title: "Deck incomplete",
-          description: "Please select exactly 10 cards for your deck.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      const success = await matchmaking.joinQueue({
-        deckCards: selectedCards,
-        battleType: '1v1'
+  // Join battle queue
+  const startMatchmaking = async () => {
+    if (selectedCards.length !== 10) {
+      toast({
+        title: "Deck incomplete",
+        description: "Please select exactly 10 cards for your deck.",
+        variant: "destructive",
       });
-      
-      if (success) {
-        toast({
-          title: "Joined Queue",
-          description: "You have joined the battle queue. Waiting for opponent...",
-        });
-      }
+      return;
     }
+    
+    setShowQueue(true);
   };
   
   // If loading or checking payment, show loading state
@@ -190,144 +173,121 @@ const Multiplayer = () => {
     <div className="container mx-auto py-12 px-4">
       <h1 className="text-4xl font-fantasy text-fantasy-accent text-center mb-8">Multiplayer Battle</h1>
       
-      {/* Queue Status */}
-      {matchmaking.inQueue && (
-        <Card className="mb-8 border-2 border-fantasy-accent bg-black/70">
-          <CardHeader>
-            <CardTitle className="text-2xl font-fantasy text-fantasy-accent flex items-center">
-              <Clock className="mr-2 h-6 w-6" /> In Queue: {formatTime(matchmaking.queueTime)}
-            </CardTitle>
-            <CardDescription>
-              Waiting for an opponent to join. You can leave the queue at any time.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Button 
-              className="bg-red-600 hover:bg-red-700"
-              onClick={toggleQueue}
-              disabled={matchmaking.matchFound}
-            >
-              {matchmaking.matchFound ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <X className="mr-2 h-4 w-4" />
-              )}
-              {matchmaking.matchFound ? "Preparing Battle..." : "Leave Queue"}
-            </Button>
-          </CardFooter>
-        </Card>
-      )}
-      
-      {/* Card Selection */}
-      <Card className="border-2 border-fantasy-primary bg-black/70">
-        <CardHeader>
-          <CardTitle className="text-2xl font-fantasy text-fantasy-accent">
-            Select Your Battle Deck
-          </CardTitle>
-          <CardDescription>
-            Choose 10 cards for your deck. You can change your selection before joining the queue.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <h3 className="text-lg font-medium mb-2">Selected Cards: {selectedCards.length}/10</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-              {selectedCards.map((card) => (
-                <div 
-                  key={card.id} 
-                  className="border-2 border-fantasy-accent rounded-md p-2 cursor-pointer bg-fantasy-accent/10 hover:bg-fantasy-accent/20"
-                  onClick={() => toggleCardSelection(card)}
-                >
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-medium">{card.nft_name}</h4>
-                    <Check className="h-4 w-4 text-green-500" />
-                  </div>
-                  <p>Type: {card.animorph_type}</p>
-                  <div className="flex justify-between mt-1">
-                    <span>ATK: {card.attack}</span>
-                    <span>HP: {card.health}</span>
-                    <span>PWR: {card.power}</span>
-                  </div>
+      {/* Show Queue Component if matchmaking is started */}
+      {showQueue ? (
+        <div className="max-w-md mx-auto mb-8">
+          <BattleQueueUI 
+            selectedCards={selectedCards} 
+            battleType="1v1"
+            onCancel={() => setShowQueue(false)} 
+          />
+        </div>
+      ) : (
+        <>
+          {/* Card Selection */}
+          <Card className="border-2 border-fantasy-primary bg-black/70">
+            <CardHeader>
+              <CardTitle className="text-2xl font-fantasy text-fantasy-accent">
+                Select Your Battle Deck
+              </CardTitle>
+              <CardDescription>
+                Choose 10 cards for your deck. You can change your selection before joining the queue.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4">
+                <h3 className="text-lg font-medium mb-2">Selected Cards: {selectedCards.length}/10</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+                  {selectedCards.map((card) => (
+                    <div 
+                      key={card.id} 
+                      className="border-2 border-fantasy-accent rounded-md p-2 cursor-pointer bg-fantasy-accent/10 hover:bg-fantasy-accent/20"
+                      onClick={() => toggleCardSelection(card)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-medium">{card.nft_name}</h4>
+                        <Check className="h-4 w-4 text-green-500" />
+                      </div>
+                      <p>Type: {card.animorph_type}</p>
+                      <div className="flex justify-between mt-1">
+                        <span>ATK: {card.attack}</span>
+                        <span>HP: {card.health}</span>
+                        <span>PWR: {card.power}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {[...Array(Math.max(0, 10 - selectedCards.length))].map((_, i) => (
+                    <div key={i} className="border-2 border-dashed border-gray-500 rounded-md p-4 flex items-center justify-center">
+                      <span className="text-gray-500">Empty Slot</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {[...Array(Math.max(0, 10 - selectedCards.length))].map((_, i) => (
-                <div key={i} className="border-2 border-dashed border-gray-500 rounded-md p-4 flex items-center justify-center">
-                  <span className="text-gray-500">Empty Slot</span>
-                </div>
-              ))}
-            </div>
-          </div>
+              </div>
+              
+              <h3 className="text-lg font-medium mb-2">Available Cards</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 max-h-96 overflow-y-auto p-2">
+                {allCards
+                  .filter(card => !selectedCards.some(c => c.id === card.id))
+                  .map((card) => (
+                    <div 
+                      key={card.id} 
+                      className="border border-fantasy-primary rounded-md p-2 cursor-pointer hover:bg-black/40"
+                      onClick={() => toggleCardSelection(card)}
+                    >
+                      <h4 className="font-medium">{card.nft_name}</h4>
+                      <p>Type: {card.animorph_type}</p>
+                      <div className="flex justify-between mt-1">
+                        <span>ATK: {card.attack}</span>
+                        <span>HP: {card.health}</span>
+                        <span>PWR: {card.power}</span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+            
+            <CardFooter className="flex justify-between">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/battle')}
+              >
+                Back to Battle Modes
+              </Button>
+              
+              <Button
+                className="fantasy-button"
+                onClick={startMatchmaking}
+                disabled={selectedCards.length !== 10}
+              >
+                <Users className="mr-2 h-4 w-4" /> Start Matchmaking
+              </Button>
+            </CardFooter>
+          </Card>
           
-          <h3 className="text-lg font-medium mb-2">Available Cards</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 max-h-96 overflow-y-auto p-2">
-            {allCards
-              .filter(card => !selectedCards.some(c => c.id === card.id))
-              .map((card) => (
-                <div 
-                  key={card.id} 
-                  className="border border-fantasy-primary rounded-md p-2 cursor-pointer hover:bg-black/40"
-                  onClick={() => toggleCardSelection(card)}
-                >
-                  <h4 className="font-medium">{card.nft_name}</h4>
-                  <p>Type: {card.animorph_type}</p>
-                  <div className="flex justify-between mt-1">
-                    <span>ATK: {card.attack}</span>
-                    <span>HP: {card.health}</span>
-                    <span>PWR: {card.power}</span>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </CardContent>
-        
-        <CardFooter className="flex justify-between">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/battle')}
-          >
-            Back to Battle Modes
-          </Button>
-          
-          <Button
-            className="fantasy-button"
-            onClick={toggleQueue}
-            disabled={matchmaking.inQueue || selectedCards.length !== 10}
-          >
-            {matchmaking.inQueue ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> In Queue...
-              </>
-            ) : (
-              <>
-                <Users className="mr-2 h-4 w-4" /> Ready for Battle
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
-      
-      {/* Battle Information */}
-      <Card className="mt-8 border-2 border-fantasy-primary bg-black/70">
-        <CardHeader>
-          <CardTitle className="text-2xl font-fantasy text-fantasy-accent">
-            Multiplayer Battle Rules
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="list-disc pl-5 space-y-2">
-            <li>Select 10 cards for your battle deck</li>
-            <li>Click "Ready for Battle" to join the matchmaking queue</li>
-            <li>You'll be matched with another player of similar skill</li>
-            <li>Battle results affect your profile stats:
-              <ul className="list-disc pl-5 mt-2">
-                <li><span className="text-green-500 font-medium">Win:</span> +1 Match Point (MP) and +1 Leaderboard Point (LBP)</li>
-                <li><span className="text-red-500 font-medium">Loss:</span> +1 Match Point (MP)</li>
-                <li><span className="text-yellow-500 font-medium">Tie:</span> Both players receive +1 Match Point (MP)</li>
+          {/* Battle Information */}
+          <Card className="mt-8 border-2 border-fantasy-primary bg-black/70">
+            <CardHeader>
+              <CardTitle className="text-2xl font-fantasy text-fantasy-accent">
+                Multiplayer Battle Rules
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>Select 10 cards for your battle deck</li>
+                <li>Click "Start Matchmaking" to join the matchmaking queue</li>
+                <li>You'll be matched with another player of similar skill</li>
+                <li>Battle results affect your profile stats:
+                  <ul className="list-disc pl-5 mt-2">
+                    <li><span className="text-green-500 font-medium">Win:</span> +1 Match Point (MP) and +1 Leaderboard Point (LBP)</li>
+                    <li><span className="text-red-500 font-medium">Loss:</span> +1 Match Point (MP)</li>
+                    <li><span className="text-yellow-500 font-medium">Tie:</span> Both players receive +1 Match Point (MP)</li>
+                  </ul>
+                </li>
               </ul>
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 };

@@ -33,7 +33,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   maxPlayers
 }) => {
   const { user } = useAuth();
-  const { onlineUsers, loading, error } = useOnlineUsers();
+  const { onlineUsers, loading, error, connectionStatus, refreshUsers } = useOnlineUsers(10000); // 10 second refresh
   const [paidUsers, setPaidUsers] = useState<OnlineUser[]>([]);
   const [sentInvites, setSentInvites] = useState<Record<string, boolean>>({});
   const [participantsCount, setParticipantsCount] = useState<number>(1); // Host is already in
@@ -140,10 +140,9 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
           }, { onConflict: 'user_id' });
       }
       
-      // Wait briefly to let other systems update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Refresh the online users list
+      refreshUsers();
       
-      // The onlineUsers hook will handle the refreshing
     } catch (err) {
       console.error("Error refreshing user presence:", err);
     } finally {
@@ -166,9 +165,16 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
         
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {paidUsers.length === 0 ? "No paid users online" : `${paidUsers.length} paid ${paidUsers.length === 1 ? 'user' : 'users'} online`}
-            </p>
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full ${
+                connectionStatus === 'connected' ? 'bg-green-500' :
+                connectionStatus === 'connecting' ? 'bg-yellow-500' :
+                'bg-red-500'
+              }`}></div>
+              <p className="text-sm text-muted-foreground">
+                {paidUsers.length === 0 ? "No paid users online" : `${paidUsers.length} paid ${paidUsers.length === 1 ? 'user' : 'users'} online`}
+              </p>
+            </div>
             <Button 
               size="sm" 
               variant="outline" 

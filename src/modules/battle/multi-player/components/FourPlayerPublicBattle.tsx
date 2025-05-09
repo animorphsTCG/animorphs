@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -255,3 +256,5 @@ export const FourPlayerPublicBattle = () => {
     </div>
   );
 };
+
+export default FourPlayerPublicBattle;

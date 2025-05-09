@@ -231,3 +231,5 @@ export const ThreePlayerBattle = () => {
     </div>
   );
 };
+
+export default ThreePlayerBattle;

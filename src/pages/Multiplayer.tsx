@@ -8,19 +8,24 @@ import { AnimorphCard } from "@/types";
 import { fetchAnimorphCards } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/modules/auth/context/AuthContext"; // Use the correct import
+import { useMatchmaking } from "@/modules/battle/multi-player/hooks/useMatchmaking";
 import { Loader2, Check, X, Users, Clock, AlertCircle } from "lucide-react";
 
 const Multiplayer = () => {
   const navigate = useNavigate();
-  const { user, userProfile, isLoading, refreshProfile } = useAuth();
+  const { user, userProfile, isLoading } = useAuth();
   const [allCards, setAllCards] = useState<AnimorphCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [selectedCards, setSelectedCards] = useState<AnimorphCard[]>([]);
-  const [inQueue, setInQueue] = useState(false);
-  const [queueTime, setQueueTime] = useState(0);
-  const [queueInterval, setQueueInterval] = useState<NodeJS.Timeout | null>(null);
-  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
+  const matchmaking = useMatchmaking();
+  
+  // Format queue time
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
   
   // Load cards on component mount
   useEffect(() => {
@@ -67,12 +72,6 @@ const Multiplayer = () => {
           const isPaid = data?.has_paid || false;
           console.log("Explicit payment verification result:", isPaid);
           
-          // If payment status doesn't match our current userProfile
-          if (isPaid !== !!userProfile?.has_paid) {
-            console.log("Payment status mismatch detected. Refreshing profile...");
-            await refreshProfile();
-          }
-          
           if (!isPaid) {
             console.log("User does not have paid access");
             toast({
@@ -97,11 +96,11 @@ const Multiplayer = () => {
       
       verifyPaymentStatus();
     }
-  }, [user, userProfile, isLoading, navigate, refreshProfile]);
+  }, [user, userProfile, isLoading, navigate]);
   
   // Handle card selection
   const toggleCardSelection = (card: AnimorphCard) => {
-    if (inQueue) return; // Can't change deck when in queue
+    if (matchmaking.inQueue) return; // Can't change deck when in queue
     
     if (selectedCards.some(c => c.id === card.id)) {
       setSelectedCards(selectedCards.filter(c => c.id !== card.id));
@@ -119,36 +118,9 @@ const Multiplayer = () => {
   
   // Join/leave battle queue
   const toggleQueue = async () => {
-    if (!user) return;
-    
-    if (inQueue) {
-      // Leave queue
-      if (queueInterval) {
-        clearInterval(queueInterval);
-        setQueueInterval(null);
-      }
-      
-      if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
-        setRealtimeChannel(null);
-      }
-      
-      // Update server-side queue status
-      try {
-        await supabase.from('battle_lobbies').delete().eq('host_id', user.id).eq('status', 'waiting');
-        
-        toast({
-          title: "Left Queue",
-          description: "You have left the battle queue.",
-        });
-      } catch (error) {
-        console.error("Error leaving queue:", error);
-      }
-      
-      setInQueue(false);
-      setQueueTime(0);
+    if (matchmaking.inQueue) {
+      await matchmaking.leaveQueue();
     } else {
-      // Join queue
       if (selectedCards.length !== 10) {
         toast({
           title: "Deck incomplete",
@@ -158,148 +130,19 @@ const Multiplayer = () => {
         return;
       }
       
-      try {
-        // Create a lobby for matchmaking
-        const { data, error } = await supabase.from('battle_lobbies').insert({
-          name: `${userProfile?.username || user.email}'s Queue`,
-          host_id: user.id,
-          max_players: 2,
-          status: 'waiting',
-          battle_type: '1v1',
-          requires_payment: true
-        }).select();
-        
-        if (error) throw error;
-        
-        const lobbyId = data?.[0]?.id;
-        
-        // Join as participant
-        if (lobbyId) {
-          await supabase.from('lobby_participants').insert({
-            lobby_id: lobbyId,
-            user_id: user.id,
-            is_ready: true,
-            player_number: 1
-          });
-          
-          // Set up realtime subscription to listen for opponent
-          const channel = supabase.channel(`lobby-${lobbyId}`)
-            .on('postgres_changes', {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'lobby_participants',
-              filter: `lobby_id=eq.${lobbyId}`,
-            }, (payload) => {
-              // Check if this is a different user joining (not us)
-              if (payload.new && payload.new.user_id !== user.id) {
-                // Handle opponent joining
-                handleOpponentFound(lobbyId);
-              }
-            })
-            .on('postgres_changes', {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'battle_lobbies',
-              filter: `id=eq.${lobbyId}`,
-            }, (payload) => {
-              // Check if lobby status changed to 'in_progress'
-              if (payload.new && payload.new.status === 'in_progress') {
-                // Redirect to battle
-                navigate(`/battle/multiplayer/${lobbyId}`);
-              }
-            })
-            .subscribe();
-          
-          setRealtimeChannel(channel);
-        }
-        
-        // Start queue timer
-        const interval = setInterval(() => {
-          setQueueTime(prev => prev + 1);
-        }, 1000);
-        setQueueInterval(interval);
-        
+      const success = await matchmaking.joinQueue({
+        deckCards: selectedCards,
+        battleType: '1v1'
+      });
+      
+      if (success) {
         toast({
           title: "Joined Queue",
           description: "You have joined the battle queue. Waiting for opponent...",
         });
-        
-        setInQueue(true);
-        
-        // For demonstration purposes - auto-find match after a random time (5-15s)
-        // In a real app, this would be server-side matchmaking
-        if (process.env.NODE_ENV === 'development') {
-          setTimeout(() => {
-            // Simulate finding opponent
-            handleOpponentFound(lobbyId);
-          }, Math.floor(Math.random() * 10000) + 5000);
-        }
-        
-      } catch (error) {
-        console.error("Error joining queue:", error);
-        toast({
-          title: "Error",
-          description: "Failed to join queue. Please try again.",
-          variant: "destructive",
-        });
       }
     }
   };
-  
-  const handleOpponentFound = async (lobbyId: string) => {
-    // Clean up timer
-    if (queueInterval) {
-      clearInterval(queueInterval);
-      setQueueInterval(null);
-    }
-    
-    toast({
-      title: "Opponent Found!",
-      description: "Preparing battle...",
-    });
-    
-    // In a real implementation, you'd wait for both players to be ready
-    // Then the server would create the battle session
-    // For this demo, we'll navigate to the battle page
-    try {
-      // Update lobby status
-      await supabase.from('battle_lobbies')
-        .update({ status: 'in_progress' })
-        .eq('id', lobbyId);
-      
-      // Create battle session
-      const { data: sessionData } = await supabase.from('battle_sessions').insert({
-        battle_type: '1v1',
-        status: 'active'
-      }).select();
-      
-      if (sessionData && sessionData[0]) {
-        // Navigate to battle
-        navigate(`/battle/multiplayer/${lobbyId}`);
-      }
-    } catch (error) {
-      console.error("Error preparing battle:", error);
-    }
-  };
-  
-  // Format queue time
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-  
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (queueInterval) {
-        clearInterval(queueInterval);
-      }
-      if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
-      }
-    };
-  }, [queueInterval, realtimeChannel]);
   
   // If loading or checking payment, show loading state
   if (loading || isLoading || checkingPayment) {
@@ -348,11 +191,11 @@ const Multiplayer = () => {
       <h1 className="text-4xl font-fantasy text-fantasy-accent text-center mb-8">Multiplayer Battle</h1>
       
       {/* Queue Status */}
-      {inQueue && (
+      {matchmaking.inQueue && (
         <Card className="mb-8 border-2 border-fantasy-accent bg-black/70">
           <CardHeader>
             <CardTitle className="text-2xl font-fantasy text-fantasy-accent flex items-center">
-              <Clock className="mr-2 h-6 w-6" /> In Queue: {formatTime(queueTime)}
+              <Clock className="mr-2 h-6 w-6" /> In Queue: {formatTime(matchmaking.queueTime)}
             </CardTitle>
             <CardDescription>
               Waiting for an opponent to join. You can leave the queue at any time.
@@ -362,8 +205,14 @@ const Multiplayer = () => {
             <Button 
               className="bg-red-600 hover:bg-red-700"
               onClick={toggleQueue}
+              disabled={matchmaking.matchFound}
             >
-              <X className="mr-2 h-4 w-4" /> Leave Queue
+              {matchmaking.matchFound ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <X className="mr-2 h-4 w-4" />
+              )}
+              {matchmaking.matchFound ? "Preparing Battle..." : "Leave Queue"}
             </Button>
           </CardFooter>
         </Card>
@@ -442,9 +291,9 @@ const Multiplayer = () => {
           <Button
             className="fantasy-button"
             onClick={toggleQueue}
-            disabled={inQueue || selectedCards.length !== 10}
+            disabled={matchmaking.inQueue || selectedCards.length !== 10}
           >
-            {inQueue ? (
+            {matchmaking.inQueue ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> In Queue...
               </>

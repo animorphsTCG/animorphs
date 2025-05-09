@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, UserCheck, Users, Check, X } from "lucide-react";
+import { Loader2, UserCheck, Users, Check, X, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/modules/auth";
 import useOnlineUsers, { OnlineUser } from "@/hooks/useOnlineUsers";
@@ -33,17 +33,23 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   maxPlayers
 }) => {
   const { user } = useAuth();
-  const { onlineUsers, loading } = useOnlineUsers();
+  const { onlineUsers, loading, error } = useOnlineUsers();
   const [paidUsers, setPaidUsers] = useState<OnlineUser[]>([]);
   const [sentInvites, setSentInvites] = useState<Record<string, boolean>>({});
   const [participantsCount, setParticipantsCount] = useState<number>(1); // Host is already in
+  const [refreshingUsers, setRefreshingUsers] = useState(false);
   
   // Filter paid users only
   useEffect(() => {
     if (onlineUsers) {
-      setPaidUsers(onlineUsers.filter(user => user.has_paid));
+      // Filter out current user and only include paid users
+      const filteredUsers = onlineUsers.filter(
+        onlineUser => onlineUser.has_paid && onlineUser.id !== user?.id
+      );
+      console.log("Filtered paid online users:", filteredUsers);
+      setPaidUsers(filteredUsers);
     }
-  }, [onlineUsers]);
+  }, [onlineUsers, user]);
   
   // Get current lobby participants count
   useEffect(() => {
@@ -59,6 +65,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
         if (error) throw error;
         
         setParticipantsCount(data?.length || 1);
+        console.log(`Lobby ${lobbyId} has ${data?.length || 0} participants`);
       } catch (err) {
         console.error("Error fetching participants:", err);
       }
@@ -118,6 +125,35 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
     }
   };
   
+  const manualRefresh = async () => {
+    setRefreshingUsers(true);
+    
+    try {
+      // Force update presence for current user
+      if (user) {
+        await supabase
+          .from('user_presence')
+          .upsert({
+            user_id: user.id,
+            last_seen: new Date().toISOString(),
+            status: 'online'
+          }, { onConflict: 'user_id' });
+      }
+      
+      // Wait briefly to let other systems update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // The onlineUsers hook will handle the refreshing
+    } catch (err) {
+      console.error("Error refreshing user presence:", err);
+    } finally {
+      // Give a bit of time for visual feedback
+      setTimeout(() => {
+        setRefreshingUsers(false);
+      }, 500);
+    }
+  };
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -129,7 +165,26 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
         </DialogHeader>
         
         <div className="space-y-4">
-          {loading ? (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {paidUsers.length === 0 ? "No paid users online" : `${paidUsers.length} paid ${paidUsers.length === 1 ? 'user' : 'users'} online`}
+            </p>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={manualRefresh} 
+              disabled={refreshingUsers}
+            >
+              {refreshingUsers ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span className="ml-1">Refresh</span>
+            </Button>
+          </div>
+          
+          {loading || refreshingUsers ? (
             <div className="py-8 flex justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-fantasy-accent" />
             </div>
@@ -174,6 +229,13 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
             <div className="py-6 text-center text-muted-foreground">
               <Users className="mx-auto h-12 w-12 opacity-30 mb-2" />
               <p>No other paid users are online right now</p>
+              <p className="text-sm mt-2">Make sure your friends login with paid accounts to play together</p>
+            </div>
+          )}
+          
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md">
+              <p className="text-sm text-red-500">Error: {error}</p>
             </div>
           )}
           

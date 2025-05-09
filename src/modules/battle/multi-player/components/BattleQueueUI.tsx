@@ -1,21 +1,23 @@
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Loader2, X, Users, AlertTriangle } from 'lucide-react';
+import { Loader2, Clock, Users, Signal, Zap } from 'lucide-react';
 import { useBattleQueue } from '../hooks/useBattleQueue';
 import { AnimorphCard } from '@/types';
 
 interface BattleQueueUIProps {
   selectedCards: AnimorphCard[];
   battleType: '1v1' | '3player' | '4player';
-  onCancel: () => void;
+  onCancel?: () => void;
+  metadata?: Record<string, any>;
 }
 
-export const BattleQueueUI: React.FC<BattleQueueUIProps> = ({ 
-  selectedCards, 
-  battleType, 
-  onCancel 
+export const BattleQueueUI: React.FC<BattleQueueUIProps> = ({
+  selectedCards,
+  battleType,
+  onCancel,
+  metadata = {},
 }) => {
   const {
     inQueue,
@@ -28,104 +30,107 @@ export const BattleQueueUI: React.FC<BattleQueueUIProps> = ({
   } = useBattleQueue();
   
   // Join queue on component mount
-  React.useEffect(() => {
-    if (!inQueue && selectedCards.length === 10) {
+  useEffect(() => {
+    if (selectedCards.length === 10) {
       joinQueue({
         battleType,
-        deckCards: selectedCards
+        deckCards: selectedCards,
+        metadata
       });
     }
   }, []);
   
-  // Handle cancel button click
+  // Return to card selection if canceled
   const handleCancel = async () => {
-    if (inQueue) {
-      await leaveQueue();
-    }
-    onCancel();
+    await leaveQueue();
+    if (onCancel) onCancel();
   };
   
+  // Get connection status info
+  const getConnectionStatusInfo = () => {
+    switch (presenceStatus) {
+      case 'connected':
+        return { icon: <Signal className="h-4 w-4 text-green-500" />, text: 'Connected' };
+      case 'connecting':
+        return { icon: <Signal className="h-4 w-4 text-yellow-500" />, text: 'Connecting...' };
+      case 'disconnected':
+        return { icon: <Signal className="h-4 w-4 text-red-500" />, text: 'Disconnected' };
+      default:
+        return { icon: <Signal className="h-4 w-4 text-gray-500" />, text: 'Unknown' };
+    }
+  };
+  
+  const connectionStatus = getConnectionStatusInfo();
+  
   return (
-    <Card className="border-2 border-fantasy-accent bg-black/70">
-      <CardHeader>
-        <CardTitle className="text-2xl font-fantasy text-fantasy-accent flex items-center">
-          <Clock className="mr-2 h-6 w-6" /> 
-          Battle Queue: {formattedQueueTime()}
-        </CardTitle>
-        <CardDescription>
-          {matchFound 
-            ? "Match found! Preparing battle..." 
-            : `Searching for ${battleType === '1v1' ? 'an opponent' : 'opponents'}...`}
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent>
-        {/* Connection Status */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className={`h-3 w-3 rounded-full ${
-            presenceStatus === 'connected' ? 'bg-green-500' :
-            presenceStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-            'bg-red-500'
-          }`}></div>
-          <span className="text-sm">
-            {presenceStatus === 'connected' ? 'Connected to matchmaking server' :
-             presenceStatus === 'connecting' ? 'Connecting to matchmaking server...' :
-             'Disconnected from matchmaking server'}
-          </span>
-        </div>
-        
-        {/* Queue Status */}
-        <div className="bg-gray-900/50 p-4 rounded-md">
-          <div className="flex items-center mb-2">
-            <Users className="mr-2 h-5 w-5 text-fantasy-accent" />
-            <span className="font-medium">Battle Type: </span>
-            <span className="ml-2">
-              {battleType === '1v1' ? '1v1 Battle' : 
-               battleType === '3player' ? '3-Player Tournament' : 
-               '4-Player Battle'}
-            </span>
-          </div>
-          
-          <div className="mb-2">
-            <p className="text-sm text-gray-400">
-              {battleType === '1v1' 
-                ? "You'll be matched against another player with similar stats." 
-                : battleType === '3player'
-                ? "You'll be matched with 2 other players for a 3-way tournament."
-                : "You'll be matched with 3 other players for a 4-player battle."}
+    <Card className="bg-black/70 border-2 border-fantasy-primary">
+      <CardContent className="p-6 flex flex-col items-center">
+        {matchFound ? (
+          <div className="text-center py-8">
+            <Zap className="h-16 w-16 text-fantasy-accent mx-auto mb-4" />
+            <h2 className="text-2xl font-fantasy text-fantasy-accent mb-2">
+              Match Found!
+            </h2>
+            <p className="text-white mb-4">
+              Preparing your battle...
             </p>
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
           </div>
-          
-          {/* Estimated Wait Time */}
-          <div className="text-sm text-gray-400">
-            <p>Estimated wait time: 1-3 minutes</p>
-            <div className="w-full bg-gray-700 h-1.5 mt-1.5 rounded-full overflow-hidden">
-              <div className="bg-fantasy-accent h-full animate-pulse" style={{width: '60%'}}></div>
+        ) : (
+          <>
+            <div className="w-24 h-24 rounded-full bg-fantasy-primary/20 flex items-center justify-center mb-6">
+              <Loader2 className="h-12 w-12 animate-spin text-fantasy-accent" />
             </div>
-          </div>
-        </div>
-        
-        {/* Error Message */}
-        {error && (
-          <div className="mt-4 p-3 bg-red-900/30 border border-red-500/30 rounded-md flex items-center">
-            <AlertTriangle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
-            <p className="text-sm text-red-400">{error}</p>
-          </div>
+            
+            <h2 className="text-2xl font-fantasy text-fantasy-accent mb-1">
+              Finding Opponents
+            </h2>
+            
+            <p className="text-gray-300 text-center mb-6">
+              Searching for {battleType === '1v1' ? '1v1' : 
+                            battleType === '3player' ? '3-player' : 
+                            '4-player'} battle opponents...
+            </p>
+            
+            <div className="flex items-center justify-center space-x-2 mb-6">
+              <Clock className="h-5 w-5 text-fantasy-accent" />
+              <span className="text-xl font-semibold">{formattedQueueTime()}</span>
+            </div>
+            
+            <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden mb-6">
+              <div 
+                className="bg-fantasy-accent h-full rounded-full animate-pulse"
+                style={{ width: `${Math.min(100, parseInt(formattedQueueTime()) * 3)}%` }}  
+              ></div>
+            </div>
+            
+            <div className="flex justify-between items-center w-full text-sm text-gray-400 mb-2">
+              <div className="flex items-center">
+                <Users className="h-4 w-4 mr-1" />
+                <span>{battleType} Battle</span>
+              </div>
+              
+              <div className="flex items-center">
+                {connectionStatus.icon}
+                <span className="ml-1">{connectionStatus.text}</span>
+              </div>
+            </div>
+            
+            {error && (
+              <p className="text-red-500 text-sm mb-4">Error: {error}</p>
+            )}
+          </>
         )}
       </CardContent>
       
       <CardFooter>
         <Button 
-          className="bg-red-600 hover:bg-red-700 w-full"
+          variant="outline" 
+          className="w-full"
           onClick={handleCancel}
           disabled={matchFound}
         >
-          {matchFound ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <X className="mr-2 h-4 w-4" />
-          )}
-          {matchFound ? "Preparing Battle..." : "Cancel Queue"}
+          {matchFound ? "Preparing Battle..." : "Cancel"}
         </Button>
       </CardFooter>
     </Card>

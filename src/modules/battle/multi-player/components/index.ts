@@ -1,4 +1,5 @@
 
+// Update the index.ts file to use named exports instead of default exports
 export { MultiplayerBattle } from './MultiplayerBattle';
 export { WaitingRoom } from './WaitingRoom';
 export { FourPlayerPublicBattle } from './FourPlayerPublicBattle';

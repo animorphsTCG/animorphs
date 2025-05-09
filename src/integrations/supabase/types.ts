@@ -148,6 +148,7 @@ export type Database = {
           host_id: string
           id: string
           max_players: number
+          metadata: Json | null
           name: string
           requires_payment: boolean | null
           started_at: string | null
@@ -163,6 +164,7 @@ export type Database = {
           host_id: string
           id?: string
           max_players?: number
+          metadata?: Json | null
           name: string
           requires_payment?: boolean | null
           started_at?: string | null
@@ -178,6 +180,7 @@ export type Database = {
           host_id?: string
           id?: string
           max_players?: number
+          metadata?: Json | null
           name?: string
           requires_payment?: boolean | null
           started_at?: string | null
@@ -267,6 +270,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      battle_queue: {
+        Row: {
+          battle_type: string
+          created_at: string
+          deck_data: Json | null
+          id: string
+          matched_at: string | null
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          battle_type?: string
+          created_at?: string
+          deck_data?: Json | null
+          id?: string
+          matched_at?: string | null
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          battle_type?: string
+          created_at?: string
+          deck_data?: Json | null
+          id?: string
+          matched_at?: string | null
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       battle_results: {
         Row: {
@@ -466,6 +499,7 @@ export type Database = {
           id: string
           is_ready: boolean
           join_time: string
+          left_at: string | null
           lobby_id: string
           player_number: number
           user_id: string
@@ -474,6 +508,7 @@ export type Database = {
           id?: string
           is_ready?: boolean
           join_time?: string
+          left_at?: string | null
           lobby_id: string
           player_number: number
           user_id: string
@@ -482,6 +517,7 @@ export type Database = {
           id?: string
           is_ready?: boolean
           join_time?: string
+          left_at?: string | null
           lobby_id?: string
           player_number?: number
           user_id?: string
@@ -779,6 +815,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      find_user_active_battle: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
       get_battle_participants: {
         Args: { battle_id: string }
         Returns: {
@@ -805,6 +845,14 @@ export type Database = {
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      process_matchmaking: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          lobby_id: string
+          user_ids: string[]
+          battle_type: string
+        }[]
       }
       user_in_battle: {
         Args: { user_id: string }

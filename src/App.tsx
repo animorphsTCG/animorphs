@@ -19,7 +19,7 @@ import About from './pages/About';
 
 // Battle mode components
 import OneVOneBattle from './modules/battle/single-player/one-v-one/OneVOneBattle';
-import { 
+import {
   MultiplayerBattle,
   ThreePlayerBattle,
   FourPlayerPublicBattle,
@@ -63,7 +63,7 @@ function App() {
               <Route path="/3-player-battle/:battleId" element={<ThreePlayerBattle />} />
               <Route path="/4-player-public/:battleId" element={<FourPlayerPublicBattle />} />
               <Route path="/4-player-user-lobby/:battleId" element={<FourPlayerUserBattle />} />
-              <Route path="/battle-lobby/:lobbyId" element={<WaitingRoom />} />
+              <Route path="/battle-lobby/:lobbyId" element={<WaitingRoom lobbyId="" />} />
               <Route path="/deck-builder" element={<DeckBuilder />} />
               <Route path="/about" element={<About />} />
             </Routes>

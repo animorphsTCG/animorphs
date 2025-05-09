@@ -17,12 +17,14 @@ export const ThreePlayerBattle = () => {
   const [players, setPlayers] = useState<any[]>([]);
   
   const { 
-    battleState, 
-    playerDecks, 
-    currentTurn,
+    currentRound,
     isUserTurn,
-    playCard,
-    selectTarget
+    participants,
+    playerDecks,
+    winner,
+    handleStatSelection,
+    handleCardPlay,
+    handleTargetSelection
   } = useBattleMultiplayer(battleId);
   
   useEffect(() => {
@@ -87,6 +89,9 @@ export const ThreePlayerBattle = () => {
     );
   }
   
+  // Get the current turn player ID
+  const currentTurnPlayerId = participants.find(p => p.user_id && isUserTurn)?.user_id || null;
+  
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-fantasy text-fantasy-accent mb-6 text-center">
@@ -96,14 +101,14 @@ export const ThreePlayerBattle = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Player Columns */}
         {players.map((player) => (
-          <Card key={player.id} className={`bg-black/50 border-2 ${currentTurn === player.user_id ? 'border-fantasy-accent' : 'border-fantasy-primary/40'}`}>
+          <Card key={player.id} className={`bg-black/50 border-2 ${currentTurnPlayerId === player.user_id ? 'border-fantasy-accent' : 'border-fantasy-primary/40'}`}>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <div className="w-8 h-8 rounded-full bg-fantasy-primary flex items-center justify-center mr-2">
                   {player.player_number}
                 </div>
                 {player.profiles?.username || `Player ${player.player_number}`}
-                {currentTurn === player.user_id && (
+                {currentTurnPlayerId === player.user_id && (
                   <span className="ml-2 text-xs bg-fantasy-accent text-black px-2 py-1 rounded">
                     Current Turn
                   </span>
@@ -133,6 +138,7 @@ export const ThreePlayerBattle = () => {
                     <Button 
                       variant="default" 
                       className="w-full bg-fantasy-accent hover:bg-fantasy-accent/80"
+                      onClick={() => handleCardPlay && handleCardPlay()}
                     >
                       Play Card
                     </Button>
@@ -144,7 +150,7 @@ export const ThreePlayerBattle = () => {
                     <Button 
                       variant="outline" 
                       className="w-full"
-                      onClick={() => selectTarget(player.user_id)}
+                      onClick={() => handleTargetSelection && handleTargetSelection(player.user_id)}
                     >
                       Select Target
                     </Button>

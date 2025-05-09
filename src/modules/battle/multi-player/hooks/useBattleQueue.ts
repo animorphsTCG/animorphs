@@ -1,316 +1,200 @@
-
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/modules/auth';
 import { toast } from '@/components/ui/use-toast';
 import { AnimorphCard } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
 import { useEOSPresence } from './useEOSPresence';
 
-export interface BattleQueueOptions {
+interface QueueConfig {
   battleType: '1v1' | '3player' | '4player';
   deckCards: AnimorphCard[];
   metadata?: Record<string, any>;
 }
 
 export const useBattleQueue = () => {
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [inQueue, setInQueue] = useState(false);
-  const [queueTime, setQueueTime] = useState(0);
-  const [queueId, setQueueId] = useState<string | null>(null);
+  const [queueStartTime, setQueueStartTime] = useState<Date | null>(null);
   const [matchFound, setMatchFound] = useState(false);
-  const [lobbyId, setLobbyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const queueIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [queueId, setQueueId] = useState<string | null>(null);
+  const [presenceStatus, setPresenceStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   
-  // Initialize presence tracking with more frequent heartbeats while in queue
+  // Initialize presence tracking
   const presence = useEOSPresence({
-    heartbeatInterval: 10000, // More frequent when in queue
-    logActivity: true,
+    heartbeatInterval: 5000, // Shorter interval for queue
   });
   
-  // Start queue timer when inQueue changes
   useEffect(() => {
-    if (inQueue) {
-      queueIntervalRef.current = setInterval(() => {
-        setQueueTime(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (queueIntervalRef.current) {
-        clearInterval(queueIntervalRef.current);
-        queueIntervalRef.current = null;
-      }
-      setQueueTime(0);
-    }
-    
-    return () => {
-      if (queueIntervalRef.current) {
-        clearInterval(queueIntervalRef.current);
-        queueIntervalRef.current = null;
-      }
-    };
-  }, [inQueue]);
+    setPresenceStatus(presence.connectionStatus);
+  }, [presence.connectionStatus]);
   
-  // Subscribe to match notifications
-  useEffect(() => {
-    if (!user || !queueId) return;
-    
-    // Set up realtime subscription first
-    const channel = supabase
-      .channel(`match_notifications_${user.id}`)
-      .on('broadcast', { event: `match:found:${user.id}` }, (payload) => {
-        console.log('Received match notification:', payload);
-        if (payload.payload && payload.payload.lobby_id) {
-          handleMatchFound(payload.payload.lobby_id, payload.payload.battle_type);
-        }
-      })
-      .subscribe((status) => {
-        if (status !== 'SUBSCRIBED') {
-          console.warn('Failed to subscribe to match notifications channel, falling back to polling');
-          // Start polling as fallback
-          startPollingForMatch();
-        } else {
-          console.log('Subscribed to match notifications channel');
-          // Stop polling if we're subscribed properly
-          stopPollingForMatch();
-        }
-      });
-      
-    return () => {
-      supabase.removeChannel(channel);
-      stopPollingForMatch();
-    };
-  }, [user, queueId]);
+  // Format queue time
+  const formattedQueueTime = (): string => {
+    if (!queueStartTime) return '0';
+    const now = new Date();
+    const diff = now.getTime() - queueStartTime.getTime();
+    const seconds = Math.floor(diff / 1000);
+    return seconds.toString();
+  };
   
-  // Polling fallback for match checking
-  const startPollingForMatch = useCallback(() => {
-    if (!user || !inQueue || pollingIntervalRef.current) return;
-    
-    console.log('Starting polling for match');
-    pollingIntervalRef.current = setInterval(async () => {
-      if (!user || !queueId) return;
-      
-      try {
-        // Check if user has been matched
-        const { data: lobbyData, error: lobbyError } = await supabase
-          .from('lobby_members')
-          .select('lobby_id, battle_lobbies!inner(battle_type)')
-          .eq('user_id', user.id)
-          .is('left_at', null)
-          .order('joined_at', { ascending: false })
-          .limit(1);
-          
-        if (lobbyError) throw lobbyError;
-        
-        if (lobbyData && lobbyData.length > 0) {
-          const foundLobbyId = lobbyData[0].lobby_id;
-          // Check if this is different from our current lobby (if any)
-          if (foundLobbyId !== lobbyId) {
-            console.log('Found match via polling:', foundLobbyId);
-            handleMatchFound(
-              foundLobbyId, 
-              lobbyData[0].battle_lobbies?.battle_type as '1v1' | '3player' | '4player'
-            );
-          }
-        }
-      } catch (err) {
-        console.error('Error during match polling:', err);
-      }
-    }, 5000); // Check every 5 seconds
-    
-    return () => stopPollingForMatch();
-  }, [user, inQueue, queueId, lobbyId]);
-  
-  const stopPollingForMatch = useCallback(() => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-  }, []);
-  
-  // Join battle queue
-  const joinQueue = useCallback(async (options: BattleQueueOptions) => {
+  // Join the battle queue
+  const joinQueue = useCallback(async (config: QueueConfig) => {
     if (!user) {
       toast({
         title: "Authentication Required",
-        description: "You need to be logged in to join a battle queue",
+        description: "You need to be logged in to join the battle queue",
         variant: "destructive"
       });
-      return false;
+      return;
     }
     
-    if (!userProfile?.has_paid) {
+    if (inQueue) {
       toast({
-        title: "Full Access Required",
-        description: "Only paid users can access multiplayer battles",
+        title: "Already In Queue",
+        description: "You are already in the battle queue",
         variant: "destructive"
       });
-      return false;
+      return;
     }
     
-    if (options.deckCards.length !== 10) {
-      toast({
-        title: "Invalid Deck",
-        description: "You need exactly 10 cards for your battle deck",
-        variant: "destructive"
-      });
-      return false;
-    }
+    setInQueue(true);
+    setQueueStartTime(new Date());
+    setError(null);
+    
+    const newQueueId = uuidv4();
+    setQueueId(newQueueId);
     
     try {
-      setError(null);
-      
-      // Check user is not already in a battle or lobby
-      const { data: userInBattle } = await supabase
-        .rpc('user_in_battle', { user_id: user.id });
-        
-      if (userInBattle) {
-        toast({
-          title: 'Already in Battle',
-          description: 'You are already participating in a battle',
-          variant: 'destructive'
-        });
-        return false;
-      }
-      
-      const { data: userInLobby } = await supabase
-        .rpc('user_in_lobby', { user_id: user.id });
-        
-      if (userInLobby) {
-        toast({
-          title: 'Already in Lobby',
-          description: 'You are already participating in a lobby',
-          variant: 'destructive'
-        });
-        return false;
-      }
-      
-      // Add to battle queue
-      const queueEntry = {
-        user_id: user.id,
-        battle_type: options.battleType,
-        deck_data: options.deckCards,
-        metadata: {
-          ...options.metadata,
-          username: userProfile?.username || 'Unknown Player',
-          device_info: navigator.userAgent
-        }
-      };
-      
-      const { data: queueData, error: queueError } = await supabase
+      // Insert into battle_queue
+      const { error: queueError } = await supabase
         .from('battle_queue')
-        .insert(queueEntry)
-        .select()
-        .single();
+        .insert({
+          id: newQueueId,
+          user_id: user.id,
+          battle_type: config.battleType,
+          deck_data: config.deckCards,
+          metadata: config.metadata || {}
+        });
         
       if (queueError) throw queueError;
       
-      setQueueId(queueData.id);
-      setInQueue(true);
-      presence.setStatus('online'); // Ensure online status
+      // Set presence status
+      presence.setStatus('queueing');
       
       toast({
-        title: "Joined Queue",
-        description: "Searching for opponents...",
+        title: "Joined Battle Queue",
+        description: `Looking for a ${config.battleType} battle...`,
       });
-      
-      // Start polling as a fallback measure
-      startPollingForMatch();
-      
-      return true;
     } catch (err: any) {
       console.error("Error joining battle queue:", err);
-      setError(err.message || "Failed to join queue");
+      setError(err.message || "Failed to join battle queue");
+      setInQueue(false);
+      setQueueStartTime(null);
       toast({
         title: "Error",
-        description: "Failed to join matchmaking queue. Please try again.",
+        description: "Failed to join battle queue",
         variant: "destructive"
       });
-      return false;
     }
-  }, [user, userProfile, presence]);
+  }, [user, inQueue, presence]);
   
-  // Leave battle queue
+  // Leave the battle queue
   const leaveQueue = useCallback(async () => {
-    if (!user || !queueId) return false;
+    if (!user || !inQueue) return;
     
     try {
-      // Remove from queue
-      const { error } = await supabase
+      // Delete from battle_queue
+      const { error: queueError } = await supabase
         .from('battle_queue')
         .delete()
-        .eq('id', queueId);
+        .eq('user_id', user.id);
         
-      if (error) throw error;
+      if (queueError) throw queueError;
       
+      // Reset state
       setInQueue(false);
-      setQueueId(null);
-      stopPollingForMatch();
+      setQueueStartTime(null);
+      setMatchFound(false);
+      
+      // Reset presence
+      presence.setStatus('online');
       
       toast({
-        title: "Left Queue",
-        description: "You have left the matchmaking queue",
+        title: "Left Battle Queue",
+        description: "You have left the battle queue.",
       });
-      
-      return true;
     } catch (err: any) {
-      console.error("Error leaving queue:", err);
+      console.error("Error leaving battle queue:", err);
+      setError(err.message || "Failed to leave battle queue");
       toast({
         title: "Error",
-        description: "Failed to leave queue. Please try again.",
+        description: "Failed to leave battle queue",
         variant: "destructive"
       });
-      return false;
     }
-  }, [user, queueId]);
-  
+  }, [user, inQueue, presence]);
+
   // Handle match found
-  const handleMatchFound = useCallback((foundLobbyId: string, battleType: '1v1' | '3player' | '4player') => {
-    setMatchFound(true);
-    setLobbyId(foundLobbyId);
-    stopPollingForMatch();
-    
-    toast({
-      title: "Match Found!",
-      description: "Preparing battle...",
-    });
-    
-    // Navigate to correct battle page based on battle type
-    setTimeout(() => {
-      let battleRoute = '';
+  const handleMatchFound = useCallback(async (payload: any) => {
+    try {
+      console.log('Match found:', payload);
+      setMatchFound(true);
+
+      // Get the battle type from the queue record
+      const { data: queueData, error: queueError } = await supabase
+        .from('battle_queue')
+        .select('battle_type')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (queueError) throw queueError;
       
-      switch (battleType) {
-        case '1v1':
-          battleRoute = `/battle/multiplayer/${foundLobbyId}`;
-          break;
-        case '3player':
-          battleRoute = `/3-player-battle/${foundLobbyId}`;
-          break;
-        case '4player':
-          battleRoute = `/4-player-user-lobby/${foundLobbyId}`;
-          break;
-      }
+      const battleType = queueData ? queueData.battle_type : '1v1'; // Default to 1v1 if not found
       
-      navigate(battleRoute);
-    }, 1500);
-  }, [navigate]);
+      toast({
+        title: "Match Found!",
+        description: `Preparing your ${battleType} battle...`,
+      });
+      
+      // Navigate to the battle
+      setTimeout(() => {
+        navigate(`/battle/multiplayer/${payload.record.id}`);
+      }, 2000);
+    } catch (error) {
+      console.error('Error handling match found:', error);
+    }
+  }, [user, navigate]);
   
-  // Format queue time for display (mm:ss)
-  const formattedQueueTime = useCallback(() => {
-    const minutes = Math.floor(queueTime / 60);
-    const seconds = queueTime % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }, [queueTime]);
+  // Subscribe to queue changes
+  useEffect(() => {
+    if (!user) return;
+    
+    // Listen for matches
+    const channel = supabase
+      .channel('battle_queue')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'battle_sessions', filter: `player_ids @> array["${user.id}"]` }, 
+        handleMatchFound
+      )
+      .subscribe();
+      
+    // Clean up subscription
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, handleMatchFound]);
   
   return {
     inQueue,
-    queueTime,
+    queueStartTime,
     formattedQueueTime,
     matchFound,
     error,
-    presenceStatus: presence.connectionStatus,
+    presenceStatus,
     joinQueue,
     leaveQueue
   };

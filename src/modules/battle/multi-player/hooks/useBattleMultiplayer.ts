@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/modules/auth';
@@ -323,6 +324,80 @@ export const useBattleMultiplayer = (
     }
   );
 
+  // Add these missing methods
+  const handleCardPlay = useCallback(async () => {
+    if (!user || !isUserTurn || !battleId) return;
+    
+    try {
+      const participantId = participants.find(p => p.user_id === user.id)?.participant_id;
+      
+      if (!participantId) {
+        throw new Error('Participant not found');
+      }
+      
+      const { error } = await supabase
+        .from('battle_actions')
+        .insert({
+          battle_session_id: battleId,
+          participant_id: participantId,
+          action_type: 'play_card',
+          action_data: {}
+        });
+        
+      if (error) throw error;
+      
+      toast({
+        title: 'Card Played',
+        description: 'You played a card successfully',
+      });
+      
+    } catch (error: any) {
+      console.error('Error playing card:', error);
+      toast({
+        title: 'Action Failed',
+        description: 'Failed to play card. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  }, [user, isUserTurn, battleId, participants]);
+  
+  const handleTargetSelection = useCallback(async (targetUserId: string) => {
+    if (!user || !isUserTurn || !battleId) return;
+    
+    try {
+      const participantId = participants.find(p => p.user_id === user.id)?.participant_id;
+      const targetParticipantId = participants.find(p => p.user_id === targetUserId)?.participant_id;
+      
+      if (!participantId || !targetParticipantId) {
+        throw new Error('Participant not found');
+      }
+      
+      const { error } = await supabase
+        .from('battle_actions')
+        .insert({
+          battle_session_id: battleId,
+          participant_id: participantId,
+          action_type: 'select_target',
+          action_data: { target_participant_id: targetParticipantId }
+        });
+        
+      if (error) throw error;
+      
+      toast({
+        title: 'Target Selected',
+        description: 'You selected a target successfully',
+      });
+      
+    } catch (error: any) {
+      console.error('Error selecting target:', error);
+      toast({
+        title: 'Action Failed',
+        description: 'Failed to select target. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  }, [user, isUserTurn, battleId, participants]);
+
   return {
     loading,
     connectionStatus,
@@ -337,6 +412,8 @@ export const useBattleMultiplayer = (
     participants,
     lastError,
     handleStatSelection,
+    handleCardPlay,
+    handleTargetSelection,
     refreshBattleState: fetchBattleState
   };
 };

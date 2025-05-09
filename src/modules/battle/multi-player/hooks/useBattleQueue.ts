@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/modules/auth';
 import { toast } from '@/components/ui/use-toast';
 import { AnimorphCard } from '@/types';
-import { v4 as uuidv4 } from 'uuid';
 import { useEOSPresence } from './useEOSPresence';
 
 interface QueueConfig {
@@ -65,25 +64,27 @@ export const useBattleQueue = () => {
     setQueueStartTime(new Date());
     setError(null);
     
-    const newQueueId = uuidv4();
-    setQueueId(newQueueId);
-    
     try {
-      // Insert into battle_queue
-      const { error: queueError } = await supabase
+      // Insert into battle_queue - let the server generate the ID
+      const { data: queueData, error: queueError } = await supabase
         .from('battle_queue')
         .insert({
-          id: newQueueId,
           user_id: user.id,
           battle_type: config.battleType,
           deck_data: config.deckCards,
           metadata: config.metadata || {}
-        });
+        })
+        .select()
+        .single();
         
       if (queueError) throw queueError;
       
-      // Set presence status
-      presence.setStatus('queueing');
+      if (queueData) {
+        setQueueId(queueData.id);
+      }
+      
+      // Set presence status - use 'online' instead of 'queueing'
+      presence.setStatus('online');
       
       toast({
         title: "Joined Battle Queue",

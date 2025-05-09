@@ -81,8 +81,8 @@ export const useBattleLobby = (lobbyId?: string) => {
       
       const formattedMembers: LobbyMember[] = membersData.map(member => ({
         id: member.user_id,
-        username: member.profiles ? member.profiles.username : 'Unknown Player',
-        profile_image_url: member.profiles ? member.profiles.profile_image_url : null,
+        username: member.profiles?.username || 'Unknown Player',
+        profile_image_url: member.profiles?.profile_image_url || null,
         player_number: member.player_number,
         is_ready: member.is_ready,
         is_host: member.user_id === lobbyData.host_id,

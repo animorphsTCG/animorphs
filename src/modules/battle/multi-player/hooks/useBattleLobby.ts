@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -80,16 +81,23 @@ export const useBattleLobby = (lobbyId?: string) => {
       if (membersError) throw membersError;
       
       // Fix here: Correctly handle the profiles data structure
-      const formattedMembers: LobbyMember[] = membersData.map(member => ({
-        id: member.user_id,
-        // Fix: Access profile data correctly with proper type handling
-        username: member.profiles ? member.profiles.username || 'Unknown Player' : 'Unknown Player',
-        profile_image_url: member.profiles ? member.profiles.profile_image_url || null : null,
-        player_number: member.player_number,
-        is_ready: member.is_ready,
-        is_host: member.user_id === lobbyData.host_id,
-        joined_at: member.join_time
-      }));
+      const formattedMembers: LobbyMember[] = membersData.map(member => {
+        // Extract profile data from the nested structure
+        // The profiles field is likely returning a single object, not an array
+        const profileData = member.profiles as unknown;
+        // Type assertion to help TypeScript understand the structure
+        const profile = profileData as { username?: string; profile_image_url?: string | null } | null;
+        
+        return {
+          id: member.user_id,
+          username: profile?.username || 'Unknown Player',
+          profile_image_url: profile?.profile_image_url || null,
+          player_number: member.player_number,
+          is_ready: member.is_ready,
+          is_host: member.user_id === lobbyData.host_id,
+          joined_at: member.join_time
+        };
+      });
       
       setLobbyMembers(formattedMembers);
       

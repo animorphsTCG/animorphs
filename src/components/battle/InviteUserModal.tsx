@@ -11,7 +11,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, UserCheck, Users, Check, X, RefreshCw } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabase';
 import { useAuth } from "@/modules/auth";
 import useOnlineUsers, { OnlineUser } from "@/hooks/useOnlineUsers";
 
@@ -42,12 +42,17 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   // Filter paid users only
   useEffect(() => {
     if (onlineUsers) {
-      // Filter out current user and only include paid users
-      const filteredUsers = onlineUsers.filter(
-        onlineUser => onlineUser.has_paid && onlineUser.id !== user?.id
-      );
-      console.log("Filtered paid online users:", filteredUsers);
-      setPaidUsers(filteredUsers);
+      try {
+        // Filter out current user and only include paid users
+        const filteredUsers = onlineUsers.filter(
+          onlineUser => onlineUser.has_paid && onlineUser.id !== user?.id
+        );
+        console.log("Filtered paid online users:", filteredUsers);
+        setPaidUsers(filteredUsers);
+      } catch (err) {
+        console.error("Error filtering paid users:", err);
+        setPaidUsers([]);
+      }
     }
   }, [onlineUsers, user]);
   
@@ -242,6 +247,15 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-md">
               <p className="text-sm text-red-500">Error: {error}</p>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="mt-2"
+                onClick={manualRefresh}
+              >
+                <RefreshCw className="mr-1 h-3 w-3" />
+                Try Again
+              </Button>
             </div>
           )}
           

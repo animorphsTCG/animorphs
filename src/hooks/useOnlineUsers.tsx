@@ -13,20 +13,6 @@ export interface OnlineUser {
   last_seen: string;
 }
 
-// Define TypeScript interface for the Supabase query result
-interface UserPresenceRow {
-  user_id: string;
-  last_seen: string;
-  status: 'online' | 'away' | 'busy' | 'offline';
-  profiles: {
-    username: string;
-    profile_image_url: string | null;
-  } | null;
-  payment_status: {
-    has_paid: boolean;
-  } | null;
-}
-
 export const useOnlineUsers = (autoRefreshInterval: number = 15000) => {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
@@ -45,41 +31,24 @@ export const useOnlineUsers = (autoRefreshInterval: number = 15000) => {
       const twoMinutesAgo = new Date();
       twoMinutesAgo.setMinutes(twoMinutesAgo.getMinutes() - 2);
       
-      const { data, error } = await supabase
+      // First, get online users from user_presence table
+      const { data: onlineUserIds, error: presenceError } = await supabase
         .from('user_presence')
-        .select(`
-          user_id,
-          last_seen,
-          status,
-          profiles:user_id (username, profile_image_url),
-          payment_status:user_id (has_paid)
-        `)
+        .select('user_id, last_seen, status')
         .gt('last_seen', twoMinutesAgo.toISOString())
         .in('status', ['online', 'away', 'busy']);
         
-      if (error) {
-        throw error;
+      if (presenceError) {
+        throw presenceError;
       }
       
-      if (data) {
-        console.log("Online users raw data:", data);
+      if (!onlineUserIds || onlineUserIds.length === 0) {
+        // No online users found
+        console.log("No online users found");
+        setOnlineUsers([]);
+        setLoading(false);
         
-        // Safely cast the data to the correct type
-        const typedData = data as unknown as UserPresenceRow[];
-        
-        const formattedUsers: OnlineUser[] = typedData.map(item => ({
-          id: item.user_id,
-          username: item.profiles?.username || 'Unknown User',
-          profile_image_url: item.profiles?.profile_image_url,
-          status: item.status,
-          has_paid: item.payment_status?.has_paid || false,
-          last_seen: item.last_seen
-        }));
-        
-        console.log("Formatted online users:", formattedUsers);
-        setOnlineUsers(formattedUsers);
-        
-        // Reset reconnect attempts on success
+        // Reset reconnect attempts on success (even if no users found)
         if (reconnectAttempts > 0) {
           setReconnectAttempts(0);
         }
@@ -87,7 +56,64 @@ export const useOnlineUsers = (autoRefreshInterval: number = 15000) => {
         if (connectionStatus !== 'connected') {
           setConnectionStatus('connected');
         }
+        
+        return;
       }
+
+      console.log("Online user IDs found:", onlineUserIds);
+      
+      // Then, fetch profile data for these users
+      const userIds = onlineUserIds.map(u => u.user_id);
+      
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, profile_image_url')
+        .in('id', userIds);
+        
+      if (profilesError) {
+        throw profilesError;
+      }
+
+      // Separately fetch payment status for the users
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payment_status')
+        .select('id, has_paid')
+        .in('id', userIds);
+        
+      if (paymentError) {
+        throw paymentError;
+      }
+      
+      console.log("Profiles data:", profilesData);
+      console.log("Payment data:", paymentData);
+      
+      // Combine the data
+      const formattedUsers: OnlineUser[] = onlineUserIds.map(presence => {
+        const profile = profilesData?.find(p => p.id === presence.user_id);
+        const payment = paymentData?.find(p => p.id === presence.user_id);
+        
+        return {
+          id: presence.user_id,
+          username: profile?.username || 'Unknown User',
+          profile_image_url: profile?.profile_image_url,
+          status: presence.status,
+          has_paid: payment?.has_paid || false,
+          last_seen: presence.last_seen
+        };
+      });
+      
+      console.log("Formatted online users:", formattedUsers);
+      setOnlineUsers(formattedUsers);
+      
+      // Reset reconnect attempts on success
+      if (reconnectAttempts > 0) {
+        setReconnectAttempts(0);
+      }
+      
+      if (connectionStatus !== 'connected') {
+        setConnectionStatus('connected');
+      }
+      
     } catch (err: any) {
       console.error("Error fetching online users:", err);
       setError(err.message || 'Failed to load online users');

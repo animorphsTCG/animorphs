@@ -1,0 +1,23 @@
+
+# Netlify configuration file
+
+[build]
+  publish = "dist"  # The folder to publish (output of the build)
+  command = "npm run build"  # The command to build your site
+
+# This ensures that React Router's client-side routing works correctly
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Set environment variable processing
+[build.environment]
+  # Environment variables should be set in the Netlify UI
+  # DO NOT add sensitive info here - this file will be in version control
+
+# Define the dev command
+[dev]
+  command = "npm run dev"
+  port = 3000
+  publish = "dist"

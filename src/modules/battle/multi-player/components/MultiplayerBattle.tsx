@@ -11,16 +11,29 @@ export const MultiplayerBattle = () => {
   const { battleId } = useParams<{ battleId: string }>();
   const { user } = useAuth();
   const {
+    loading,
     currentRound,
     isUserTurn,
     selectedStat,
     cardsRevealed,
     gameOver,
+    winner,
+    playerDecks,
+    roundWins,
+    participants,
     handleStatSelection
   } = useBattleMultiplayer(battleId || '');
 
   if (!battleId) {
     return <div>Invalid battle ID</div>;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -46,6 +59,27 @@ export const MultiplayerBattle = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 justify-items-center">
             {/* Battle card displays will be populated based on participants */}
+            {participants.map(participant => (
+              <div key={participant.user_id}>
+                <div className="text-center mb-4">
+                  <p className="font-medium text-lg">
+                    {participant.user_id === user?.id 
+                      ? "You" 
+                      : participant.username || 'Opponent'}
+                  </p>
+                  <p className="text-sm">Wins: {roundWins[participant.user_id] || 0}</p>
+                </div>
+                <BattleCardDisplay
+                  card={playerDecks[participant.user_id]?.[0]}
+                  isFlipped={participant.user_id === user?.id || cardsRevealed}
+                  isActive={isUserTurn && participant.user_id === user?.id && !cardsRevealed}
+                  onStatSelect={isUserTurn && participant.user_id === user?.id && !cardsRevealed 
+                    ? handleStatSelection 
+                    : undefined}
+                  selectedStat={selectedStat}
+                />
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

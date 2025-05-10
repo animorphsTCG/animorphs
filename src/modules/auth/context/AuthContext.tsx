@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
@@ -37,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Store channel and polling fallback
   const paymentChannelRef = useRef<any>(null);
@@ -248,7 +249,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchUserProfile(currentSession.user.id);
           }, 0);
           toast({ title: 'Signed in successfully' });
-          navigate(`/profile/${currentSession.user.id}`);
+          
+          // Safe navigation - only if not on visitor demo
+          if (!location.pathname.includes('visitor-demo')) {
+            navigate(`/profile/${currentSession.user.id}`);
+          }
         } else if (event === 'SIGNED_OUT') {
           // Clean up userProfile and channels
           setUserProfile(null);
@@ -261,7 +266,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             pollingIntervalRef.current = null;
           }
           toast({ title: 'Signed out successfully' });
-          navigate('/login');
+          
+          // Safe navigation
+          if (!location.pathname.includes('visitor-demo')) {
+            navigate('/login');
+          }
         } else if (event === 'PASSWORD_RECOVERY') {
           navigate('/update-password');
         }
@@ -285,7 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, location]);
 
   const signUp = async (email: string, password: string, metadata?: any) => {
     try {

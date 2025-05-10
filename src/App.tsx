@@ -19,6 +19,7 @@ import About from './pages/About';
 
 // Battle mode components
 import OneVOneBattle from './modules/battle/single-player/one-v-one/OneVOneBattle';
+import { DemoBattle } from './modules/battle/single-player';
 import {
   MultiplayerBattle,
   ThreePlayerBattle,
@@ -28,6 +29,7 @@ import {
 } from './modules/battle/multi-player';
 import DeckBuilder from './pages/DeckBuilder';
 import { useCleanupLobbies } from './modules/battle/multi-player/hooks';
+import VisitorDemoBattle from './pages/VisitorDemoBattle';
 
 // Create a React Query client with default settings
 const queryClient = new QueryClient({
@@ -57,6 +59,7 @@ function App() {
             <Route path="/music" element={<Music />} />
             <Route path="/battle" element={<Battle />} />
             <Route path="/multiplayer" element={<Multiplayer />} />
+            <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
             <Route path="/battle/one-v-one" element={<OneVOneBattle />} />
             <Route path="/battle/multiplayer/:battleId" element={<MultiplayerBattle />} />
             <Route path="/3-player-battle/:battleId" element={<ThreePlayerBattle />} />

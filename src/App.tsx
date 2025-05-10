@@ -1,6 +1,6 @@
 
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './ThemeProvider';
 import { Toaster } from '@/components/ui/toaster';
@@ -47,29 +47,27 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <QueryClientProvider client={queryClient}>
-        <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/music" element={<Music />} />
-              <Route path="/battle" element={<Battle />} />
-              <Route path="/multiplayer" element={<Multiplayer />} />
-              <Route path="/battle/one-v-one" element={<OneVOneBattle />} />
-              <Route path="/battle/multiplayer/:battleId" element={<MultiplayerBattle />} />
-              <Route path="/3-player-battle/:battleId" element={<ThreePlayerBattle />} />
-              <Route path="/4-player-public/:battleId" element={<FourPlayerPublicBattle />} />
-              <Route path="/4-player-user-lobby/:battleId" element={<FourPlayerUserBattle />} />
-              <Route path="/battle-lobby/:lobbyId" element={<WaitingRoom lobbyId="" />} />
-              <Route path="/deck-builder" element={<DeckBuilder />} />
-              <Route path="/about" element={<About />} />
-            </Routes>
-          </Layout>
-          <Toaster />
-        </Router>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/music" element={<Music />} />
+            <Route path="/battle" element={<Battle />} />
+            <Route path="/multiplayer" element={<Multiplayer />} />
+            <Route path="/battle/one-v-one" element={<OneVOneBattle />} />
+            <Route path="/battle/multiplayer/:battleId" element={<MultiplayerBattle />} />
+            <Route path="/3-player-battle/:battleId" element={<ThreePlayerBattle />} />
+            <Route path="/4-player-public/:battleId" element={<FourPlayerPublicBattle />} />
+            <Route path="/4-player-user-lobby/:battleId" element={<FourPlayerUserBattle />} />
+            <Route path="/battle-lobby/:lobbyId" element={<WaitingRoom lobbyId="" />} />
+            <Route path="/deck-builder" element={<DeckBuilder />} />
+            <Route path="/about" element={<About />} />
+          </Routes>
+        </Layout>
+        <Toaster />
       </QueryClientProvider>
     </ThemeProvider>
   );

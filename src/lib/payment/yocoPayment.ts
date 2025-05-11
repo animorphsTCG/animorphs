@@ -73,7 +73,12 @@ export const createCheckoutSession = async (
 /**
  * Verify a completed payment
  */
-export const verifyPayment = async (token: string, checkoutId: string): Promise<boolean> => {
+export interface PaymentVerificationResult {
+  success: boolean;
+  error?: string;
+}
+
+export const verifyPayment = async (token: string, checkoutId: string): Promise<PaymentVerificationResult> => {
   try {
     const response = await fetch(`${YOCO_WORKER_URL}/verify-payment`, {
       method: 'POST',
@@ -86,13 +91,22 @@ export const verifyPayment = async (token: string, checkoutId: string): Promise<
     
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Payment verification failed');
+      return {
+        success: false,
+        error: error.message || 'Payment verification failed'
+      };
     }
     
     const result = await response.json();
-    return result.success;
-  } catch (error) {
+    return {
+      success: result.success,
+      error: result.error
+    };
+  } catch (error: any) {
     console.error('Error verifying YoCo payment:', error);
-    throw error;
+    return {
+      success: false,
+      error: error.message || 'An error occurred while verifying payment'
+    };
   }
 };

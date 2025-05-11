@@ -4,34 +4,34 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { verifyPayment } from '@/lib/payment';
+import { useAuth } from '@/modules/auth';
+import { verifyPayment, PaymentVerificationResult } from '@/lib/payment';
 import { Loader2 } from 'lucide-react';
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { refreshProfile } = useAuth();
+  const { refreshProfile, token } = useAuth();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
     async function verifyAndUpdatePayment() {
-      if (!sessionId) {
+      if (!sessionId || !token?.access_token) {
         setIsVerifying(false);
-        setVerificationError('No payment session found');
+        setVerificationError('No payment session found or user not authenticated');
         return;
       }
 
       try {
-        const { success, error } = await verifyPayment(sessionId);
+        const result = await verifyPayment(token.access_token, sessionId);
         
-        if (success) {
+        if (result.success) {
           // Refresh the user profile to get updated payment status
           await refreshProfile();
         } else {
-          setVerificationError(error || 'Payment verification failed');
+          setVerificationError(result.error || 'Payment verification failed');
         }
       } catch (error: any) {
         console.error('Error verifying payment:', error);
@@ -42,7 +42,7 @@ const PaymentSuccess = () => {
     }
 
     verifyAndUpdatePayment();
-  }, [sessionId, refreshProfile]);
+  }, [sessionId, refreshProfile, token]);
 
   return (
     <div className="container mx-auto py-12 px-4">

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -35,6 +34,12 @@ export interface UserProfile {
     subscription_type: string;
     end_date: string;
   } | null;
+  bio?: string | null;
+  favorite_animorph?: string | null;
+  favorite_battle_mode?: string | null;
+  online_times_gmt2?: string | null;
+  playing_times?: string | null;
+  profile_image_url?: string | null;
 }
 
 // Auth state interface
@@ -131,12 +136,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Refresh user profile
-  const refreshProfile = async () => {
+  const refreshProfile = async (): Promise<void> => {
     if (user?.id && token?.access_token) {
       console.log("Refreshing profile for user:", user.id);
-      return await fetchUserProfile(user.id, token.access_token);
+      await fetchUserProfile(user.id, token.access_token);
     }
-    return null;
   };
 
   // Set up token refresh timer

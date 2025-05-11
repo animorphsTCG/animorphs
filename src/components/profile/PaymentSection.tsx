@@ -3,10 +3,10 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import { UserProfile } from '@/types';
-import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { createCheckoutSession } from '@/lib/payment';
+import { createCheckoutSession } from '@/lib/payment/yocoPayment';
+import { useAuth } from '@/modules/auth';
 
 interface PaymentSectionProps {
   userProfile: UserProfile;
@@ -15,18 +15,36 @@ interface PaymentSectionProps {
 
 export default function PaymentSection({ userProfile, onPaymentComplete }: PaymentSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { user, token } = useAuth();
 
   const handlePaymentClick = async () => {
+    if (!user || !token?.access_token) {
+      toast({
+        variant: 'destructive',
+        title: 'Authentication Required',
+        description: 'Please log in to continue with payment',
+      });
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      const { url, error } = await createCheckoutSession();
+      // Create YoCo checkout session
+      const checkoutResponse = await createCheckoutSession(
+        token.access_token,
+        user.id,
+        {
+          amount: 10000, // R100 in cents
+          name: 'Full Game Access',
+          description: 'Unlock all game modes and 200 cards',
+          successUrl: `${window.location.origin}/payment-success`,
+          cancelUrl: `${window.location.origin}/payment-cancelled`,
+        }
+      );
       
-      if (error) {
-        throw new Error(error);
-      }
-      
-      if (url) {
-        window.location.href = url;
+      // Redirect to checkout
+      if (checkoutResponse.url) {
+        window.location.href = checkoutResponse.url;
       } else {
         throw new Error('No checkout URL returned');
       }
@@ -105,7 +123,7 @@ export default function PaymentSection({ userProfile, onPaymentComplete }: Payme
       </div>
       
       <p className="text-xs text-gray-500 mt-2">
-        Payments processed securely via Stripe
+        Payments processed securely via YoCo
       </p>
     </div>
   );

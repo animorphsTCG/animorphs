@@ -1,7 +1,7 @@
 
 import { Routes as RouterRoutes, Route, Navigate } from 'react-router-dom';
 
-import { Layout } from '@/components/Layout';
+import Layout from '@/components/Layout';
 import { ProtectedRoute } from '@/modules/auth';
 
 import Home from '@/pages/Home';

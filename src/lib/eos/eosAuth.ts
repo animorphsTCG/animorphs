@@ -1,10 +1,10 @@
-
 /**
  * Epic Online Services (EOS) Authentication Client
  * Handles token-based authentication with Epic's OAuth service
  */
 
 const EOS_BASE_URL = 'https://api.epicgames.dev';
+const EOS_AUTH_URL = 'https://www.epicgames.com/id/api/redirect';
 
 // Environment-based configuration
 interface EOSConfig {
@@ -227,7 +227,7 @@ export const getEpicGamesOAuthURL = (): string => {
   // Store the state in localStorage to verify when the user returns
   localStorage.setItem('eos_oauth_state', state);
   
-  // Build the OAuth URL
+  // Build the OAuth URL using Epic Games' official authorization endpoint
   const params = new URLSearchParams({
     client_id: config.clientId,
     redirect_uri: config.redirectUrl,
@@ -237,7 +237,7 @@ export const getEpicGamesOAuthURL = (): string => {
     deployment_id: config.environmentId
   });
   
-  return `${EOS_BASE_URL}/oauth/v1/authorize?${params.toString()}`;
+  return `${EOS_AUTH_URL}?${params.toString()}`;
 };
 
 /**

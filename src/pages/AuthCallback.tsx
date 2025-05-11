@@ -2,13 +2,15 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/context/EOSAuthContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { handleAuthCallback } from '@/lib/eos/eosAuth';
+import { Button } from '@/components/ui/button';
 
 const AuthCallback = () => {
   const { handleExternalAuth } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const processAuth = async () => {
@@ -30,29 +32,41 @@ const AuthCallback = () => {
         // Pass the auth response to the auth context
         await handleExternalAuth(authResponse);
         
-        // Redirect to profile or home page
+        // Redirect to profile or home page on success
         navigate('/');
       } catch (error: any) {
         console.error('Auth callback error:', error);
         setError(error.message || 'Authentication failed. Please try again.');
+        setIsLoading(false);
         
-        // Redirect to login after a delay
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
+        // Don't auto-redirect on error so the user can see the message
+      } finally {
+        setIsLoading(false);
       }
     };
     
     processAuth();
   }, [handleExternalAuth, navigate]);
 
+  const handleReturnToLogin = () => {
+    navigate('/login');
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
       {error ? (
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-6 max-w-md bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg">
+          <div className="flex justify-center">
+            <AlertTriangle className="h-12 w-12 text-red-500" />
+          </div>
           <h1 className="text-2xl font-bold text-red-500">Authentication Failed</h1>
           <p className="text-gray-500">{error}</p>
-          <p className="text-sm">Redirecting to login page...</p>
+          <Button 
+            onClick={handleReturnToLogin}
+            className="w-full"
+          >
+            Return to Login
+          </Button>
         </div>
       ) : (
         <div className="text-center space-y-4">

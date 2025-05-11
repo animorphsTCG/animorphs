@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -28,6 +29,7 @@ interface EOSAuthState {
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
   refreshProfile: () => Promise<UserProfile | null>;
+  handleExternalAuth: (authResponse: EOSAuthResponse) => Promise<void>;
 }
 
 // Create the auth context
@@ -325,6 +327,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
   
+  // Handle external authentication (Epic Games OAuth)
+  const handleExternalAuth = async (authResponse: EOSAuthResponse): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      // Get user profile from EOS using the token
+      const eosProfile = await getUserProfile(authResponse.access_token);
+      
+      // Set auth state
+      setUser(eosProfile);
+      setToken(authResponse);
+      
+      // Save to localStorage
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(eosProfile));
+      localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(authResponse));
+      
+      // Fetch or create D1 profile
+      await fetchUserProfile(eosProfile.id, authResponse);
+      
+      toast({
+        title: 'Signed in successfully with Epic Games',
+      });
+      
+      // Navigate to profile or redirect URL
+      const redirectTo = new URLSearchParams(location.search).get('redirectTo');
+      if (redirectTo && !redirectTo.includes('login') && !redirectTo.includes('register')) {
+        navigate(redirectTo);
+      } else if (!location.pathname.includes('visitor-demo')) {
+        navigate(`/profile/${eosProfile.id}`);
+      }
+    } catch (error: any) {
+      console.error('Epic Games auth error:', error);
+      toast({
+        title: 'Sign in failed',
+        description: error.message || 'Failed to authenticate with Epic Games',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   // Sign out function
   const signOut = async (): Promise<void> => {
     try {
@@ -420,6 +465,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPassword,
         updatePassword,
         refreshProfile,
+        handleExternalAuth,
       }}
     >
       {children}

@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '../context/EOSAuthContext';
 import PasswordStrengthIndicator from './PasswordStrengthIndicator';
+import EpicGamesButton from './EpicGamesButton';
 
 const registrationSchema = z.object({
   username: z.string().min(3, { message: 'Username must be at least 3 characters' }),
@@ -71,6 +72,21 @@ const RegistrationForm: React.FC = () => {
           <AlertDescription>{registrationError}</AlertDescription>
         </Alert>
       )}
+      
+      <div className="space-y-4">
+        <EpicGamesButton variant="outline" />
+        
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              Or register with email
+            </span>
+          </div>
+        </div>
+      </div>
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -191,7 +207,7 @@ const RegistrationForm: React.FC = () => {
                 Creating account...
               </>
             ) : (
-              'Create Account'
+              'Create Account with Email'
             )}
           </Button>
         </form>

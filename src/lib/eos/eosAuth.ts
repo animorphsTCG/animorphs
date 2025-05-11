@@ -12,6 +12,7 @@ interface EOSConfig {
   clientSecret: string;
   environmentId: string;
   isProduction: boolean;
+  redirectUrl: string;
 }
 
 // Get EOS configuration from environment variables
@@ -26,11 +27,15 @@ export const getEOSConfig = (): EOSConfig => {
     ? import.meta.env.EOS_ENV_RELEASE_ID || 'c3b2637442224a31b5408418bdfbe9a6'  
     : import.meta.env.EOS_ENV_LIVE_SANDBOX_ID || '90eb223664704cb6ab8da2529a62d052';
     
+  // Redirect URL for OAuth flows
+  const redirectUrl = `${window.location.origin}/auth/callback`;
+  
   return {
     clientId,
     clientSecret,
     environmentId,
-    isProduction
+    isProduction,
+    redirectUrl
   };
 };
 
@@ -211,6 +216,79 @@ export const refreshAuthToken = async (refreshToken: string): Promise<EOSAuthRes
 };
 
 /**
+ * Generate OAuth URL for Epic Games account login
+ */
+export const getEpicGamesOAuthURL = (): string => {
+  const config = getEOSConfig();
+  
+  // Create the state parameter with a random value for security
+  const state = Math.random().toString(36).substring(2, 15);
+  
+  // Store the state in localStorage to verify when the user returns
+  localStorage.setItem('eos_oauth_state', state);
+  
+  // Build the OAuth URL
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    redirect_uri: config.redirectUrl,
+    response_type: 'code',
+    scope: 'basic_profile openid',
+    state: state,
+    deployment_id: config.environmentId
+  });
+  
+  return `${EOS_BASE_URL}/oauth/v1/authorize?${params.toString()}`;
+};
+
+/**
+ * Exchange OAuth code for auth tokens
+ */
+export const exchangeCodeForToken = async (code: string): Promise<EOSAuthResponse> => {
+  const config = getEOSConfig();
+  const encodedCredentials = btoa(`${config.clientId}:${config.clientSecret}`);
+  
+  try {
+    const response = await fetch(`${EOS_BASE_URL}/auth/v1/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${encodedCredentials}`
+      },
+      body: new URLSearchParams({
+        'grant_type': 'authorization_code',
+        'code': code,
+        'redirect_uri': config.redirectUrl,
+        'deployment_id': config.environmentId
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new EOSAuthError(
+        error.message || 'Failed to exchange code for token',
+        error.errorCode || 'auth/code-exchange-failed'
+      );
+    }
+    
+    const data = await response.json();
+    
+    // Add expiration timestamps for easier management
+    const now = Date.now();
+    data.expires_at = now + (data.expires_in * 1000);
+    if (data.refresh_token && data.refresh_expires_in) {
+      data.refresh_expires_at = now + (data.refresh_expires_in * 1000);
+    }
+    
+    return data;
+  } catch (error) {
+    if (error instanceof EOSAuthError) {
+      throw error;
+    }
+    throw new EOSAuthError(`Failed to exchange code: ${error.message}`, 'auth/code-exchange-failed');
+  }
+};
+
+/**
  * Sign up a new user
  */
 export const signUp = async (
@@ -310,6 +388,7 @@ export const signOut = async (): Promise<void> => {
   // Just clear local storage and return
   localStorage.removeItem('eos_auth_user');
   localStorage.removeItem('eos_auth_token');
+  localStorage.removeItem('eos_oauth_state');
   
   return Promise.resolve();
 };
@@ -349,4 +428,28 @@ export const resetPassword = async (email: string): Promise<void> => {
     }
     throw new EOSAuthError(`Password reset failed: ${error.message}`, 'auth/reset-failed');
   }
+};
+
+/**
+ * Handle authentication callback from Epic Games OAuth
+ */
+export const handleAuthCallback = async (url: URL): Promise<EOSAuthResponse> => {
+  // Extract the authorization code from the URL
+  const code = url.searchParams.get('code');
+  const state = url.searchParams.get('state');
+  
+  // Verify the state parameter to prevent CSRF attacks
+  const savedState = localStorage.getItem('eos_oauth_state');
+  localStorage.removeItem('eos_oauth_state'); // Clean up state
+  
+  if (!state || state !== savedState) {
+    throw new EOSAuthError('Invalid state parameter', 'auth/invalid-state');
+  }
+  
+  if (!code) {
+    throw new EOSAuthError('No authorization code found in callback URL', 'auth/missing-code');
+  }
+  
+  // Exchange the code for tokens
+  return await exchangeCodeForToken(code);
 };

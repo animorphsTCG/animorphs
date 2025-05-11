@@ -1,142 +1,179 @@
-import React from 'react';
-import { Routes as RouterRoutes, Route } from 'react-router-dom';
-import { ProtectedRoute } from '@/modules/auth'; // Using the correct import
-import { DemoBattle, OneVOneBattle } from '@/modules/battle/single-player';
-import { MultiplayerBattle, ThreePlayerBattle, FourPlayerPublicBattle, FourPlayerUserBattle } from '@/modules/battle/multi-player';
 
-// Pages
-import Index from "./pages/Index";
-import CardGallery from "./pages/CardGallery";
-import Register from "./pages/Register";
-import Login from "./pages/Login";
-import Verify from "./pages/Verify";
-import TermsAndConditions from "./pages/TermsAndConditions";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentCancelled from "./pages/PaymentCancelled";
-import Battle from "./pages/Battle";
-import Multiplayer from "./pages/Multiplayer";
-import Profile from "./pages/Profile";
-import NotFound from "./pages/NotFound";
-import Admin from "./pages/Admin";
-import ResetPassword from "./pages/ResetPassword";
-import UpdatePassword from "./pages/UpdatePassword";
-import PublicProfile from './pages/PublicProfile';
-import ThreePlayerBattlePage from './pages/ThreePlayerBattle';
+import { Routes as RouterRoutes, Route, Navigate } from 'react-router-dom';
 
-export const Routes = () => {
+import { Layout } from '@/components/Layout';
+import { ProtectedRoute } from '@/modules/auth';
+
+import Home from '@/pages/Home';
+import About from '@/pages/About';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import ResetPassword from '@/pages/ResetPassword';
+import UpdatePassword from '@/pages/UpdatePassword';
+import Profile from '@/pages/Profile';
+import PublicProfile from '@/pages/PublicProfile';
+import Battle from '@/pages/Battle';
+import VisitorDemoBattle from '@/pages/VisitorDemoBattle';
+import DeckBuilder from '@/pages/DeckBuilder';
+import CardGallery from '@/pages/CardGallery';
+import Leaderboard from '@/pages/Leaderboard';
+import Music from '@/pages/Music';
+import Admin from '@/pages/Admin';
+import NotFound from '@/pages/NotFound';
+import Index from '@/pages/Index';
+import UserProfile from '@/pages/UserProfile';
+import UserSearch from '@/pages/UserSearch';
+import Verify from '@/pages/Verify';
+import PaymentSuccess from '@/pages/PaymentSuccess';
+import PaymentCancelled from '@/pages/PaymentCancelled';
+import TermsAndConditions from '@/pages/TermsAndConditions';
+import OneVOneBattle from '@/pages/OneVOneBattle';
+import ThreePlayerBattle from '@/pages/ThreePlayerBattle';
+import FourPlayerPublicBattle from '@/pages/FourPlayerPublicBattle';
+import FourPlayerUserLobby from '@/pages/FourPlayerUserLobby';
+import Multiplayer from '@/pages/Multiplayer';
+import AuthCallback from '@/pages/AuthCallback';
+
+const Routes = () => {
   return (
     <RouterRoutes>
-      <Route path="/" element={<Index />} />
-      <Route path="/card-gallery" element={<CardGallery />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/verify" element={<Verify />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/update-password" element={<UpdatePassword />} />
-      <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-      <Route path="/payment-success" element={<PaymentSuccess />} />
-      <Route path="/payment-cancelled" element={<PaymentCancelled />} />
-      <Route 
-        path="/battle" 
-        element={
-          <ProtectedRoute>
-            <Battle />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/multiplayer" 
-        element={
-          <ProtectedRoute>
-            <Multiplayer />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/profile" 
-        element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/1v1-battle" 
-        element={
-          <ProtectedRoute>
-            <OneVOneBattle />
-          </ProtectedRoute>
-        } 
-      />
-      <Route path="/visitor-demo-battle" element={<DemoBattle />} />
-      <Route path="/admin" element={<Admin />} />
-      
-      <Route path="/profile/:userId" element={<PublicProfile />} />
-      
-      <Route 
-        path="/battle/multiplayer/:battleId" 
-        element={
-          <ProtectedRoute>
-            <MultiplayerBattle />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/3-player-battle/:battleId" 
-        element={
-          <ProtectedRoute>
-            <ThreePlayerBattle />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/3-player-battle" 
-        element={
-          <ProtectedRoute>
-            <ThreePlayerBattlePage />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/4-player-public-battle/:battleId" 
-        element={
-          <ProtectedRoute>
-            <FourPlayerPublicBattle />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/4-player-public-battle" 
-        element={
-          <ProtectedRoute>
-            <FourPlayerPublicBattle />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/4-player-user-lobby/:battleId" 
-        element={
-          <ProtectedRoute>
-            <FourPlayerUserBattle />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/4-player-user-lobby" 
-        element={
-          <ProtectedRoute>
-            <FourPlayerUserBattle />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route path="*" element={<NotFound />} />
+      {/* Public Routes */}
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Index />} />
+        <Route path="about" element={<About />} />
+        <Route path="login" element={<Login />} />
+        <Route path="register" element={<Register />} />
+        <Route path="reset-password" element={<ResetPassword />} />
+        <Route path="update-password" element={<UpdatePassword />} />
+        <Route path="visitor-demo-battle" element={<VisitorDemoBattle />} />
+        <Route path="public-profile/:id" element={<PublicProfile />} />
+        <Route path="verify" element={<Verify />} />
+        <Route path="payment-success" element={<PaymentSuccess />} />
+        <Route path="payment-cancelled" element={<PaymentCancelled />} />
+        <Route path="terms-and-conditions" element={<TermsAndConditions />} />
+        
+        {/* Auth Callback for Epic Games OAuth */}
+        <Route path="auth/callback" element={<AuthCallback />} />
+        
+        {/* Protected Routes */}
+        <Route
+          path="profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile/:id"
+          element={
+            <ProtectedRoute>
+              <UserProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="battle"
+          element={
+            <ProtectedRoute>
+              <Battle />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="deck-builder"
+          element={
+            <ProtectedRoute>
+              <DeckBuilder />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="card-gallery"
+          element={
+            <ProtectedRoute>
+              <CardGallery />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="leaderboard"
+          element={
+            <ProtectedRoute>
+              <Leaderboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="music"
+          element={
+            <ProtectedRoute>
+              <Music />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin"
+          element={
+            <ProtectedRoute>
+              <Admin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="users"
+          element={
+            <ProtectedRoute>
+              <UserSearch />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="one-v-one-battle"
+          element={
+            <ProtectedRoute>
+              <OneVOneBattle />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="three-player-battle"
+          element={
+            <ProtectedRoute>
+              <ThreePlayerBattle />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="four-player-public-battle"
+          element={
+            <ProtectedRoute>
+              <FourPlayerPublicBattle />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="four-player-user-lobby"
+          element={
+            <ProtectedRoute>
+              <FourPlayerUserLobby />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="multiplayer"
+          element={
+            <ProtectedRoute>
+              <Multiplayer />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Not Found Route */}
+        <Route path="*" element={<NotFound />} />
+      </Route>
     </RouterRoutes>
   );
 };
+
+export default Routes;

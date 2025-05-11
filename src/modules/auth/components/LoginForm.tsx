@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { useAuth } from '../context/EOSAuthContext';
+import EpicGamesButton from './EpicGamesButton';
+import { Separator } from '@/components/ui/separator';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
@@ -60,6 +62,21 @@ const LoginForm: React.FC = () => {
           <AlertDescription>{loginError}</AlertDescription>
         </Alert>
       )}
+      
+      <div className="space-y-4">
+        <EpicGamesButton variant="outline" />
+        
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              Or continue with email
+            </span>
+          </div>
+        </div>
+      </div>
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -127,7 +144,7 @@ const LoginForm: React.FC = () => {
                 Signing in...
               </>
             ) : (
-              'Sign In'
+              'Sign In with Email'
             )}
           </Button>
         </form>

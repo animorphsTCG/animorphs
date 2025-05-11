@@ -1,49 +1,23 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
+import { UserProfile } from '@/types';
 import { 
-  EOSAuthResponse, 
-  signInWithPassword, 
+  getClientCredentialsToken,
+  getUserProfile,
+  signInWithPassword,
   signUp as eosSignUp,
   refreshAuthToken,
-  getUserProfile,
   signOut as eosSignOut,
   resetPassword as eosResetPassword,
+  EOSAuthResponse,
   EOSUserProfile
-} from '@/lib/eos';
-import { d1Client } from '@/lib/cloudflare/d1Client';
-import { trackPresence } from '@/lib/eos/eosPresence';
+} from '@/lib/eos/eosAuth';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
+import { presenceWorker } from '@/lib/cloudflare/presenceWorker';
 
-// User profile interface
-export interface UserProfile {
-  id: string;
-  username: string;
-  name?: string;
-  surname?: string;
-  email?: string;
-  country?: string;
-  created_at?: string;
-  has_paid?: boolean;
-  mp?: number;
-  ai_points?: number;
-  lbp?: number;
-  digi?: number;
-  gold?: number;
-  music_unlocked?: boolean;
-  music_subscription?: {
-    subscription_type: string;
-    end_date: string;
-  } | null;
-  bio?: string | null;
-  favorite_animorph?: string | null;
-  favorite_battle_mode?: string | null;
-  online_times_gmt2?: string | null;
-  playing_times?: string | null;
-  profile_image_url?: string | null;
-}
-
-// Auth state interface
-interface AuthState {
+// Define our auth state interface
+interface EOSAuthState {
   user: EOSUserProfile | null;
   token: EOSAuthResponse | null;
   isLoading: boolean;
@@ -53,418 +27,347 @@ interface AuthState {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: () => Promise<UserProfile | null>;
 }
 
-// Create auth context
-const AuthContext = createContext<AuthState>({} as AuthState);
+// Create the auth context
+const EOSAuthContext = createContext<EOSAuthState>({} as EOSAuthState);
 
-// Auth provider hook
+// Custom hook to use the auth context
 export const useAuth = () => {
-  const context = useContext(AuthContext);
+  const context = useContext(EOSAuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth must be used within an EOSAuthProvider');
   }
   return context;
 };
 
 // Local storage keys
-const TOKEN_STORAGE_KEY = 'eos_auth_token';
 const USER_STORAGE_KEY = 'eos_auth_user';
+const TOKEN_STORAGE_KEY = 'eos_auth_token';
 
+// Auth provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<EOSUserProfile | null>(null);
   const [token, setToken] = useState<EOSAuthResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Store refs for token refresh interval and presence tracking
-  const refreshIntervalRef = useRef<any>(null);
-  const presenceIntervalRef = useRef<any>(null);
-
-  // Fetch user profile data from D1
-  const fetchUserProfile = async (userId: string, authToken: string): Promise<UserProfile | null> => {
-    try {
-      console.log("Fetching user profile for:", userId);
-      setError(null);
-
-      // Initialize D1 client with auth token
-      d1Client.setToken(authToken);
-      
-      // Fetch profile data
-      const profileData = await d1Client.getOne<any>(`
-        SELECT * FROM profiles WHERE id = ?
-      `, { params: [userId] });
-      
-      if (!profileData) {
-        console.error("No profile found for user:", userId);
-        return null;
-      }
-      
-      // Fetch payment status
-      const paymentData = await d1Client.getOne<{ has_paid: boolean }>(
-        `SELECT has_paid FROM payment_status WHERE id = ?`,
-        { params: [userId] }
-      );
-      
-      // Fetch music subscription if any
-      const musicSubData = await d1Client.getOne<any>(
-        `SELECT subscription_type, end_date FROM music_subscriptions 
-        WHERE user_id = ? AND end_date > CURRENT_TIMESTAMP 
-        ORDER BY end_date DESC LIMIT 1`,
-        { params: [userId] }
-      );
-      
-      // Combine data
-      const profile: UserProfile = {
-        ...profileData,
-        has_paid: paymentData?.has_paid || false,
-        music_subscription: musicSubData || null
-      };
-      
-      console.log("Fetched user profile:", profile);
-      setUserProfile(profile);
-      return profile;
-    } catch (error) {
-      console.error("Failed to fetch profile data:", error);
-      setError('Failed to fetch profile data');
-      return null;
-    }
-  };
-
-  // Refresh user profile
-  const refreshProfile = async (): Promise<void> => {
-    if (user?.id && token?.access_token) {
-      console.log("Refreshing profile for user:", user.id);
-      await fetchUserProfile(user.id, token.access_token);
-    }
-  };
-
-  // Set up token refresh timer
-  const setupTokenRefresh = (currentToken: EOSAuthResponse) => {
-    // Clear any existing refresh interval
-    if (refreshIntervalRef.current) {
-      clearInterval(refreshIntervalRef.current);
-      refreshIntervalRef.current = null;
-    }
-    
-    // If we have a refresh token, set up a timer to refresh before it expires
-    if (currentToken.refresh_token && currentToken.expires_at) {
-      // Refresh the token 5 minutes before it expires
-      const refreshTime = currentToken.expires_at - Date.now() - (5 * 60 * 1000);
-      if (refreshTime <= 0) {
-        // Token is already expired or about to expire, refresh now
-        refreshAuthToken(currentToken.refresh_token)
-          .then(newToken => {
-            setToken(newToken);
-            saveTokenToStorage(newToken);
-            setupTokenRefresh(newToken);
-          })
-          .catch(err => {
-            console.error("Failed to refresh token:", err);
-            handleSignOut();
-          });
-      } else {
-        // Set up timer to refresh token before it expires
-        console.log(`Token will be refreshed in ${Math.floor(refreshTime / 60000)} minutes`);
-        refreshIntervalRef.current = setTimeout(() => {
-          if (currentToken.refresh_token) {
-            refreshAuthToken(currentToken.refresh_token)
-              .then(newToken => {
-                setToken(newToken);
-                saveTokenToStorage(newToken);
-                setupTokenRefresh(newToken);
-              })
-              .catch(err => {
-                console.error("Failed to refresh token:", err);
-                handleSignOut();
-              });
-          }
-        }, refreshTime);
-      }
-    }
-  };
-  
-  // Set up presence tracking
-  const setupPresenceTracking = (userId: string, authToken: string) => {
-    // Clear any existing presence interval
-    if (presenceIntervalRef.current) {
-      clearInterval(presenceIntervalRef.current);
-      presenceIntervalRef.current = null;
-    }
-    
-    // Update presence immediately
-    trackPresence(userId, 'online', authToken)
-      .catch(err => console.error("Failed to track presence:", err));
-    
-    // Set up interval to update presence (every 30 seconds)
-    presenceIntervalRef.current = setInterval(() => {
-      trackPresence(userId, 'online', authToken)
-        .catch(err => console.error("Failed to track presence:", err));
-    }, 30000);
-    
-    // Set up event listener for page visibility changes
-    const handleVisibilityChange = () => {
-      const status = document.visibilityState === 'visible' ? 'online' : 'away';
-      trackPresence(userId, status, authToken)
-        .catch(err => console.error("Failed to track presence:", err));
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Return cleanup function
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  };
-
-  // Load auth data from storage
+  // Initialize auth state from localStorage
   useEffect(() => {
-    const loadStoredAuth = async () => {
+    const initializeAuth = async () => {
       try {
-        const storedTokenJson = localStorage.getItem(TOKEN_STORAGE_KEY);
-        const storedUserJson = localStorage.getItem(USER_STORAGE_KEY);
-
-        if (storedTokenJson && storedUserJson) {
-          const storedToken: EOSAuthResponse = JSON.parse(storedTokenJson);
-          const storedUser: EOSUserProfile = JSON.parse(storedUserJson);
-
-          // If token is not expired or we have a refresh token
+        // Load saved auth state from localStorage
+        const savedUser = localStorage.getItem(USER_STORAGE_KEY);
+        const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+        
+        if (savedUser && savedToken) {
+          const parsedUser = JSON.parse(savedUser);
+          const parsedToken = JSON.parse(savedToken);
+          
+          // Check if token is expired
           const now = Date.now();
-          if ((storedToken.expires_at && storedToken.expires_at > now) || storedToken.refresh_token) {
-            // Token is valid or can be refreshed
-            setToken(storedToken);
-            setUser(storedUser);
-
-            // Set up token refresh
-            setupTokenRefresh(storedToken);
-
-            // Initialize D1 client
-            d1Client.setToken(storedToken.access_token);
-
-            // Fetch user profile
-            await fetchUserProfile(storedUser.id, storedToken.access_token);
+          if (parsedToken.expires_at && parsedToken.expires_at > now) {
+            // Token is still valid
+            setUser(parsedUser);
+            setToken(parsedToken);
             
-            // Set up presence tracking
-            const cleanup = setupPresenceTracking(storedUser.id, storedToken.access_token);
-            return () => cleanup();
+            // Fetch user profile
+            await fetchUserProfile(parsedUser.id, parsedToken);
+          } else if (parsedToken.refresh_token && parsedToken.refresh_expires_at && parsedToken.refresh_expires_at > now) {
+            // Token expired but refresh token is still valid
+            try {
+              console.log('Refreshing token...');
+              const newToken = await refreshAuthToken(parsedToken.refresh_token);
+              
+              // Update token in state and localStorage
+              setToken(newToken);
+              localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(newToken));
+              
+              // Keep the user and fetch profile
+              setUser(parsedUser);
+              await fetchUserProfile(parsedUser.id, newToken);
+            } catch (error) {
+              console.error('Failed to refresh token:', error);
+              clearAuthState();
+            }
           } else {
-            // Token is expired and can't be refreshed
-            handleSignOut();
+            // Both tokens expired
+            console.log('Auth tokens expired');
+            clearAuthState();
           }
+        } else {
+          // No saved auth state
+          clearAuthState();
         }
       } catch (error) {
-        console.error("Error loading stored auth:", error);
-        handleSignOut();
+        console.error('Error initializing auth state:', error);
+        clearAuthState();
       } finally {
         setIsLoading(false);
       }
     };
-
-    loadStoredAuth();
-
-    // Cleanup function
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-      if (presenceIntervalRef.current) {
-        clearInterval(presenceIntervalRef.current);
+    
+    initializeAuth();
+  }, []);
+  
+  // Update user online status when token changes
+  useEffect(() => {
+    const updatePresence = async () => {
+      if (user && token) {
+        try {
+          await presenceWorker.updatePresence(
+            user.id,
+            'online',
+            {
+              username: user.displayName,
+              profile_image_url: user.avatarUrl || null
+            },
+            token.access_token
+          );
+          
+          // Set up interval to update presence every 5 minutes
+          const interval = setInterval(async () => {
+            if (user && token) {
+              await presenceWorker.updatePresence(
+                user.id,
+                'online',
+                {
+                  username: user.displayName,
+                  profile_image_url: user.avatarUrl || null
+                },
+                token.access_token
+              );
+            }
+          }, 5 * 60 * 1000);
+          
+          // Clean up on unmount
+          return () => clearInterval(interval);
+        } catch (error) {
+          console.error('Failed to update presence:', error);
+        }
       }
     };
-  }, []);
-
-  // Save token to storage
-  const saveTokenToStorage = (token: EOSAuthResponse) => {
-    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(token));
-  };
-
-  // Save user to storage
-  const saveUserToStorage = (user: EOSUserProfile) => {
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-  };
-
-  // Handle successful authentication
-  const handleAuthSuccess = async (
-    authToken: EOSAuthResponse, 
-    userProfile: EOSUserProfile
-  ) => {
-    // Save token and user to state and storage
-    setToken(authToken);
-    setUser(userProfile);
-    saveTokenToStorage(authToken);
-    saveUserToStorage(userProfile);
-
-    // Initialize D1 client
-    d1Client.setToken(authToken.access_token);
-
-    // Set up token refresh
-    setupTokenRefresh(authToken);
-
-    // Fetch additional user data
-    await fetchUserProfile(userProfile.id, authToken.access_token);
     
-    // Set up presence tracking
-    setupPresenceTracking(userProfile.id, authToken.access_token);
-    
-    // Show success message
-    toast({ title: 'Signed in successfully' });
-    
-    // Navigate to profile page (unless on visitor demo)
-    if (!location.pathname.includes('visitor-demo')) {
-      navigate(`/profile/${userProfile.id}`);
-    }
+    updatePresence();
+  }, [user, token]);
+  
+  // Clear auth state helper
+  const clearAuthState = () => {
+    setUser(null);
+    setToken(null);
+    setUserProfile(null);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
   };
-
-  // Sign in with email and password
-  const signIn = async (email: string, password: string) => {
+  
+  // Fetch user profile from D1 database
+  const fetchUserProfile = async (userId: string, authToken: EOSAuthResponse) => {
+    if (!userId || !authToken) return null;
+    
     try {
-      // Sign in with EOS
-      const authToken = await signInWithPassword(email, password);
+      console.log('Fetching user profile for:', userId);
       
-      // Get user profile
-      const userProfile = await getUserProfile(authToken.access_token);
+      // Initialize the D1 worker with the token
+      const profile = await d1Worker.getOne<UserProfile>(
+        'SELECT * FROM profiles WHERE id = ?',
+        { params: [userId] },
+        authToken.access_token
+      );
       
-      // Handle successful authentication
-      await handleAuthSuccess(authToken, userProfile);
-    } catch (error: any) {
-      console.error("Sign in error:", error);
-      toast({
-        title: 'Sign in failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-      throw error;
-    }
-  };
-
-  // Sign up with email and password
-  const signUp = async (email: string, password: string, metadata?: any) => {
-    try {
-      console.log("Signing up with email:", email);
-      console.log("Metadata:", metadata);
-      
-      // Generate display name from email if not provided
-      const displayName = metadata?.username || email.split('@')[0];
-      
-      // Sign up with EOS
-      const authToken = await eosSignUp(email, password, displayName, metadata);
-      
-      // Get user profile
-      const userProfile = await getUserProfile(authToken.access_token);
-      
-      // Create profile record in D1
-      d1Client.setToken(authToken.access_token);
-      try {
-        await d1Client.insert('profiles', {
-          id: userProfile.id,
-          username: displayName,
-          name: metadata?.name || displayName,
-          surname: metadata?.surname || '',
-          age: metadata?.age || 18,
-          country: userProfile.country || metadata?.country || 'ZA',
+      if (!profile) {
+        // Profile doesn't exist, create it
+        console.log('Creating new profile for user:', userId);
+        
+        // Get user details from EOS
+        const eosUserProfile = await getUserProfile(authToken.access_token);
+        
+        // Create basic profile
+        const newProfile: Partial<UserProfile> = {
+          id: userId,
+          username: eosUserProfile.displayName,
+          email: eosUserProfile.email,
+          country: eosUserProfile.country || 'ZA',
+          created_at: new Date().toISOString(),
+          has_paid: false,
           mp: 0,
           ai_points: 0,
           lbp: 0,
-          digi: 0,
-          gold: 0,
-          music_unlocked: false,
-          created_at: new Date().toISOString()
-        });
+          digi: 0
+        };
         
-        // Also create payment status record
-        await d1Client.insert('payment_status', {
-          id: userProfile.id,
-          has_paid: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-      } catch (dbError) {
-        console.error("Error creating profile records:", dbError);
+        // Insert into database
+        await d1Worker.insert('profiles', newProfile, authToken.access_token);
+        
+        // Return the new profile
+        setUserProfile(newProfile as UserProfile);
+        return newProfile as UserProfile;
       }
+      
+      // Get payment status
+      const paymentStatus = await d1Worker.getOne(
+        'SELECT has_paid FROM payment_status WHERE id = ?',
+        { params: [userId] },
+        authToken.access_token
+      );
+      
+      // Merge payment status with profile
+      const completeProfile = {
+        ...profile,
+        has_paid: paymentStatus?.has_paid || false
+      };
+      
+      setUserProfile(completeProfile);
+      return completeProfile;
+    } catch (error) {
+      console.error('Failed to fetch profile data:', error);
+      return null;
+    }
+  };
+  
+  // Refresh user profile
+  const refreshProfile = async (): Promise<UserProfile | null> => {
+    if (!user?.id || !token) {
+      return null;
+    }
+    
+    return await fetchUserProfile(user.id, token);
+  };
+  
+  // Sign up function
+  const signUp = async (email: string, password: string, metadata?: any): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      console.log('Signing up with:', { email, metadata });
+      
+      // Create the profile with EOS
+      const displayName = metadata?.username || email.split('@')[0];
+      const response = await eosSignUp(email, password, displayName, metadata);
+      
+      // Set the new auth state
+      const eosProfile = await getUserProfile(response.access_token);
+      setUser(eosProfile);
+      setToken(response);
+      
+      // Save to localStorage
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(eosProfile));
+      localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(response));
+      
+      // Create D1 profile
+      await fetchUserProfile(eosProfile.id, response);
       
       toast({
         title: 'Registration successful',
-        description: 'Your account has been created.',
+        description: 'Your account has been created successfully.',
       });
       
-      // Handle successful authentication
-      await handleAuthSuccess(authToken, userProfile);
+      // Navigate to profile page
+      navigate(`/profile/${eosProfile.id}`);
     } catch (error: any) {
-      console.error("Sign up error:", error);
+      console.error('Sign up error:', error);
       toast({
         title: 'Registration failed',
-        description: error.message,
+        description: error.message || 'Failed to create account',
         variant: 'destructive',
       });
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  // Sign out
-  const handleSignOut = async () => {
-    // Clear all auth data
-    setToken(null);
-    setUser(null);
-    setUserProfile(null);
-    
-    // Clear D1 client token
-    d1Client.clearToken();
-    
-    // Clear intervals
-    if (refreshIntervalRef.current) {
-      clearInterval(refreshIntervalRef.current);
-      refreshIntervalRef.current = null;
-    }
-    if (presenceIntervalRef.current) {
-      clearInterval(presenceIntervalRef.current);
-      presenceIntervalRef.current = null;
-    }
-    
-    // Clear local storage
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
-    
-    // Navigate to login
-    if (!location.pathname.includes('visitor-demo')) {
-      navigate('/login');
-    }
-    
-    toast({ title: 'Signed out successfully' });
-  };
-
-  // Sign out (exposed to API)
-  const signOut = async () => {
+  
+  // Sign in function
+  const signIn = async (email: string, password: string): Promise<void> => {
     try {
-      // Update presence to offline before signing out
-      if (user?.id && token?.access_token) {
+      setIsLoading(true);
+      
+      // Sign in with EOS
+      const response = await signInWithPassword(email, password);
+      
+      // Get user profile from EOS
+      const eosProfile = await getUserProfile(response.access_token);
+      
+      // Set auth state
+      setUser(eosProfile);
+      setToken(response);
+      
+      // Save to localStorage
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(eosProfile));
+      localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(response));
+      
+      // Fetch D1 profile
+      await fetchUserProfile(eosProfile.id, response);
+      
+      toast({
+        title: 'Signed in successfully',
+      });
+      
+      // Navigate to profile or redirect URL
+      const redirectTo = new URLSearchParams(location.search).get('redirectTo');
+      if (redirectTo && !redirectTo.includes('login') && !redirectTo.includes('register')) {
+        navigate(redirectTo);
+      } else if (!location.pathname.includes('visitor-demo')) {
+        navigate(`/profile/${eosProfile.id}`);
+      }
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      toast({
+        title: 'Sign in failed',
+        description: error.message || 'Invalid email or password',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Sign out function
+  const signOut = async (): Promise<void> => {
+    try {
+      if (user && token) {
+        // Update presence to offline
         try {
-          await trackPresence(user.id, 'offline', token.access_token);
-        } catch (err) {
-          console.error("Error setting offline status:", err);
+          await presenceWorker.updatePresence(
+            user.id,
+            'offline',
+            {},
+            token.access_token
+          );
+        } catch (error) {
+          console.error('Failed to update offline status:', error);
         }
+        
+        // Sign out from EOS (client-side only)
+        await eosSignOut();
       }
       
-      // Call EOS sign out (clears local data)
-      await eosSignOut();
+      // Clear local state
+      clearAuthState();
       
-      // Then handle our own sign out cleanup
-      await handleSignOut();
+      toast({
+        title: 'Signed out successfully',
+      });
+      
+      // Safe navigation
+      if (!location.pathname.includes('visitor-demo')) {
+        navigate('/login');
+      }
     } catch (error: any) {
-      console.error("Sign out error:", error);
+      console.error('Sign out error:', error);
       toast({
         title: 'Sign out failed',
-        description: error.message,
+        description: error.message || 'Failed to sign out',
         variant: 'destructive',
       });
     }
   };
-
-  // Reset password
-  const resetPassword = async (email: string) => {
+  
+  // Reset password function
+  const resetPassword = async (email: string): Promise<void> => {
     try {
       await eosResetPassword(email);
       
@@ -476,24 +379,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Reset password error:', error);
       toast({
         title: 'Failed to send reset email',
-        description: error.message,
+        description: error.message || 'Failed to send reset email',
         variant: 'destructive',
       });
       throw error;
     }
   };
-
-  // Update password
-  const updatePassword = async (newPassword: string) => {
+  
+  // Update password function (placeholder - would need implementation in eosAuth.ts)
+  const updatePassword = async (newPassword: string): Promise<void> => {
     try {
-      // For EOS, updating password usually requires the old password
-      // This is a simplified version that might need to be updated
-      if (!token?.access_token) {
-        throw new Error('You must be logged in to update your password');
-      }
-      
-      // In a real implementation, we would call the EOS API to update the password
-      // For now, we'll just show a message
+      // TODO: Implement password update in eosAuth.ts
       toast({
         title: 'Password updated',
         description: 'You can now log in with your new password.',
@@ -504,15 +400,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Update password error:', error);
       toast({
         title: 'Failed to update password',
-        description: error.message,
+        description: error.message || 'Failed to update password',
         variant: 'destructive',
       });
       throw error;
     }
   };
-
+  
   return (
-    <AuthContext.Provider
+    <EOSAuthContext.Provider
       value={{
         user,
         token,
@@ -527,7 +423,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }}
     >
       {children}
-    </AuthContext.Provider>
+    </EOSAuthContext.Provider>
   );
 };
 

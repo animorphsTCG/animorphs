@@ -1,11 +1,11 @@
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/EOSAuthContext';
 import { Loader2 } from 'lucide-react';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoading } = useAuth();
+  const { user, token, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -18,8 +18,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  // Redirect to login if user is not authenticated
+  if (!user || !token) {
+    return <Navigate to={`/login?redirectTo=${encodeURIComponent(window.location.pathname)}`} replace />;
   }
 
   return <>{children}</>;

@@ -1,36 +1,34 @@
 
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '../context/AuthContext';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useAuth } from '../context/EOSAuthContext';
 import PasswordStrengthIndicator from './PasswordStrengthIndicator';
 
 const updatePasswordSchema = z.object({
-  password: z.string()
-    .min(8, { message: "Password must be at least 8 characters long" })
-    .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
-    .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
-    .regex(/[0-9]/, { message: "Password must contain at least one number" })
-    .regex(/[^A-Za-z0-9]/, { message: "Password must contain at least one special character" }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters' }),
   confirmPassword: z.string(),
-}).refine(data => data.password === data.confirmPassword, {
+}).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
 type UpdatePasswordFormValues = z.infer<typeof updatePasswordSchema>;
 
-const UpdatePassword = () => {
+const UpdatePassword: React.FC = () => {
   const { updatePassword } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const [password, setPassword] = useState('');
+  
+  // Initialize form
   const form = useForm<UpdatePasswordFormValues>({
     resolver: zodResolver(updatePasswordSchema),
     defaultValues: {
@@ -38,23 +36,21 @@ const UpdatePassword = () => {
       confirmPassword: '',
     },
   });
-
-  const onSubmit = async (data: UpdatePasswordFormValues) => {
-    setIsSubmitting(true);
+  
+  // Handle form submission
+  const onSubmit = async (values: UpdatePasswordFormValues) => {
+    setIsLoading(true);
     setError(null);
-
+    
     try {
-      await updatePassword(data.password);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update password');
-    } finally {
-      setIsSubmitting(false);
+      await updatePassword(values.password);
+      // Navigation is handled in the auth context
+    } catch (error: any) {
+      setError(error.message || 'Failed to update password');
+      setIsLoading(false);
     }
   };
-
-  // Watch the password field to calculate strength
-  const password = form.watch('password');
-
+  
   return (
     <div className="space-y-6">
       {error && (
@@ -63,7 +59,14 @@ const UpdatePassword = () => {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-
+      
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold">Set New Password</h2>
+        <p className="text-muted-foreground mt-1">
+          Please set a new secure password for your account.
+        </p>
+      </div>
+      
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
@@ -73,14 +76,25 @@ const UpdatePassword = () => {
               <FormItem>
                 <FormLabel>New Password</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Enter your new password" {...field} />
+                  <Input
+                    placeholder="••••••••"
+                    type="password"
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    disabled={isLoading}
+                    {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      setPassword(e.target.value);
+                    }}
+                  />
                 </FormControl>
                 <PasswordStrengthIndicator password={password} />
                 <FormMessage />
               </FormItem>
             )}
           />
-
+          
           <FormField
             control={form.control}
             name="confirmPassword"
@@ -88,25 +102,32 @@ const UpdatePassword = () => {
               <FormItem>
                 <FormLabel>Confirm New Password</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Confirm your new password" {...field} />
+                  <Input
+                    placeholder="••••••••"
+                    type="password"
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    disabled={isLoading}
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-
+          
           <Button
             type="submit"
             className="w-full"
-            disabled={isSubmitting}
+            disabled={isLoading}
           >
-            {isSubmitting ? (
+            {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Updating Password...
+                Updating password...
               </>
             ) : (
-              "Update Password"
+              'Update Password'
             )}
           </Button>
         </form>

@@ -41,7 +41,7 @@ export interface QueryOptions {
 // Database operations for D1
 export const d1Worker = {
   // Execute a query and return results
-  async query<T = any>(sql: string, options: QueryOptions = {}, token?: string): Promise<T[]> {
+  async query(sql: string, options: QueryOptions = {}, token?: string) {
     try {
       const response = await fetch(`${CF_WORKER_URL}/query`, {
         method: 'POST',
@@ -63,7 +63,7 @@ export const d1Worker = {
       }
       
       const result = await response.json();
-      return result.results as T[];
+      return result.results;
     } catch (error) {
       if (error instanceof D1Error) {
         throw error;
@@ -74,7 +74,7 @@ export const d1Worker = {
   
   // Get a single row
   async getOne<T = any>(sql: string, options: QueryOptions = {}, token?: string): Promise<T | null> {
-    const results = await this.query<T>(sql, options, token);
+    const results = await this.query(sql, options, token) as T[];
     return results.length > 0 ? results[0] : null;
   },
   
@@ -93,7 +93,8 @@ export const d1Worker = {
                 VALUES (${placeholders})
                 ${returning ? `RETURNING ${returning}` : ''}`;
     
-    return this.getOne<T>(sql, { params: values }, token);
+    const result = await this.query(sql, { params: values }, token);
+    return result && result.length > 0 ? result[0] as T : null;
   },
   
   // Update row(s)
@@ -115,7 +116,8 @@ export const d1Worker = {
                 ${returning ? `RETURNING ${returning}` : ''}`;
     
     if (returning) {
-      return this.getOne<T>(sql, { params: values }, token);
+      const result = await this.query(sql, { params: values }, token);
+      return result && result.length > 0 ? result[0] as T : null;
     } else {
       await this.query(sql, { params: values }, token);
       return null;
@@ -131,7 +133,7 @@ export const d1Worker = {
   ): Promise<number> {
     const sql = `DELETE FROM ${table} WHERE ${whereClause} RETURNING id`;
     const results = await this.query(sql, { params: whereParams }, token);
-    return results.length;
+    return results ? results.length : 0;
   },
   
   // Execute multiple statements as a transaction

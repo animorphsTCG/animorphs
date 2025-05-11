@@ -1,0 +1,42 @@
+
+# Wrangler configuration for Animorphs game
+name = "animorphs"
+type = "javascript"
+workers_dev = true
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "animorphs-db"
+database_id = "44cd43b3-629e-4cf6-88ea-f6999339abb1"
+
+# R2 Bucket for assets
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "animorphs-assets"
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "PRESENCE_DO"
+class_name = "PresenceDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["PresenceDO"]
+
+# Environment variables
+[vars]
+NODE_ENV = "development"
+
+[env.production]
+NODE_ENV = "production"
+
+# Secrets (set using wrangler secret put <NAME>)
+# - YOCO_TEST_SECRET_KEY
+# - YOCO_TEST_PUBLIC_KEY
+# - YOCO_LIVE_SECRET_KEY
+# - YOCO_LIVE_PUBLIC_KEY
+# - EOS_CLIENT_ID
+# - EOS_CLIENT_SECRET
+# - EOS_ENV_LIVE_SANDBOX_ID
+# - EOS_ENV_RELEASE_ID

@@ -1,310 +1,358 @@
 
-// Cloudflare Payment Worker for YoCo integration
+/**
+ * Cloudflare Worker for YoCo Payment Integration
+ * Handles payment processing via YoCo
+ */
 
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info',
 };
 
-// Helper functions for request/response handling
-function parseToken(request) {
-  const authHeader = request.headers.get('Authorization') || '';
-  return authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+// Helper function to handle CORS preflight requests
+function handleOptions(request) {
+  if (request.headers.get('Origin') !== null &&
+    request.headers.get('Access-Control-Request-Method') !== null &&
+    request.headers.get('Access-Control-Request-Headers') !== null) {
+    return new Response(null, {
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': request.headers.get('Access-Control-Request-Headers'),
+      }
+    });
+  } else {
+    return new Response(null, {
+      headers: corsHeaders
+    });
+  }
 }
 
-function corsResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
-
-function errorResponse(message, status = 400) {
-  return corsResponse({ error: message }, status);
-}
-
-// Verify and decode the JWT token
-async function verifyToken(token) {
-  if (!token) return null;
+// Helper to verify authentication
+async function verifyAuth(request) {
+  const authHeader = request.headers.get('Authorization');
   
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new Error('Missing or invalid authorization');
+  }
+  
+  const token = authHeader.replace('Bearer ', '');
+  
+  // In production, this would verify the token with the EOS auth service
+  // For now, we're just checking if a token exists
+  if (!token) {
+    throw new Error('Invalid token');
+  }
+  
+  return token;
+}
+
+// Create a checkout session with YoCo
+async function createCheckout(request, env) {
   try {
-    // In a real implementation, this would validate with EOS
-    // For now, just decode and return a user ID
-    // This should be replaced with actual EOS token validation
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
+    // Verify authentication
+    await verifyAuth(request);
     
-    const payload = JSON.parse(atob(parts[1]));
-    return payload.sub || null;
+    // Parse request body
+    const { user_id, amount, name, description, successUrl, cancelUrl, metadata } = await request.json();
+    
+    if (!user_id || !amount || !name || !successUrl || !cancelUrl) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required parameters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Determine YoCo API key based on environment
+    const isProduction = env.NODE_ENV === 'production';
+    const publicKey = isProduction ? env.YOCO_LIVE_PUBLIC_KEY : env.YOCO_TEST_PUBLIC_KEY;
+    const secretKey = isProduction ? env.YOCO_LIVE_SECRET_KEY : env.YOCO_TEST_SECRET_KEY;
+    
+    if (!publicKey || !secretKey) {
+      return new Response(
+        JSON.stringify({ error: 'YoCo API keys not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Call YoCo API to create checkout session
+    const yocoResponse = await fetch('https://online.yoco.com/v1/checkouts', {
+      method: 'POST',
+      headers: {
+        'X-Auth-Secret-Key': secretKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount, // Amount in cents
+        currency: 'ZAR',
+        name,
+        description,
+        callback_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          user_id,
+          ...metadata
+        }
+      })
+    });
+    
+    if (!yocoResponse.ok) {
+      const errorData = await yocoResponse.json();
+      throw new Error(errorData.message || `YoCo API error: ${yocoResponse.statusText}`);
+    }
+    
+    const checkoutData = await yocoResponse.json();
+    
+    // Store checkout ID in database
+    await env.DB.prepare(`
+      INSERT INTO payment_checkouts (id, user_id, amount, status, created_at)
+      VALUES (?, ?, ?, 'pending', ?)
+    `).bind(
+      checkoutData.id,
+      user_id,
+      amount,
+      new Date().toISOString()
+    ).run();
+    
+    return new Response(
+      JSON.stringify({
+        id: checkoutData.id,
+        url: checkoutData.redirectUrl,
+        status: 'created',
+        created_at: new Date().toISOString()
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   } catch (error) {
-    console.error('Token verification error:', error);
-    return null;
+    return new Response(
+      JSON.stringify({ error: error.message || 'Failed to create checkout' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+// Verify a payment
+async function verifyPayment(request, env) {
+  try {
+    // Verify authentication
+    await verifyAuth(request);
+    
+    // Parse request body
+    const { payment_id, user_id } = await request.json();
+    
+    if (!payment_id || !user_id) {
+      return new Response(
+        JSON.stringify({ error: 'Missing payment_id or user_id' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Determine YoCo API key based on environment
+    const isProduction = env.NODE_ENV === 'production';
+    const secretKey = isProduction ? env.YOCO_LIVE_SECRET_KEY : env.YOCO_TEST_SECRET_KEY;
+    
+    if (!secretKey) {
+      return new Response(
+        JSON.stringify({ error: 'YoCo API keys not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Check payment status with YoCo API
+    const yocoResponse = await fetch(`https://online.yoco.com/v1/checkouts/${payment_id}`, {
+      method: 'GET',
+      headers: {
+        'X-Auth-Secret-Key': secretKey,
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!yocoResponse.ok) {
+      const errorData = await yocoResponse.json();
+      throw new Error(errorData.message || `YoCo API error: ${yocoResponse.statusText}`);
+    }
+    
+    const paymentData = await yocoResponse.json();
+    
+    // Check if payment is successful
+    if (paymentData.status === 'paid') {
+      // Update checkout status
+      await env.DB.prepare(`
+        UPDATE payment_checkouts 
+        SET status = 'completed', updated_at = ?
+        WHERE id = ?
+      `).bind(
+        new Date().toISOString(),
+        payment_id
+      ).run();
+      
+      // Update user's payment status
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO payment_status 
+        (id, has_paid, payment_date, payment_method, transaction_id, updated_at)
+        VALUES (?, 1, ?, 'yoco', ?, ?)
+      `).bind(
+        user_id,
+        new Date().toISOString(),
+        payment_id,
+        new Date().toISOString()
+      ).run();
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          payment_id,
+          user_id,
+          status: 'paid'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // Payment not successful
+      return new Response(
+        JSON.stringify({
+          success: false,
+          payment_id,
+          user_id,
+          status: paymentData.status,
+          error: 'Payment not completed'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ success: false, error: error.message || 'Failed to verify payment' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+// Get payment history for a user
+async function getPaymentHistory(request, env) {
+  try {
+    // Verify authentication
+    await verifyAuth(request);
+    
+    // Get user ID from URL
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    
+    if (pathParts.length < 2 || pathParts[0] !== 'payment-history') {
+      throw new Error('Invalid URL format');
+    }
+    
+    const userId = pathParts[1];
+    
+    // Query payment history from database
+    const checkouts = await env.DB.prepare(`
+      SELECT c.id, c.amount, c.status, c.created_at, c.updated_at
+      FROM payment_checkouts c
+      WHERE c.user_id = ?
+      ORDER BY c.created_at DESC
+    `).bind(userId).all();
+    
+    return new Response(
+      JSON.stringify({ payments: checkouts.results }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error.message || 'Failed to get payment history' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+// Handle webhook from YoCo
+async function handleWebhook(request, env) {
+  try {
+    // Verify YoCo webhook signature
+    // For real implementation, this would validate the signature from YoCo
+    
+    // Parse webhook data
+    const webhookData = await request.json();
+    
+    if (webhookData.event !== 'checkout.paid') {
+      // Only handle successful payments
+      return new Response(
+        JSON.stringify({ received: true, action: 'ignored' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const { id: payment_id, metadata } = webhookData.data;
+    const user_id = metadata?.user_id;
+    
+    if (!payment_id || !user_id) {
+      throw new Error('Missing payment_id or user_id in webhook data');
+    }
+    
+    // Update checkout status
+    await env.DB.prepare(`
+      UPDATE payment_checkouts 
+      SET status = 'completed', updated_at = ?
+      WHERE id = ?
+    `).bind(
+      new Date().toISOString(),
+      payment_id
+    ).run();
+    
+    // Update user's payment status
+    await env.DB.prepare(`
+      INSERT OR REPLACE INTO payment_status 
+      (id, has_paid, payment_date, payment_method, transaction_id, updated_at)
+      VALUES (?, 1, ?, 'yoco', ?, ?)
+    `).bind(
+      user_id,
+      new Date().toISOString(),
+      payment_id,
+      new Date().toISOString()
+    ).run();
+    
+    return new Response(
+      JSON.stringify({ received: true, processed: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error.message || 'Failed to process webhook' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 }
 
 // Main request handler
 export default {
   async fetch(request, env, ctx) {
-    // Handle CORS preflight
+    // Handle CORS preflight requests
     if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+      return handleOptions(request);
     }
     
-    // Parse the URL to get the path
     const url = new URL(request.url);
-    const path = url.pathname.slice(1);
+    const path = url.pathname;
     
     try {
-      // Routes that don't require authentication
-      if (path === 'health' || path === 'webhook') {
-        if (path === 'health') {
-          return corsResponse({ status: 'ok' });
-        } else if (path === 'webhook' && request.method === 'POST') {
-          return await handleWebhook(request, env);
-        }
-      }
-      
-      // All other routes require authentication
-      const token = parseToken(request);
-      const userId = await verifyToken(token);
-      
-      if (!userId) {
-        return errorResponse('Unauthorized', 401);
-      }
-      
-      // Store userId in env for access in route handlers
-      env.userId = userId;
-      
-      // Route handlers
-      switch (path) {
-        case 'create-checkout':
-          return await createCheckout(request, env);
-          
-        case 'verify-payment':
-          return await verifyPayment(request, env);
-          
-        default:
-          if (path.startsWith('payment-status/')) {
-            const targetUserId = path.replace('payment-status/', '');
-            return await getPaymentStatus(targetUserId, env);
-          }
-          
-          return errorResponse('Not Found', 404);
+      // Route request based on path
+      if (path === '/create-checkout' && request.method === 'POST') {
+        return createCheckout(request, env);
+      } else if (path === '/verify-payment' && request.method === 'POST') {
+        return verifyPayment(request, env);
+      } else if (path.startsWith('/payment-history/') && request.method === 'GET') {
+        return getPaymentHistory(request, env);
+      } else if (path === '/webhook' && request.method === 'POST') {
+        return handleWebhook(request, env);
+      } else {
+        return new Response('Not found', { status: 404, headers: corsHeaders });
       }
     } catch (error) {
-      console.error('Worker error:', error);
-      return errorResponse(error.message || 'Internal Server Error', 500);
+      return new Response(
+        JSON.stringify({ error: error.message || 'Internal server error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
   }
 };
-
-// Create a YoCo checkout session
-async function createCheckout(request, env) {
-  const data = await request.json();
-  
-  if (!data.userId || !data.amount) {
-    return errorResponse('Missing required fields');
-  }
-  
-  // Get YoCo API key based on environment
-  const yocoApiKey = env.NODE_ENV === 'production'
-    ? env.YOCO_LIVE_SECRET_KEY
-    : env.YOCO_TEST_SECRET_KEY;
-  
-  try {
-    // Create checkout session with YoCo API
-    const checkoutResponse = await fetch('https://online.yoco.com/v1/checkouts', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${yocoApiKey}`
-      },
-      body: JSON.stringify({
-        amount: data.amount,
-        currency: data.currency || 'ZAR',
-        name: data.name || 'Full Game Access',
-        description: data.description || 'Unlock all game modes and cards',
-        metadata: {
-          userId: data.userId,
-          ...data.metadata
-        },
-        callback_url: data.successUrl,
-        cancel_url: data.cancelUrl
-      })
-    });
-    
-    if (!checkoutResponse.ok) {
-      const errorData = await checkoutResponse.json();
-      return errorResponse(errorData.message || 'Failed to create checkout', 400);
-    }
-    
-    const checkoutData = await checkoutResponse.json();
-    
-    return corsResponse({
-      url: checkoutData.redirectUrl,
-      id: checkoutData.id
-    });
-  } catch (error) {
-    console.error('YoCo checkout error:', error);
-    return errorResponse(`Checkout creation failed: ${error.message}`, 500);
-  }
-}
-
-// Verify a payment
-async function verifyPayment(request, env) {
-  const { checkoutId } = await request.json();
-  
-  if (!checkoutId) {
-    return errorResponse('Missing checkoutId');
-  }
-  
-  // Get YoCo API key based on environment
-  const yocoApiKey = env.NODE_ENV === 'production'
-    ? env.YOCO_LIVE_SECRET_KEY
-    : env.YOCO_TEST_SECRET_KEY;
-  
-  try {
-    // Verify checkout with YoCo API
-    const verifyResponse = await fetch(`https://online.yoco.com/v1/checkouts/${checkoutId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${yocoApiKey}`
-      }
-    });
-    
-    if (!verifyResponse.ok) {
-      const errorData = await verifyResponse.json();
-      return errorResponse(errorData.message || 'Failed to verify payment', 400);
-    }
-    
-    const paymentData = await verifyResponse.json();
-    
-    // Check payment status
-    if (paymentData.status === 'succeeded') {
-      // Get user ID from metadata
-      const userId = paymentData.metadata?.userId;
-      
-      if (userId) {
-        // Update user's payment status
-        await updatePaymentStatus(userId, checkoutId, env);
-        
-        // Process referral if exists
-        if (paymentData.metadata?.referrerId) {
-          await processReferralBonus(paymentData.metadata.referrerId, env);
-        }
-      }
-      
-      return corsResponse({ success: true });
-    } else {
-      return corsResponse({ 
-        success: false, 
-        error: `Payment not completed. Status: ${paymentData.status}` 
-      });
-    }
-  } catch (error) {
-    console.error('Payment verification error:', error);
-    return errorResponse(`Verification failed: ${error.message}`, 500);
-  }
-}
-
-// Handle YoCo webhook events
-async function handleWebhook(request, env) {
-  // Verify webhook signature
-  const signature = request.headers.get('x-yoco-signature');
-  
-  // In a production implementation, we would verify the signature
-  // using the webhook secret and the request body
-  
-  try {
-    const webhookData = await request.json();
-    
-    if (webhookData.event === 'checkout.succeeded') {
-      // Get user ID from metadata
-      const userId = webhookData.data.metadata?.userId;
-      
-      if (userId) {
-        // Update payment status
-        await updatePaymentStatus(userId, webhookData.data.id, env);
-        
-        // Process referral bonus if exists
-        if (webhookData.data.metadata?.referrerId) {
-          await processReferralBonus(webhookData.data.metadata.referrerId, env);
-        }
-      }
-    }
-    
-    return corsResponse({ received: true });
-  } catch (error) {
-    console.error('Webhook processing error:', error);
-    return errorResponse(`Webhook processing failed: ${error.message}`, 500);
-  }
-}
-
-// Update a user's payment status
-async function updatePaymentStatus(userId, transactionId, env) {
-  const sql = `
-    UPDATE payment_status 
-    SET has_paid = TRUE, 
-        payment_date = datetime('now'), 
-        payment_method = 'yoco', 
-        transaction_id = ?, 
-        updated_at = datetime('now') 
-    WHERE id = ?
-  `;
-  
-  const stmt = await env.DB.prepare(sql).bind(transactionId, userId);
-  await stmt.run();
-  
-  console.log(`Updated payment status for user ${userId}`);
-  return true;
-}
-
-// Process referral bonus (add Digi to referrer)
-async function processReferralBonus(referrerId, env) {
-  const REFERRAL_BONUS = 5; // 5 Digi as per requirements
-  
-  const sql = `
-    UPDATE profiles 
-    SET digi = digi + ? 
-    WHERE id = ?
-  `;
-  
-  const stmt = await env.DB.prepare(sql).bind(REFERRAL_BONUS, referrerId);
-  await stmt.run();
-  
-  console.log(`Added ${REFERRAL_BONUS} Digi to referrer ${referrerId}`);
-  return true;
-}
-
-// Get payment status for a user
-async function getPaymentStatus(userId, env) {
-  if (!userId) {
-    return errorResponse('Missing userId');
-  }
-  
-  try {
-    const sql = `
-      SELECT has_paid, payment_date, payment_method 
-      FROM payment_status 
-      WHERE id = ?
-    `;
-    
-    const stmt = await env.DB.prepare(sql).bind(userId);
-    const result = await stmt.first();
-    
-    if (!result) {
-      return corsResponse({ has_paid: false });
-    }
-    
-    return corsResponse({
-      has_paid: result.has_paid === 1, // SQLite returns 1/0 for boolean
-      payment_date: result.payment_date,
-      payment_method: result.payment_method
-    });
-  } catch (error) {
-    console.error('Error fetching payment status:', error);
-    return errorResponse(`Failed to get payment status: ${error.message}`, 500);
-  }
-}

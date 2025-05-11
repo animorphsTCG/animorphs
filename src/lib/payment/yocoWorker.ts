@@ -1,36 +1,39 @@
 
 /**
  * YoCo Payment Worker Client
- * Handles payment processing via YoCo checkout and Cloudflare Worker
+ * Handles payment processing via YoCo integrated with Cloudflare Worker
  */
 
 // Configuration
-const PAYMENT_WORKER_URL = 'https://payments.animorphs.workers.dev';
+const CF_PAYMENT_URL = 'https://payment.animorphs.workers.dev';
 
-// Checkout options
-export interface YocoCheckoutOptions {
-  amount: number;                 // In cents (e.g., R100 = 10000)
-  currency?: string;              // Default: ZAR
-  name?: string;                  // Product name
-  description?: string;           // Product description
-  metadata?: Record<string, any>; // Additional data to store
-  successUrl: string;             // Redirect after success
-  cancelUrl: string;              // Redirect after cancel
-}
-
-// Response from checkout creation
+// YoCo checkout session response
 export interface YocoCheckoutResponse {
-  url: string;                   // Checkout URL to redirect to
-  id: string;                    // Checkout ID for reference
+  id: string;
+  url: string;
+  status: string;
+  created_at: string;
 }
 
-// Payment verification result
-export interface PaymentVerificationResult {
+// Payment verification response
+export interface PaymentVerificationResponse {
   success: boolean;
   error?: string;
+  payment_id?: string;
+  user_id?: string;
 }
 
-// Standard HTTP headers
+// Checkout session options
+export interface CreateCheckoutOptions {
+  amount: number; // amount in cents
+  name: string;
+  description: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata?: Record<string, any>;
+}
+
+// Standard HTTP headers for requests
 const getHeaders = (token?: string) => {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -43,96 +46,91 @@ const getHeaders = (token?: string) => {
   return headers;
 };
 
-// YoCo worker client
+// YoCo payment worker methods
 export const yocoWorker = {
   // Create a checkout session
   async createCheckout(
     token: string,
     userId: string,
-    options: YocoCheckoutOptions
+    options: CreateCheckoutOptions
   ): Promise<YocoCheckoutResponse> {
     try {
-      const response = await fetch(`${PAYMENT_WORKER_URL}/create-checkout`, {
+      const response = await fetch(`${CF_PAYMENT_URL}/create-checkout`, {
         method: 'POST',
         headers: getHeaders(token),
         body: JSON.stringify({
-          userId,
-          amount: options.amount,
-          currency: options.currency || 'ZAR',
-          name: options.name || 'Full Game Access',
-          description: options.description || 'Unlock all game modes and all 200 cards',
-          metadata: {
-            userId,
-            ...options.metadata
-          },
-          successUrl: options.successUrl,
-          cancelUrl: options.cancelUrl
+          user_id: userId,
+          ...options
         })
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create checkout session');
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Payment creation failed: ${response.statusText}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      return data as YocoCheckoutResponse;
     } catch (error) {
       console.error('[YoCo Worker] Error creating checkout:', error);
       throw error;
     }
   },
   
-  // Verify a payment
+  // Verify payment status
   async verifyPayment(
     token: string,
-    checkoutId: string
-  ): Promise<PaymentVerificationResult> {
+    paymentId: string,
+    userId: string
+  ): Promise<PaymentVerificationResponse> {
     try {
-      const response = await fetch(`${PAYMENT_WORKER_URL}/verify-payment`, {
+      const response = await fetch(`${CF_PAYMENT_URL}/verify-payment`, {
         method: 'POST',
         headers: getHeaders(token),
-        body: JSON.stringify({ checkoutId })
+        body: JSON.stringify({
+          payment_id: paymentId,
+          user_id: userId
+        })
       });
       
       if (!response.ok) {
-        const error = await response.json();
+        const errorData = await response.json();
         return {
           success: false,
-          error: error.message || 'Payment verification failed'
+          error: errorData.error || `Payment verification failed: ${response.statusText}`
         };
       }
       
-      const result = await response.json();
+      const data = await response.json();
       return {
-        success: result.success,
-        error: result.error
+        success: true,
+        payment_id: data.payment_id,
+        user_id: data.user_id
       };
-    } catch (error: any) {
+    } catch (error) {
       console.error('[YoCo Worker] Error verifying payment:', error);
       return {
         success: false,
-        error: error.message || 'An error occurred while verifying payment'
+        error: error.message || 'Unknown error during payment verification'
       };
     }
   },
   
-  // Get payment status
-  async getPaymentStatus(
-    token: string,
-    userId: string
-  ): Promise<{ has_paid: boolean, payment_date?: string, payment_method?: string }> {
+  // Get payment history
+  async getPaymentHistory(token: string, userId: string): Promise<any[]> {
     try {
-      const response = await fetch(`${PAYMENT_WORKER_URL}/payment-status/${userId}`, {
+      const response = await fetch(`${CF_PAYMENT_URL}/payment-history/${userId}`, {
         headers: getHeaders(token)
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch payment status');
+        throw new Error(`Failed to fetch payment history: ${response.statusText}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      return data.payments || [];
     } catch (error) {
-      console.error('[YoCo Worker] Error fetching payment status:', error);
+      console.error('[YoCo Worker] Error fetching payment history:', error);
       throw error;
     }
   }

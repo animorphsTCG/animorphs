@@ -1,118 +1,128 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Icons } from '@/components/ui/icons';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/modules/auth';
-import { yocoWorker, PaymentVerificationResult } from '@/lib/payment/yocoWorker';
-import { Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { yocoWorker } from '@/lib/payment/yocoWorker';
 
 const PaymentSuccess = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { refreshProfile, token } = useAuth();
-  const [isVerifying, setIsVerifying] = useState(true);
-  const [verificationError, setVerificationError] = useState<string | null>(null);
-  const [verificationResult, setVerificationResult] = useState<PaymentVerificationResult | null>(null);
-  const sessionId = searchParams.get('session_id');
-
+  const location = useLocation();
+  const { user, token, refreshProfile } = useAuth();
+  const [verifying, setVerifying] = useState(true);
+  const [success, setSuccess] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
   useEffect(() => {
-    async function verifyAndUpdatePayment() {
-      if (!sessionId || !token?.access_token) {
-        setIsVerifying(false);
-        setVerificationError('No payment session found or user not authenticated');
-        return;
-      }
-
+    if (!user?.id || !token?.access_token) {
+      navigate('/login');
+      return;
+    }
+    
+    const verifyPayment = async () => {
+      setVerifying(true);
       try {
-        const result = await yocoWorker.verifyPayment(token.access_token, sessionId);
-        setVerificationResult(result);
+        // Get payment ID from URL query params
+        const searchParams = new URLSearchParams(location.search);
+        const paymentId = searchParams.get('payment_id');
+        
+        if (!paymentId) {
+          setError('Payment ID not found in URL');
+          setSuccess(false);
+          return;
+        }
+        
+        // Verify payment with our worker
+        const result = await yocoWorker.verifyPayment(
+          token.access_token,
+          paymentId,
+          user.id
+        );
         
         if (result.success) {
-          // Refresh the user profile to get updated payment status
+          setSuccess(true);
+          
+          // Refresh user profile to get updated payment status
           await refreshProfile();
+          
+          toast({
+            title: 'Payment Successful',
+            description: 'Your account has been upgraded. Enjoy all game features!',
+            variant: 'default',
+          });
         } else {
-          setVerificationError(result.error || 'Payment verification failed');
+          setSuccess(false);
+          setError(result.error || 'Payment verification failed');
+          
+          toast({
+            title: 'Payment Verification Failed',
+            description: result.error || 'There was an issue verifying your payment',
+            variant: 'destructive',
+          });
         }
-      } catch (error: any) {
-        console.error('Error verifying payment:', error);
-        setVerificationError(error.message || 'An error occurred while verifying payment');
+      } catch (err: any) {
+        console.error('Payment verification error:', err);
+        setSuccess(false);
+        setError(err.message || 'An error occurred while verifying the payment');
+        
+        toast({
+          title: 'Payment Verification Error',
+          description: err.message || 'An unexpected error occurred',
+          variant: 'destructive',
+        });
       } finally {
-        setIsVerifying(false);
+        setVerifying(false);
       }
-    }
-
-    verifyAndUpdatePayment();
-  }, [sessionId, refreshProfile, token]);
+    };
+    
+    verifyPayment();
+  }, [user, token, location.search, navigate, refreshProfile]);
 
   return (
     <div className="container mx-auto py-12 px-4">
       <div className="max-w-md mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl text-center flex items-center justify-center">
-              {isVerifying ? (
-                <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              ) : verificationError ? (
-                <Icons.error className="h-6 w-6 text-red-500 mr-2" />
-              ) : (
-                <Icons.check className="h-6 w-6 text-green-500 mr-2" />
-              )}
-              Payment {isVerifying ? 'Processing' : verificationError ? 'Error' : 'Successful'}
-            </CardTitle>
+            <CardTitle>Payment Status</CardTitle>
+            <CardDescription>
+              Verifying your payment...
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            {isVerifying ? (
-              <div className="text-center py-6">
-                <p className="mb-4">Verifying your payment...</p>
-                <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+          
+          <CardContent className="pt-6">
+            {verifying ? (
+              <div className="flex flex-col items-center py-8 text-center">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <p className="text-lg font-medium">Verifying your payment</p>
+                <p className="text-gray-500 mt-1">Please wait while we confirm your transaction</p>
               </div>
-            ) : verificationError ? (
-              <div className="space-y-6">
-                <p className="text-center text-red-500">{verificationError}</p>
-                <p className="text-center">
-                  There was a problem verifying your payment. If funds were deducted, please contact support.
-                </p>
-                <div className="flex justify-center">
-                  <Button onClick={() => navigate('/profile')}>
-                    Return to Profile
+            ) : success ? (
+              <div className="flex flex-col items-center py-8 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+                <p className="text-lg font-medium">Payment Successful!</p>
+                <p className="text-gray-500 mt-1 mb-6">Your account has been upgraded successfully</p>
+                
+                <div className="flex flex-col space-y-2 w-full max-w-xs">
+                  <Button onClick={() => navigate('/battle')} className="w-full">
+                    Start Playing
+                  </Button>
+                  <Button onClick={() => navigate('/profile')} variant="outline" className="w-full">
+                    View Profile
                   </Button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="flex justify-center mb-6">
-                  <div className="rounded-full bg-green-100 p-3">
-                    <Icons.check className="h-8 w-8 text-green-500" />
-                  </div>
-                </div>
+              <div className="flex flex-col items-center py-8 text-center">
+                <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+                <p className="text-lg font-medium">Payment Verification Failed</p>
+                <p className="text-gray-500 mt-1 mb-2">{error || 'There was an issue with your payment'}</p>
+                <p className="text-sm mb-6">If you believe this is an error, please contact support.</p>
                 
-                <h2 className="text-xl font-bold text-center">Thank you for your purchase!</h2>
-                
-                <p className="text-center">
-                  Your payment was successful and your account has been upgraded to full access.
-                </p>
-                
-                <div className="border-t border-b py-4 my-6">
-                  <div className="flex justify-between">
-                    <span>Amount paid:</span>
-                    <span className="font-bold">R100 ZAR</span>
-                  </div>
-                </div>
-                
-                <p className="text-center text-sm">
-                  You now have access to all game modes and all 200 cards.
-                </p>
-                
-                <div className="flex flex-col space-y-2">
-                  <Button onClick={() => navigate('/card-gallery')}>
-                    View All Cards
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => navigate('/profile')}
-                  >
+                <div className="flex flex-col space-y-2 w-full max-w-xs">
+                  <Button onClick={() => navigate('/profile')} className="w-full">
                     Return to Profile
                   </Button>
                 </div>

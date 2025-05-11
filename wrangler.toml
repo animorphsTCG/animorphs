@@ -31,10 +31,16 @@ new_classes = ["PresenceDO"]
 # Environment variables
 [vars]
 NODE_ENV = "development"
+EOS_CLIENT_ID = "xyza78914XQON5yBeLZvdyhqLtZUKriu"
+EOS_CLIENT_SECRET = "Kxrh2Tmag20JFML8uFgBWxBRyvfWe0352B3jOCDKSjs"
+EOS_ENVIRONMENT = "Release"
+EOS_ENV_LIVE_SANDBOX_ID = "90eb223664704cb6ab8da2529a62d052"
+EOS_ENV_RELEASE_ID = "c3b2637442224a31b5408418bdfbe9a6"
 
 # Production environment
 [env.production]
 NODE_ENV = "production"
+EOS_ENVIRONMENT = "Release"
 
 # Custom routes
 [routes]
@@ -57,3 +63,7 @@ main = "worker-templates/presence-worker.js"
 [env.payment-worker]
 name = "payment-worker"
 main = "worker-templates/payment-worker.js"
+
+[env.assets-worker]
+name = "assets-worker"
+main = "worker-templates/assets-worker.js"

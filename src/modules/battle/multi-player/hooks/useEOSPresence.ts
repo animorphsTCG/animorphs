@@ -1,9 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/modules/auth';
 import { toast } from '@/components/ui/use-toast';
-import { resetSupabaseConnection } from '@/lib/supabase';
+import { presenceWorker } from '@/lib/cloudflare/presenceWorker';
 
 // Define types for presence data
 export interface UserPresence {
@@ -27,7 +26,7 @@ const defaultOptions: UseEOSPresenceOptions = {
 };
 
 export const useEOSPresence = (options: UseEOSPresenceOptions = {}) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('disconnected');
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const [presenceError, setPresenceError] = useState<string | null>(null);
@@ -38,26 +37,22 @@ export const useEOSPresence = (options: UseEOSPresenceOptions = {}) => {
   
   // Track presence with exponential backoff retry
   const trackPresence = useCallback(async (status: 'online' | 'away' | 'busy' | 'offline' = 'online') => {
-    if (!user) return;
+    if (!user || !token?.access_token) return;
     
     try {
       const now = Date.now();
       setLastHeartbeat(now);
       
-      // Update the presence record
-      const { error } = await supabase
-        .from('user_presence')
-        .upsert({
-          user_id: user.id,
-          last_seen: new Date().toISOString(),
-          status,
-          metadata: {
-            last_ping: now,
-            user_agent: navigator.userAgent,
-          }
-        }, { onConflict: 'user_id' });
-        
-      if (error) throw error;
+      // Update the presence record using Cloudflare worker
+      await presenceWorker.updatePresence(
+        user.id,
+        status,
+        {
+          last_ping: now,
+          user_agent: navigator.userAgent,
+        },
+        token.access_token
+      );
       
       // Reset error and reconnect attempts on success
       if (presenceError) setPresenceError(null);
@@ -84,13 +79,8 @@ export const useEOSPresence = (options: UseEOSPresenceOptions = {}) => {
         console.warn(`[EOS Presence] Reconnecting in ${delay}ms (attempt ${attempts})`);
         setTimeout(() => trackPresence(status), delay);
       }
-      
-      // Force reset Supabase connection after several retries
-      if (reconnectAttempts >= 3) {
-        resetSupabaseConnection();
-      }
     }
-  }, [user, presenceError, reconnectAttempts, connectionStatus, mergedOptions]);
+  }, [user, token, presenceError, reconnectAttempts, connectionStatus, mergedOptions]);
   
   // Set up heartbeat interval
   useEffect(() => {
@@ -118,19 +108,22 @@ export const useEOSPresence = (options: UseEOSPresenceOptions = {}) => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       
       // Set status to offline when component unmounts
-      if (user) {
-        supabase
-          .from('user_presence')
-          .update({ status: 'offline' })
-          .eq('user_id', user.id)
-          .then(() => {
-            if (mergedOptions.logActivity) {
-              console.log('[EOS Presence] Set status to offline on unmount');
-            }
-          }, (err) => console.error('[EOS Presence] Error updating offline status:', err));
+      if (user && token?.access_token) {
+        presenceWorker.updatePresence(
+          user.id,
+          'offline',
+          { last_ping: Date.now() },
+          token.access_token
+        )
+        .then(() => {
+          if (mergedOptions.logActivity) {
+            console.log('[EOS Presence] Set status to offline on unmount');
+          }
+        })
+        .catch(err => console.error('[EOS Presence] Error updating offline status:', err));
       }
     };
-  }, [user, trackPresence, mergedOptions.heartbeatInterval, mergedOptions.logActivity]);
+  }, [user, token, trackPresence, mergedOptions.heartbeatInterval, mergedOptions.logActivity]);
   
   // Function to manually update status
   const setStatus = useCallback((status: 'online' | 'away' | 'busy' | 'offline') => {

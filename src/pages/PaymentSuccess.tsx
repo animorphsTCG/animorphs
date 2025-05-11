@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/icons';
 import { useAuth } from '@/modules/auth';
-import { verifyPayment, PaymentVerificationResult } from '@/lib/payment';
+import { yocoWorker, PaymentVerificationResult } from '@/lib/payment/yocoWorker';
 import { Loader2 } from 'lucide-react';
 
 const PaymentSuccess = () => {
@@ -14,6 +14,7 @@ const PaymentSuccess = () => {
   const { refreshProfile, token } = useAuth();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verificationResult, setVerificationResult] = useState<PaymentVerificationResult | null>(null);
   const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
@@ -25,7 +26,8 @@ const PaymentSuccess = () => {
       }
 
       try {
-        const result = await verifyPayment(token.access_token, sessionId);
+        const result = await yocoWorker.verifyPayment(token.access_token, sessionId);
+        setVerificationResult(result);
         
         if (result.success) {
           // Refresh the user profile to get updated payment status

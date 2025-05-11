@@ -1,9 +1,10 @@
+
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/modules/auth'; // Updated import path
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/modules/auth'; 
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
 
 export const useAdmin = () => {
-  const { user, token } = useAuth();  // Updated to use token instead of session
+  const { user, token } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState<string | null>(null);
@@ -33,10 +34,14 @@ export const useAdmin = () => {
           console.log("Admin access granted based on admin email");
           
           // Update the profile to ensure the is_admin flag is set
-          await supabase
-            .from('profiles')
-            .update({ is_admin: true })
-            .eq('id', user.id);
+          await d1Worker.update(
+            'profiles',
+            { is_admin: true },
+            'id = ?',
+            [user.id],
+            '',
+            token.access_token
+          );
           
           setIsAdmin(true);
           setLoading(false);
@@ -45,20 +50,18 @@ export const useAdmin = () => {
         
         // Otherwise, check the database for admin status
         console.log("Checking database for admin status");
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single();
+        const profileData = await d1Worker.getOne(
+          'SELECT is_admin FROM profiles WHERE id = ?',
+          { params: [user.id] },
+          token.access_token
+        );
 
-        if (error) {
-          console.error("Error fetching admin status:", error);
-          setCheckError(error.message);
-          throw error;
+        if (!profileData) {
+          throw new Error("Profile not found");
         }
         
-        console.log("Admin check result:", data);
-        setIsAdmin(data?.is_admin || false);
+        console.log("Admin check result:", profileData);
+        setIsAdmin(profileData?.is_admin || false);
       } catch (error) {
         console.error('Error checking admin status:', error);
         setCheckError("Failed to check admin status");

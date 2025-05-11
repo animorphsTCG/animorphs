@@ -5,7 +5,7 @@ import { Icons } from '@/components/ui/icons';
 import { UserProfile } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { createCheckoutSession } from '@/lib/payment/yocoPayment';
+import { yocoWorker } from '@/lib/payment/yocoWorker';
 import { useAuth } from '@/modules/auth';
 
 interface PaymentSectionProps {
@@ -29,8 +29,8 @@ export default function PaymentSection({ userProfile, onPaymentComplete }: Payme
     
     setIsLoading(true);
     try {
-      // Create YoCo checkout session
-      const checkoutResponse = await createCheckoutSession(
+      // Create YoCo checkout session using our worker client
+      const checkoutResponse = await yocoWorker.createCheckout(
         token.access_token,
         user.id,
         {

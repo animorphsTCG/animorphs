@@ -1,0 +1,59 @@
+
+# Wrangler configuration for Animorphs game
+
+# Global configuration
+name = "animorphs"
+main = "src/worker.js"
+compatibility_date = "2023-05-10"
+node_compat = true
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "animorphs-db"
+database_id = "44cd43b3-629e-4cf6-88ea-f6999339abb1"
+
+# R2 Bucket for assets
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "animorphs-assets"
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "PRESENCE_DO"
+class_name = "PresenceDO"
+
+# Migrations
+[[migrations]]
+tag = "v1"
+new_classes = ["PresenceDO"]
+
+# Environment variables
+[vars]
+NODE_ENV = "development"
+
+# Production environment
+[env.production]
+NODE_ENV = "production"
+
+# Custom routes
+[routes]
+pattern = "/api/*"
+script = "src/worker.js"
+
+# Triggers for cleaning up stale presence data
+[triggers]
+crons = ["*/10 * * * *"] # Run every 10 minutes
+
+# Workers for specific functions
+[env.db-worker]
+name = "db-worker"
+main = "worker-templates/db-worker.js"
+
+[env.presence-worker]
+name = "presence-worker"
+main = "worker-templates/presence-worker.js"
+
+[env.payment-worker]
+name = "payment-worker"
+main = "worker-templates/payment-worker.js"

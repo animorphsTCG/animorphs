@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/modules/auth/context/EOSAuthContext';
-import { getOnlineUsers, UserPresence } from '@/lib/eos/eosPresence';
+import { useAuth } from '@/modules/auth';
+import { presenceWorker, UserPresence } from '@/lib/cloudflare/presenceWorker';
 
 export interface OnlineUser {
   id: string;
@@ -32,8 +32,8 @@ export const useOnlineUsers = (autoRefreshInterval: number = 15000) => {
       setLoading(true);
       setError(null);
       
-      // Fetch online users from our presence system
-      const users = await getOnlineUsers(token.access_token);
+      // Fetch online users from our presence worker
+      const users = await presenceWorker.getOnlineUsers(token.access_token);
       
       // Format the response to match our interface
       const formattedUsers: OnlineUser[] = users.map(user => ({

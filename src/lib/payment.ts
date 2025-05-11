@@ -1,3 +1,3 @@
 
-// Re-export from YoCo payment
-export * from './payment/yocoPayment';
+// Re-export from YoCo payment worker 
+export * from './payment/yocoWorker';

@@ -38,7 +38,7 @@ const Routes = () => {
   return (
     <RouterRoutes>
       {/* Public Routes */}
-      <Route path="/" element={<Layout />}>
+      <Route element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="about" element={<About />} />
         <Route path="login" element={<Login />} />

@@ -1,5 +1,5 @@
 
-import { Routes as RouterRoutes, Route, Navigate } from 'react-router-dom';
+import { Routes as RouterRoutes, Route, Navigate, Outlet } from 'react-router-dom';
 
 import Layout from '@/components/Layout';
 import { ProtectedRoute } from '@/modules/auth';
@@ -38,7 +38,7 @@ const Routes = () => {
   return (
     <RouterRoutes>
       {/* Public Routes */}
-      <Route element={<Layout />}>
+      <Route element={<Layout><Outlet /></Layout>}>
         <Route index element={<Index />} />
         <Route path="about" element={<About />} />
         <Route path="login" element={<Login />} />

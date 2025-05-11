@@ -24,7 +24,9 @@ const EpicGamesButton: React.FC<EpicGamesButtonProps> = ({
   const handleEpicLogin = () => {
     try {
       setIsLoading(true);
+      console.log("Initiating Epic Games login flow...");
       const epicOAuthURL = getEpicGamesOAuthURL();
+      console.log("Generated OAuth URL:", epicOAuthURL);
       window.location.href = epicOAuthURL;
     } catch (error) {
       console.error('Epic Games login error:', error);

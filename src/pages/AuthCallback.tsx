@@ -15,8 +15,10 @@ const AuthCallback = () => {
   useEffect(() => {
     const processAuth = async () => {
       try {
+        console.log("Processing auth callback...");
         // Get the current URL and parse it
         const url = new URL(window.location.href);
+        console.log("Auth callback URL:", url.toString());
         
         // Check for error in the URL parameters
         const errorParam = url.searchParams.get('error');
@@ -28,6 +30,7 @@ const AuthCallback = () => {
         
         // Handle the OAuth callback
         const authResponse = await handleAuthCallback(url);
+        console.log("Auth response received:", { ...authResponse, access_token: "[REDACTED]" });
         
         // Pass the auth response to the auth context
         await handleExternalAuth(authResponse);
@@ -38,8 +41,6 @@ const AuthCallback = () => {
         console.error('Auth callback error:', error);
         setError(error.message || 'Authentication failed. Please try again.');
         setIsLoading(false);
-        
-        // Don't auto-redirect on error so the user can see the message
       } finally {
         setIsLoading(false);
       }

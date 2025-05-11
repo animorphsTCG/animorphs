@@ -1,10 +1,11 @@
+
 /**
  * Epic Online Services (EOS) Authentication Client
  * Handles token-based authentication with Epic's OAuth service
  */
 
 const EOS_BASE_URL = 'https://api.epicgames.dev';
-const EOS_AUTH_URL = 'https://www.epicgames.com/id/api/redirect';
+const EOS_AUTH_URL = 'https://www.epicgames.com/id/authorize';
 
 // Environment-based configuration
 interface EOSConfig {
@@ -17,18 +18,26 @@ interface EOSConfig {
 
 // Get EOS configuration from environment variables
 export const getEOSConfig = (): EOSConfig => {
-  const clientId = import.meta.env.EOS_CLIENT_ID || 'xyza78914XQON5yBeLZvdyhqLtZUKriu';
-  const clientSecret = import.meta.env.EOS_CLIENT_SECRET || 'Kxrh2Tmag20JFML8uFgBWxBRyvfWe0352B3jOCDKSjs';
+  const clientId = import.meta.env.VITE_EOS_CLIENT_ID || 'xyza78914XQON5yBeLZvdyhqLtZUKriu';
+  const clientSecret = import.meta.env.VITE_EOS_CLIENT_SECRET || 'Kxrh2Tmag20JFML8uFgBWxBRyvfWe0352B3jOCDKSjs';
   // Check if we're in production environment
-  const isProduction = import.meta.env.EOS_ENVIRONMENT === 'Release';
+  const isProduction = import.meta.env.VITE_EOS_ENVIRONMENT === 'Release';
   
   // Use the appropriate environment ID based on the environment
   const environmentId = isProduction 
-    ? import.meta.env.EOS_ENV_RELEASE_ID || 'c3b2637442224a31b5408418bdfbe9a6'  
-    : import.meta.env.EOS_ENV_LIVE_SANDBOX_ID || '90eb223664704cb6ab8da2529a62d052';
+    ? import.meta.env.VITE_EOS_ENV_RELEASE_ID || 'c3b2637442224a31b5408418bdfbe9a6'  
+    : import.meta.env.VITE_EOS_ENV_LIVE_SANDBOX_ID || '90eb223664704cb6ab8da2529a62d052';
     
   // Redirect URL for OAuth flows
   const redirectUrl = `${window.location.origin}/auth/callback`;
+  
+  console.log("EOS Config:", { 
+    clientId, 
+    // Don't log the secret
+    environmentId, 
+    isProduction, 
+    redirectUrl 
+  });
   
   return {
     clientId,

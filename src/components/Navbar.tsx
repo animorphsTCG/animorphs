@@ -1,7 +1,8 @@
+
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, Users, LogOut, UserCircle, Gamepad, Swords } from "lucide-react";
+import { Menu, X, User, Users, LogOut, UserCircle, Gamepad, Swords, Shield } from "lucide-react";
 import { useAuth } from "@/modules/auth/context/AuthContext";
 import {
   DropdownMenu,
@@ -141,6 +142,14 @@ const Navbar = () => {
                 <Swords className="mr-2 h-4 w-4" /> Multiplayer
               </Link>
             )}
+            
+            <Link to="/terms-and-conditions" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
+              <Shield className="mr-2 h-4 w-4" /> Terms & Conditions
+            </Link>
+            
+            <Link to="/privacy-policy" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
+              <Shield className="mr-2 h-4 w-4" /> Privacy Policy
+            </Link>
             
             {user && (
               <>

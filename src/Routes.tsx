@@ -27,6 +27,7 @@ import Verify from '@/pages/Verify';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentCancelled from '@/pages/PaymentCancelled';
 import TermsAndConditions from '@/pages/TermsAndConditions';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import OneVOneBattle from '@/pages/OneVOneBattle';
 import ThreePlayerBattle from '@/pages/ThreePlayerBattle';
 import FourPlayerPublicBattle from '@/pages/FourPlayerPublicBattle';
@@ -51,6 +52,7 @@ const Routes = () => {
         <Route path="payment-success" element={<PaymentSuccess />} />
         <Route path="payment-cancelled" element={<PaymentCancelled />} />
         <Route path="terms-and-conditions" element={<TermsAndConditions />} />
+        <Route path="privacy-policy" element={<PrivacyPolicy />} />
         
         {/* Auth Callback for Epic Games OAuth */}
         <Route path="auth/callback" element={<AuthCallback />} />

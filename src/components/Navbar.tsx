@@ -65,8 +65,9 @@ const Navbar = () => {
               </Link>
             )}
 
+            {/* Privacy Policy link visible to all users */}
             <Link to="/privacy-policy" className="text-white hover:text-fantasy-accent transition-colors font-medium flex items-center">
-              <Shield className="mr-1 h-4 w-4" /> Privacy
+              <Shield className="mr-1 h-4 w-4" /> Privacy Policy
             </Link>
             
             {!isLoading && (
@@ -151,6 +152,7 @@ const Navbar = () => {
               </Link>
             )}
             
+            {/* Privacy Policy link prominent in mobile view */}
             <Link to="/privacy-policy" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
               <Shield className="mr-2 h-4 w-4" /> Privacy Policy
             </Link>

@@ -64,6 +64,10 @@ const Navbar = () => {
                 <Swords className="mr-1 h-4 w-4" /> Multiplayer
               </Link>
             )}
+
+            <Link to="/privacy-policy" className="text-white hover:text-fantasy-accent transition-colors font-medium flex items-center">
+              <Shield className="mr-1 h-4 w-4" /> Privacy
+            </Link>
             
             {!isLoading && (
               <>
@@ -84,6 +88,10 @@ const Navbar = () => {
                       <DropdownMenuItem onClick={() => handleProfileClick(`/profile/${user.id}`)}>
                         <Users className="mr-2 h-4 w-4" />
                         <span>Public Profile</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleProfileClick('/privacy-policy')}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Privacy Policy</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => signOut()}>
@@ -143,12 +151,12 @@ const Navbar = () => {
               </Link>
             )}
             
-            <Link to="/terms-and-conditions" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
-              <Shield className="mr-2 h-4 w-4" /> Terms & Conditions
-            </Link>
-            
             <Link to="/privacy-policy" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
               <Shield className="mr-2 h-4 w-4" /> Privacy Policy
+            </Link>
+            
+            <Link to="/terms-and-conditions" className="text-white hover:text-fantasy-accent text-lg font-medium flex items-center" onClick={toggleMenu}>
+              <Shield className="mr-2 h-4 w-4" /> Terms & Conditions
             </Link>
             
             {user && (

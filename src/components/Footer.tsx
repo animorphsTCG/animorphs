@@ -58,7 +58,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/privacy-policy" className="text-gray-400 hover:text-fantasy-accent">
+                <Link to="/privacy-policy" className="text-gray-400 hover:text-fantasy-accent font-semibold text-fantasy-accent">
                   Privacy Policy
                 </Link>
               </li>
@@ -74,6 +74,10 @@ const Footer = () => {
         
         <div className="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
           <p>© {new Date().getFullYear()} Animorph Battle Verse. All rights reserved.</p>
+          <div className="mt-2 flex justify-center space-x-4">
+            <Link to="/terms-and-conditions" className="hover:text-fantasy-accent">Terms & Conditions</Link>
+            <Link to="/privacy-policy" className="hover:text-fantasy-accent">Privacy Policy</Link>
+          </div>
         </div>
       </div>
     </footer>;

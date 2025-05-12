@@ -1,21 +1,25 @@
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export const useCleanupLobbies = () => {
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [lastCleanupTime, setLastCleanupTime] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const cleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     // Run cleanup once when component mounts
     cleanupStaleLobbies();
     
     // Set up interval to run cleanup every 5 minutes
-    const interval = setInterval(cleanupStaleLobbies, 5 * 60 * 1000);
+    cleanupIntervalRef.current = setInterval(cleanupStaleLobbies, 5 * 60 * 1000);
     
+    // Clean up the interval when the component unmounts
     return () => {
-      clearInterval(interval);
+      if (cleanupIntervalRef.current) {
+        clearInterval(cleanupIntervalRef.current);
+      }
     };
   }, []);
   
@@ -72,6 +76,9 @@ export const useCleanupLobbies = () => {
           .in('id', staleInProgressLobbies.map(lobby => lobby.id));
       }
       
+      console.log("Cleaned up stale battle queue entries");
+      console.log("Marked old waiting lobbies as abandoned");
+      
       setLastCleanupTime(new Date());
     } catch (err: any) {
       console.error("Error cleaning up stale lobbies:", err);
@@ -88,3 +95,5 @@ export const useCleanupLobbies = () => {
     cleanupStaleLobbies
   };
 };
+
+export default useCleanupLobbies;

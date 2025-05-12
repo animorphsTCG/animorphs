@@ -1,35 +1,10 @@
 
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './ThemeProvider';
 import { Toaster } from '@/components/ui/toaster';
-import Layout from './components/Layout';
 import LobbyCleanupProvider from './modules/battle/multi-player/components/LobbyCleanupProvider';
-
-// Page imports
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Profile from './pages/Profile';
-import Dashboard from './pages/Dashboard';
-import Music from './pages/Music';
-import Battle from './pages/Battle';
-import Multiplayer from './pages/Multiplayer';
-import About from './pages/About';
-
-// Battle mode components
-import OneVOneBattle from './modules/battle/single-player/one-v-one/OneVOneBattle';
-import { DemoBattle } from './modules/battle/single-player';
-import {
-  MultiplayerBattle,
-  ThreePlayerBattle,
-  FourPlayerPublicBattle,
-  FourPlayerUserBattle,
-  WaitingRoom
-} from './modules/battle/multi-player';
-import DeckBuilder from './pages/DeckBuilder';
-import VisitorDemoBattle from './pages/VisitorDemoBattle';
+import Routes from './Routes';
 
 // Create a React Query client with default settings
 const queryClient = new QueryClient({
@@ -43,34 +18,12 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  // We no longer call the hook directly here
-  
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <QueryClientProvider client={queryClient}>
         {/* Wrap the app with our LobbyCleanupProvider */}
         <LobbyCleanupProvider>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/music" element={<Music />} />
-              <Route path="/battle" element={<Battle />} />
-              <Route path="/multiplayer" element={<Multiplayer />} />
-              <Route path="/visitor-demo-battle" element={<VisitorDemoBattle />} />
-              <Route path="/battle/one-v-one" element={<OneVOneBattle />} />
-              <Route path="/battle/multiplayer/:battleId" element={<MultiplayerBattle />} />
-              <Route path="/3-player-battle/:battleId" element={<ThreePlayerBattle />} />
-              <Route path="/4-player-public/:battleId" element={<FourPlayerPublicBattle />} />
-              <Route path="/4-player-user-lobby/:battleId" element={<FourPlayerUserBattle />} />
-              <Route path="/battle-lobby/:lobbyId" element={<WaitingRoom lobbyId="" />} />
-              <Route path="/deck-builder" element={<DeckBuilder />} />
-              <Route path="/about" element={<About />} />
-            </Routes>
-          </Layout>
+          <Routes />
           <Toaster />
         </LobbyCleanupProvider>
       </QueryClientProvider>

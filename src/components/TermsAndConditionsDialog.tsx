@@ -26,7 +26,7 @@ const TermsAndConditionsDialog = ({
             Terms and Conditions
           </DialogTitle>
           <DialogDescription>
-            Last Updated: 09/April/2025
+            Last Updated: 12/May/2025
           </DialogDescription>
         </DialogHeader>
         

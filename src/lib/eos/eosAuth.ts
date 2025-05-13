@@ -240,7 +240,7 @@ export const getEpicGamesOAuthURL = (): string => {
     client_id: config.clientId,
     redirect_uri: config.redirectUrl,
     response_type: 'code',
-    scope: 'basic_profile openid friends country presence',
+    scope: 'basic_profile openid friends_list country presence',
     state: state,
     deployment_id: config.environmentId
   });

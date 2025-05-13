@@ -2,15 +2,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/context/EOSAuthContext';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, WifiOff } from 'lucide-react';
 import { handleAuthCallback } from '@/lib/eos/eosAuth';
 import { Button } from '@/components/ui/button';
+import { testD1Connection } from '@/lib/cloudflare/d1Worker';
 
 const AuthCallback = () => {
   const { handleExternalAuth } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const processAuth = async () => {
@@ -53,6 +56,18 @@ const AuthCallback = () => {
     navigate('/login');
   };
 
+  const testConnection = async () => {
+    setIsTestingConnection(true);
+    try {
+      const isConnected = await testD1Connection();
+      setConnectionStatus(isConnected ? 'Connected successfully to database worker' : 'Failed to connect to database worker');
+    } catch (error) {
+      setConnectionStatus('Error testing connection: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
       {error ? (
@@ -62,6 +77,45 @@ const AuthCallback = () => {
           </div>
           <h1 className="text-2xl font-bold text-red-500">Authentication Failed</h1>
           <p className="text-gray-500">{error}</p>
+          
+          {error.includes('Failed to fetch') && (
+            <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900 rounded-md text-left">
+              <h3 className="font-semibold flex items-center gap-2">
+                <WifiOff className="h-4 w-4" />
+                Connection Issue Detected
+              </h3>
+              <p className="text-sm mt-2">
+                There appears to be a connectivity issue with our backend services. This could be due to:
+              </p>
+              <ul className="list-disc pl-5 text-sm mt-2 space-y-1">
+                <li>The authentication service is temporarily unavailable</li>
+                <li>Network connectivity issue between the browser and our services</li>
+                <li>CORS configuration needs to be updated for your domain</li>
+              </ul>
+              <div className="mt-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  disabled={isTestingConnection}
+                  onClick={testConnection}
+                  className="text-xs"
+                >
+                  {isTestingConnection ? (
+                    <>
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      Testing connection...
+                    </>
+                  ) : 'Test Connection'}
+                </Button>
+                {connectionStatus && (
+                  <p className="text-xs mt-2">
+                    {connectionStatus}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          
           <Button 
             onClick={handleReturnToLogin}
             className="w-full"

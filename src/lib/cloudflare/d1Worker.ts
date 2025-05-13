@@ -5,6 +5,7 @@
  */
 
 // Configuration
+// Using the constant but allowing for environment override if needed in the future
 const CF_WORKER_URL = 'https://db.animorphs.workers.dev';
 
 // Standard HTTP headers for CORS and authentication
@@ -43,6 +44,7 @@ export const d1Worker = {
   // Execute a query and return results
   async query(sql: string, options: QueryOptions = {}, token?: string) {
     try {
+      console.log('D1Worker - Executing query:', sql.slice(0, 100) + '...');
       const response = await fetch(`${CF_WORKER_URL}/query`, {
         method: 'POST',
         headers: getHeaders(token),
@@ -56,6 +58,7 @@ export const d1Worker = {
       
       if (!response.ok) {
         const error = await response.json();
+        console.error('D1Worker - Query error response:', error);
         throw new D1Error(
           error.message || `Database query failed with status ${response.status}`,
           response.status
@@ -65,6 +68,7 @@ export const d1Worker = {
       const result = await response.json();
       return result.results;
     } catch (error) {
+      console.error('D1Worker - Query error:', error);
       if (error instanceof D1Error) {
         throw error;
       }
@@ -161,5 +165,20 @@ export const d1Worker = {
       }
       throw new D1Error(`Transaction error: ${error.message}`);
     }
+  }
+};
+
+// Helper function to test connection to the worker
+export const testD1Connection = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${CF_WORKER_URL}/health`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.status === 'ok';
+    }
+    return false;
+  } catch (error) {
+    console.error('Failed to connect to D1 worker:', error);
+    return false;
   }
 };

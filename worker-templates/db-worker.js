@@ -1,12 +1,22 @@
 
 // Cloudflare D1 Database Worker
 
-// CORS headers
+// CORS headers with improved domain handling
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  'Access-Control-Allow-Origin': '*', // This will allow all domains (including tcg.mythicmasters.org.za)
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Max-Age': '86400' // Cache preflight requests for 24 hours
 };
+
+// Helper function to handle CORS and set proper origin
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin') || '*';
+  return {
+    ...corsHeaders,
+    'Access-Control-Allow-Origin': origin
+  };
+}
 
 // Helper functions for request/response handling
 function parseToken(request) {
@@ -14,15 +24,17 @@ function parseToken(request) {
   return authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 }
 
-function corsResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
+function corsResponse(body, status = 200, request) {
+  const headers = {
+    ...getCorsHeaders(request),
+    'Content-Type': 'application/json'
+  };
+  
+  return new Response(JSON.stringify(body), { status, headers });
 }
 
-function errorResponse(message, status = 400) {
-  return corsResponse({ error: message }, status);
+function errorResponse(message, status = 400, request) {
+  return corsResponse({ error: message }, status, request);
 }
 
 // Verify and decode the JWT token
@@ -49,7 +61,9 @@ export default {
   async fetch(request, env, ctx) {
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, { 
+        headers: getCorsHeaders(request)
+      });
     }
     
     // Parse the URL to get the path
@@ -63,7 +77,7 @@ export default {
         const userId = await verifyToken(token);
         
         if (!userId) {
-          return errorResponse('Unauthorized', 401);
+          return errorResponse('Unauthorized', 401, request);
         }
         
         // Store userId in env for access in route handlers
@@ -73,7 +87,7 @@ export default {
       // Route handlers
       switch (path) {
         case 'health':
-          return corsResponse({ status: 'ok' });
+          return corsResponse({ status: 'ok' }, 200, request);
           
         case 'query':
           return await handleQuery(request, env);
@@ -82,11 +96,11 @@ export default {
           return await handleTransaction(request, env);
           
         default:
-          return errorResponse('Not Found', 404);
+          return errorResponse('Not Found', 404, request);
       }
     } catch (error) {
       console.error('Worker error:', error);
-      return errorResponse(error.message || 'Internal Server Error', 500);
+      return errorResponse(error.message || 'Internal Server Error', 500, request);
     }
   }
 };
@@ -96,7 +110,7 @@ async function handleQuery(request, env) {
   const { sql, params = [], timeout, metaOnly = false } = await request.json();
   
   if (!sql) {
-    return errorResponse('Missing SQL query');
+    return errorResponse('Missing SQL query', 400, request);
   }
   
   try {
@@ -122,10 +136,10 @@ async function handleQuery(request, env) {
     return corsResponse({
       results: results.results || [],
       success: true
-    });
+    }, 200, request);
   } catch (error) {
     console.error('Query error:', error);
-    return errorResponse(`SQL error: ${error.message}`, 400);
+    return errorResponse(`SQL error: ${error.message}`, 400, request);
   }
 }
 
@@ -134,7 +148,7 @@ async function handleTransaction(request, env) {
   const { statements } = await request.json();
   
   if (!statements || !Array.isArray(statements) || statements.length === 0) {
-    return errorResponse('Invalid transaction data');
+    return errorResponse('Invalid transaction data', 400, request);
   }
   
   try {
@@ -150,9 +164,9 @@ async function handleTransaction(request, env) {
     return corsResponse({
       success: true,
       affected: tx.length
-    });
+    }, 200, request);
   } catch (error) {
     console.error('Transaction error:', error);
-    return errorResponse(`Transaction error: ${error.message}`, 400);
+    return errorResponse(`Transaction error: ${error.message}`, 400, request);
   }
 }

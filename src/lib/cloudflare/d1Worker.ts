@@ -5,8 +5,19 @@
  */
 
 // Configuration
-// Using the constant but allowing for environment override if needed in the future
-const CF_WORKER_URL = 'https://db.animorphs.workers.dev';
+// Get the appropriate worker URL based on environment
+const getWorkerUrl = () => {
+  // Check for custom domain from environment variable or use default
+  const customDomain = import.meta.env.VITE_DB_WORKER_URL;
+  if (customDomain) {
+    return customDomain;
+  }
+  
+  // Default worker URL
+  return 'https://db.animorphs.workers.dev';
+};
+
+const CF_WORKER_URL = getWorkerUrl();
 
 // Standard HTTP headers for CORS and authentication
 const getHeaders = (token?: string) => {
@@ -45,6 +56,8 @@ export const d1Worker = {
   async query(sql: string, options: QueryOptions = {}, token?: string) {
     try {
       console.log('D1Worker - Executing query:', sql.slice(0, 100) + '...');
+      console.log('D1Worker - Worker URL:', CF_WORKER_URL);
+      
       const response = await fetch(`${CF_WORKER_URL}/query`, {
         method: 'POST',
         headers: getHeaders(token),
@@ -53,16 +66,22 @@ export const d1Worker = {
           params: options.params || [],
           timeout: options.timeout,
           metaOnly: options.metaOnly || false
-        })
+        }),
+        credentials: 'include'
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        console.error('D1Worker - Query error response:', error);
-        throw new D1Error(
-          error.message || `Database query failed with status ${response.status}`,
-          response.status
-        );
+        let errorMessage = `Database query failed with status ${response.status}`;
+        try {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } catch (e) {
+          // If response can't be parsed as JSON, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        console.error('D1Worker - Query error response:', errorMessage);
+        throw new D1Error(errorMessage, response.status);
       }
       
       const result = await response.json();
@@ -149,15 +168,21 @@ export const d1Worker = {
       const response = await fetch(`${CF_WORKER_URL}/transaction`, {
         method: 'POST',
         headers: getHeaders(token),
-        body: JSON.stringify({ statements })
+        body: JSON.stringify({ statements }),
+        credentials: 'include'
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new D1Error(
-          error.message || `Transaction failed with status ${response.status}`,
-          response.status
-        );
+        let errorMessage = `Transaction failed with status ${response.status}`;
+        try {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } catch (e) {
+          // If response can't be parsed as JSON, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        throw new D1Error(errorMessage, response.status);
       }
     } catch (error) {
       if (error instanceof D1Error) {
@@ -171,11 +196,16 @@ export const d1Worker = {
 // Helper function to test connection to the worker
 export const testD1Connection = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${CF_WORKER_URL}/health`);
+    console.log('Testing connection to D1 worker at:', CF_WORKER_URL);
+    const response = await fetch(`${CF_WORKER_URL}/health`, {
+      credentials: 'include'
+    });
     if (response.ok) {
       const data = await response.json();
+      console.log('D1 worker connection test result:', data);
       return data.status === 'ok';
     }
+    console.error('D1 worker connection test failed with status:', response.status);
     return false;
   } catch (error) {
     console.error('Failed to connect to D1 worker:', error);

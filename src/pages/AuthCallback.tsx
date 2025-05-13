@@ -2,10 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/context/EOSAuthContext';
-import { Loader2, AlertTriangle, WifiOff } from 'lucide-react';
+import { Loader2, AlertTriangle, WifiOff, ExternalLink } from 'lucide-react';
 import { handleAuthCallback } from '@/lib/eos/eosAuth';
 import { Button } from '@/components/ui/button';
 import { testD1Connection } from '@/lib/cloudflare/d1Worker';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const AuthCallback = () => {
   const { handleExternalAuth } = useAuth();
@@ -14,6 +15,7 @@ const AuthCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+  const [detailedError, setDetailedError] = useState<string | null>(null);
 
   useEffect(() => {
     const processAuth = async () => {
@@ -43,6 +45,14 @@ const AuthCallback = () => {
       } catch (error: any) {
         console.error('Auth callback error:', error);
         setError(error.message || 'Authentication failed. Please try again.');
+        
+        // Capture more detailed error information
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+          setDetailedError('Network error: Could not connect to the authentication service. This may be a CORS or network connectivity issue.');
+        } else {
+          setDetailedError(error.stack || null);
+        }
+        
         setIsLoading(false);
       } finally {
         setIsLoading(false);
@@ -92,6 +102,7 @@ const AuthCallback = () => {
                 <li>Network connectivity issue between the browser and our services</li>
                 <li>CORS configuration needs to be updated for your domain</li>
               </ul>
+              
               <div className="mt-4">
                 <Button 
                   variant="outline" 
@@ -108,10 +119,38 @@ const AuthCallback = () => {
                   ) : 'Test Connection'}
                 </Button>
                 {connectionStatus && (
-                  <p className="text-xs mt-2">
-                    {connectionStatus}
-                  </p>
+                  <Alert variant={connectionStatus.includes('successfully') ? 'default' : 'destructive'} className="mt-2">
+                    <AlertDescription className="text-xs">
+                      {connectionStatus}
+                    </AlertDescription>
+                  </Alert>
                 )}
+              </div>
+              
+              {detailedError && (
+                <details className="mt-4 text-xs">
+                  <summary className="cursor-pointer font-medium">Technical Details</summary>
+                  <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-900 rounded overflow-auto text-xs">
+                    {detailedError}
+                  </pre>
+                </details>
+              )}
+              
+              <div className="mt-4 text-xs border-t border-amber-200 dark:border-amber-800 pt-2">
+                <p className="font-semibold">For Administrators:</p>
+                <p>You may need to deploy the database worker with updated CORS settings:</p>
+                <code className="block p-2 mt-1 bg-gray-100 dark:bg-gray-900 rounded">
+                  npx wrangler deploy --name db-worker --env db-worker
+                </code>
+                <a 
+                  href="https://developers.cloudflare.com/workers/wrangler/commands/#deploy" 
+                  target="_blank"
+                  rel="noopener noreferrer" 
+                  className="text-primary flex items-center gap-1 mt-1"
+                >
+                  Wrangler deployment docs
+                  <ExternalLink className="h-3 w-3" />
+                </a>
               </div>
             </div>
           )}

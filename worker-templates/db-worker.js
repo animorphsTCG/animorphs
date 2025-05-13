@@ -2,19 +2,31 @@
 // Cloudflare D1 Database Worker
 
 // CORS headers with improved domain handling
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // This will allow all domains (including tcg.mythicmasters.org.za)
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Max-Age': '86400' // Cache preflight requests for 24 hours
+const getAllowedOrigins = () => {
+  return [
+    'https://tcg.mythicmasters.org.za',
+    'https://www.mythicmasters.org.za',
+    'https://mythicmasters.org.za',
+    'https://animorphs.workers.dev',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
 };
 
 // Helper function to handle CORS and set proper origin
 function getCorsHeaders(request) {
-  const origin = request.headers.get('Origin') || '*';
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigins = getAllowedOrigins();
+  
+  // Check if the origin is allowed
+  const isAllowedOrigin = allowedOrigins.includes(origin);
+  
   return {
-    ...corsHeaders,
-    'Access-Control-Allow-Origin': origin
+    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Max-Age': '86400', // Cache preflight requests for 24 hours
+    'Access-Control-Allow-Credentials': 'true'
   };
 }
 
@@ -62,7 +74,8 @@ export default {
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { 
-        headers: getCorsHeaders(request)
+        headers: getCorsHeaders(request),
+        status: 204
       });
     }
     
@@ -71,18 +84,21 @@ export default {
     const path = url.pathname.slice(1);
     
     try {
-      // All routes except health check require authentication
-      if (path !== 'health') {
-        const token = parseToken(request);
-        const userId = await verifyToken(token);
-        
-        if (!userId) {
-          return errorResponse('Unauthorized', 401, request);
-        }
-        
-        // Store userId in env for access in route handlers
-        env.userId = userId;
+      // Health check doesn't require authentication
+      if (path === 'health') {
+        return corsResponse({ status: 'ok' }, 200, request);
       }
+      
+      // All other routes require authentication
+      const token = parseToken(request);
+      const userId = await verifyToken(token);
+      
+      if (!userId && path !== 'health') {
+        return errorResponse('Unauthorized', 401, request);
+      }
+      
+      // Store userId in env for access in route handlers
+      env.userId = userId;
       
       // Route handlers
       switch (path) {

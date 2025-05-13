@@ -1,4 +1,3 @@
-
 /**
  * Epic Online Services (EOS) Authentication Client
  * Handles token-based authentication with Epic's OAuth service
@@ -241,7 +240,7 @@ export const getEpicGamesOAuthURL = (): string => {
     client_id: config.clientId,
     redirect_uri: config.redirectUrl,
     response_type: 'code',
-    scope: 'basic_profile openid',
+    scope: 'basic_profile openid friends country presence',
     state: state,
     deployment_id: config.environmentId
   });

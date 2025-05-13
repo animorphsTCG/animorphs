@@ -13,8 +13,8 @@ const getWorkerUrl = () => {
     return customDomain;
   }
   
-  // Default worker URL
-  return 'https://db.animorphs.workers.dev';
+  // Default worker URL - this should match the deployed worker name
+  return 'https://db-worker.mythicmasters.workers.dev';
 };
 
 const CF_WORKER_URL = getWorkerUrl();
@@ -98,7 +98,7 @@ export const d1Worker = {
   // Get a single row
   async getOne<T = any>(sql: string, options: QueryOptions = {}, token?: string): Promise<T | null> {
     const results = await this.query(sql, options, token) as T[];
-    return results.length > 0 ? results[0] : null;
+    return results && results.length > 0 ? results[0] : null;
   },
   
   // Insert a row and return the ID

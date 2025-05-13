@@ -1,0 +1,24 @@
+
+name = "db-worker"
+main = "worker-templates/db-worker.js"
+compatibility_date = "2023-05-10"
+node_compat = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "animorphs-db"
+database_id = "44cd43b3-629e-4cf6-88ea-f6999339abb1"
+
+# Environment variables
+[vars]
+NODE_ENV = "development"
+EOS_CLIENT_ID = "xyza78914XQON5yBeLZvdyhqLtZUKriu"
+EOS_CLIENT_SECRET = "Kxrh2Tmag20JFML8uFgBWxBRyvfWe0352B3jOCDKSjs"
+EOS_ENVIRONMENT = "Release"
+EOS_ENV_LIVE_SANDBOX_ID = "90eb223664704cb6ab8da2529a62d052"
+EOS_ENV_RELEASE_ID = "c3b2637442224a31b5408418bdfbe9a6"
+
+# Production environment
+[env.production]
+NODE_ENV = "production"
+EOS_ENVIRONMENT = "Release"

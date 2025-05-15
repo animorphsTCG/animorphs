@@ -1,4 +1,3 @@
-
 // User profile interface
 export interface UserProfile {
   id: string;
@@ -25,6 +24,7 @@ export interface UserProfile {
   online_times_gmt2?: string | null;
   playing_times?: string | null;
   profile_image_url?: string | null;
+  is_admin?: boolean; // Added is_admin property
 }
 
 // Payment status interface

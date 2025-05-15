@@ -143,7 +143,7 @@ const CloudflareErrors: React.FC = () => {
       case 'unresolved':
         return <Badge variant="destructive">Unresolved</Badge>;
       case 'resolved':
-        return <Badge variant="success" className="bg-green-600">Resolved</Badge>;
+        return <Badge variant="secondary" className="bg-green-600">Resolved</Badge>;  // Changed from "success" to "secondary" with custom styling
       case 'ignored':
         return <Badge variant="secondary">Ignored</Badge>;
       case 'pending':

@@ -94,7 +94,7 @@ const AdminAuthModal: React.FC<AdminAuthModalProps> = ({ isOpen, onClose, onSucc
         toast({
           title: "Authentication Successful",
           description: "You now have admin access",
-          variant: "success",
+          variant: "default",  // Changed from "success" to "default"
         });
         onSuccess();
         onClose();
@@ -172,7 +172,7 @@ const AdminAuthModal: React.FC<AdminAuthModalProps> = ({ isOpen, onClose, onSucc
         toast({
           title: "Authentication Successful",
           description: "Biometric verification complete",
-          variant: "success",
+          variant: "default",  // Changed from "success" to "default"
         });
         onSuccess();
         onClose();
@@ -216,7 +216,7 @@ const AdminAuthModal: React.FC<AdminAuthModalProps> = ({ isOpen, onClose, onSucc
         toast({
           title: "Backup Codes Generated",
           description: "Store these codes securely for future use",
-          variant: "success",
+          variant: "default",  // Changed from "success" to "default"
         });
       } else {
         toast({

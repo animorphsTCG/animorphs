@@ -16,3 +16,4 @@ export { default as AdminShield } from './components/AdminShield';
 export { default as WranglerTerminal } from './components/WranglerTerminal';
 export { default as CloudflareErrors } from './components/CloudflareErrors';
 export { AdminProvider } from './context/AdminContext';
+export { useAdminStatus, useAdminAuth } from './hooks/useAdmin';

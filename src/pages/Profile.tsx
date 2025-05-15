@@ -4,7 +4,7 @@ import { useAuth } from '@/modules/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, Shield } from 'lucide-react';
 import MusicSettings from '@/components/music/MusicSettings';
 import MusicPlayer from '@/components/MusicPlayer';
 import AdminPanel from '@/modules/admin/components/AdminPanel';
@@ -19,6 +19,7 @@ const Profile = () => {
   const [profileLoading, setProfileLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = React.useState(false);
+  const [isAdmin, setIsAdmin] = React.useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -55,6 +56,13 @@ const Profile = () => {
       setError('Profile not found');
     }
   }, [profileLoading, user, userProfile, isLoading]);
+
+  // Check if user is admin when profile loads
+  useEffect(() => {
+    if (userProfile) {
+      setIsAdmin(userProfile.is_admin === true);
+    }
+  }, [userProfile]);
 
   if (isLoading || profileLoading) {
     return (
@@ -96,6 +104,26 @@ const Profile = () => {
                 ) : userProfile ? (
                   <div className="space-y-6">
                     <UserProfileEditor />
+                    
+                    {isAdmin && (
+                      <div className="mt-8 border-t pt-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <Shield className="h-5 w-5 mr-2 text-green-500" />
+                            <h3 className="text-lg font-medium">Admin Access</h3>
+                          </div>
+                          <Button 
+                            onClick={() => setShowAdminPanel(true)}
+                            variant="default"
+                          >
+                            Open Admin Panel
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          As an admin, you have access to additional features for managing the game.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -108,7 +136,7 @@ const Profile = () => {
           
           <TabsContent value="settings">
             <div className="space-y-8">
-              {user && user.email?.toLowerCase() === "adanacia23d@gmail.com" && (
+              {user && user.email?.toLowerCase() === "adanacia23d@gmail.com" && !isAdmin && (
                 <AdminProfileButton onAuthenticated={() => setShowAdminPanel(true)} />
               )}
               <MusicSettings />

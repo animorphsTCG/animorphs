@@ -5,6 +5,7 @@ import { ThemeProvider } from './ThemeProvider';
 import { Toaster } from '@/components/ui/toaster';
 import LobbyCleanupProvider from './modules/battle/multi-player/components/LobbyCleanupProvider';
 import Routes from './Routes';
+import AdminShield from './modules/admin/components/AdminShield';
 
 // Create a React Query client with default settings
 const queryClient = new QueryClient({
@@ -25,6 +26,7 @@ function App() {
         <LobbyCleanupProvider>
           <Routes />
           <Toaster />
+          <AdminShield />
         </LobbyCleanupProvider>
       </QueryClientProvider>
     </ThemeProvider>

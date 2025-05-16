@@ -90,7 +90,7 @@ export const supabase = {
       
       // Return the query builder object directly for proper chaining
       return queryBuilder;
-    }),
+    },
     insert: (data) => Promise.resolve({ data: null, error: new Error(`Supabase insert to ${tableName} has been deprecated`) }),
     update: (data) => ({
       eq: (column, value) => Promise.resolve({ data: null, error: new Error(`Supabase update to ${tableName} has been deprecated`) }),

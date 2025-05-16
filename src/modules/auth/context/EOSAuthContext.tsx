@@ -17,6 +17,24 @@ import {
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 import { presenceWorker } from '@/lib/cloudflare/presenceWorker';
 
+// Define the interface for Session and User to support backward compatibility
+export interface Session {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  user: {
+    id: string;
+    email?: string;
+  }
+}
+
+export interface User {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, any>;
+  app_metadata?: Record<string, any>;
+}
+
 // Define our auth state interface
 interface EOSAuthState {
   user: EOSUserProfile | null;

@@ -1,11 +1,10 @@
-
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase, resetSupabaseConnection } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/types';
 import { getPerformanceMetrics, resetPerformanceMetrics } from '@/lib/monitoring';
+import { Session, User } from './types';
 
 interface AuthState {
   user: User | null;
@@ -61,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Use has_paid_unlock_fee to check payment status
         try {
           console.log("Checking payment status for user:", userId);
-          const { data: hasPaid, error: paymentError } = await supabase.rpc('has_paid_unlock_fee', { user_id: userId });
+          const { data: hasPaid, error: paymentError } = await supabase.rpc('has_paid_unlock_fee');
           
           if (paymentError) {
             console.error("Error checking payment status:", paymentError);
@@ -163,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log("Setting up polling fallback for user:", userId);
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        const { data, error } = await supabase.rpc('has_paid_unlock_fee', { user_id: userId });
+        const { data, error } = await supabase.rpc('has_paid_unlock_fee');
         
         if (error) {
           console.error("Polling error:", error);
@@ -248,7 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     window.addEventListener('online', () => {
-      resetSupabaseConnection();
+      
       if (user?.id) fetchUserProfile(user.id);
     });
 
@@ -282,6 +281,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error;
     }
   };
+
   const signIn = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -298,13 +298,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error;
     }
   };
+
   const signInWithGoogle = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
       });
       if (error) throw error;
     } catch (error: any) {

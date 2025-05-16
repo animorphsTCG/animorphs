@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,6 @@ export default function SupabaseCleanup() {
   const [dataQueries, setDataQueries] = useState(0);
   const [authFunctions, setAuthFunctions] = useState(0);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [toast, setToast] = useState<any>(null);
 
   useEffect(() => {
     if (SUPABASE_MIGRATION_COMPLETED) {
@@ -49,11 +49,19 @@ export default function SupabaseCleanup() {
       setDisconnecting(false);
       setStatus('done');
       
-      setToast({
+      toast({
         title: "Supabase Disconnected",
         description: "Supabase has been successfully disconnected from your application."
       });
     }, 3000);
+  };
+
+  const showTestToast = () => {
+    toast({
+      title: "Migration Required",
+      description: "Please complete the migration process before disconnecting Supabase.",
+      variant: "default" // Fixed from 'warning' to 'default'
+    });
   };
 
   return (
@@ -146,17 +154,9 @@ export default function SupabaseCleanup() {
         </Card>
       )}
 
-      {toast && (
-        <Button onClick={() => {
-          toast({
-            title: "Migration Required",
-            description: "Please complete the migration process before disconnecting Supabase.",
-            variant: "default" // Changed from 'warning' to 'default'
-          });
-        }}>
-          Test Toast
-        </Button>
-      )}
+      <Button onClick={showTestToast}>
+        Test Toast
+      </Button>
     </div>
   );
 }

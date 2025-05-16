@@ -12,7 +12,7 @@ export interface AdminStatus {
 }
 
 export const useAdminStatus = (): AdminStatus => {
-  const { user, token } = useAuth(); // Use token instead of session from EOSAuth
+  const { user, token } = useAuth(); // Use token from EOSAuth
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export const useAdminStatus = (): AdminStatus => {
 
   useEffect(() => {
     const checkAdminStatus = async () => {
-      if (!user || !token?.access_token) { // Use token?.access_token instead of session
+      if (!user || !token?.access_token) { // Use token?.access_token instead
         setIsAdmin(false);
         setLoading(false);
         setAdminToken(null);
@@ -96,7 +96,7 @@ export const useAdminStatus = (): AdminStatus => {
   // Check if user has completed 2FA
   useEffect(() => {
     const checkAdminAuth = async () => {
-      if (!isAdmin || !user || !token?.access_token) { // Use token?.access_token instead of session
+      if (!isAdmin || !user || !token?.access_token) { // Use token?.access_token instead
         setIsAuthenticated(false);
         return;
       }
@@ -120,7 +120,7 @@ export const useAdminStatus = (): AdminStatus => {
     };
     
     checkAdminAuth();
-  }, [isAdmin, user, token]); // Use token instead of session
+  }, [isAdmin, user, token]); // Use token instead
 
   return { 
     isAdmin, 
@@ -133,16 +133,16 @@ export const useAdminStatus = (): AdminStatus => {
 
 // Hook for authenticating admin access (2FA)
 export const useAdminAuth = () => {
-  const { user, token } = useAuth(); // Use token instead of session from EOSAuth
+  const { user, token } = useAuth(); // Use token from EOSAuth
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [token, setToken] = useState<any>(null); // Add token state
+  const [authToken, setAuthToken] = useState<any>(null); // Rename token to authToken to avoid naming conflict
   
-  // Initialize token from session
+  // Initialize authToken from token
   useEffect(() => {
     if (token) {
-      setToken(token);
+      setAuthToken(token);
     }
   }, [token]);
   
@@ -173,7 +173,7 @@ export const useAdminAuth = () => {
         setError('Invalid verification code format');
         return false;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('TOTP verification error:', err);
       setError(err.message || 'Authentication failed');
       return false;
@@ -203,7 +203,7 @@ export const useAdminAuth = () => {
       localStorage.setItem('admin_auth_time', Date.now().toString());
       setIsAuthenticated(true);
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Biometric verification error:', err);
       setError(err.message || 'Authentication failed');
       return false;
@@ -233,7 +233,7 @@ export const useAdminAuth = () => {
       );
       
       return codes;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Backup code generation error:', err);
       setError(err.message || 'Failed to generate backup codes');
       return [];
@@ -248,7 +248,9 @@ export const useAdminAuth = () => {
     generateBackupCodes,
     isAuthenticating,
     isAuthenticated,
-    token,
+    token: authToken, // Return the renamed variable
     error
   };
 };
+
+export default useAdminStatus;

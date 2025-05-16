@@ -1,13 +1,13 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CloudflareErrors from './CloudflareErrors';
 import WranglerTerminal from './WranglerTerminal';
 import MigrationPanel from './MigrationPanel';
+import SupabaseCleanup from './SupabaseCleanup';
 import { useAdminAuth } from '../hooks/useAdmin';
 
 interface AdminPanelProps {
-  onClose?: () => void; // Make onClose prop optional
+  onClose?: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
@@ -41,14 +41,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       </p>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 w-[400px]">
+        <TabsList className="grid grid-cols-4 w-[600px]">
           <TabsTrigger value="migration">Data Migration</TabsTrigger>
+          <TabsTrigger value="cleanup">Supabase Cleanup</TabsTrigger>
           <TabsTrigger value="errors">Cloudflare Logs</TabsTrigger>
           <TabsTrigger value="terminal">Wrangler Terminal</TabsTrigger>
         </TabsList>
         
         <TabsContent value="migration" className="space-y-4">
           <MigrationPanel />
+        </TabsContent>
+        
+        <TabsContent value="cleanup" className="space-y-4">
+          <SupabaseCleanup />
         </TabsContent>
         
         <TabsContent value="errors" className="space-y-4">

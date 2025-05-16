@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
@@ -13,7 +12,7 @@ export interface AdminStatus {
 }
 
 export const useAdminStatus = (): AdminStatus => {
-  const { user, session } = useAuth();
+  const { user, token } = useAuth(); // Use token instead of session from EOSAuth
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState<string | null>(null);
@@ -22,7 +21,7 @@ export const useAdminStatus = (): AdminStatus => {
 
   useEffect(() => {
     const checkAdminStatus = async () => {
-      if (!user || !session) {
+      if (!user || !token?.access_token) { // Use token?.access_token instead of session
         setIsAdmin(false);
         setLoading(false);
         setAdminToken(null);
@@ -33,7 +32,7 @@ export const useAdminStatus = (): AdminStatus => {
 
       try {
         // Store the access token for admin API calls
-        setAdminToken(session.access_token);
+        setAdminToken(token.access_token);
 
         // Hard-coded admin email for security (keep this for quick admin access)
         const adminEmail = 'adanacia23d@gmail.com';
@@ -45,7 +44,7 @@ export const useAdminStatus = (): AdminStatus => {
             const profile = await d1Worker.getOne(
               'SELECT is_admin FROM profiles WHERE id = ?', 
               { params: [user.id] },
-              session.access_token
+              token.access_token
             );
             
             if (!profile || profile.is_admin !== true) {
@@ -56,7 +55,7 @@ export const useAdminStatus = (): AdminStatus => {
                 'id = ?',
                 [user.id],
                 '',
-                session.access_token
+                token.access_token
               );
             }
           } catch (dbError) {
@@ -73,7 +72,7 @@ export const useAdminStatus = (): AdminStatus => {
           const profile = await d1Worker.getOne(
             'SELECT is_admin FROM profiles WHERE id = ?', 
             { params: [user.id] },
-            session.access_token
+            token.access_token
           );
           
           setIsAdmin(profile?.is_admin || false);
@@ -92,12 +91,12 @@ export const useAdminStatus = (): AdminStatus => {
     };
 
     checkAdminStatus();
-  }, [user, session]);
+  }, [user, token]); // Use token instead of session
 
   // Check if user has completed 2FA
   useEffect(() => {
     const checkAdminAuth = async () => {
-      if (!isAdmin || !user || !session) {
+      if (!isAdmin || !user || !token?.access_token) { // Use token?.access_token instead of session
         setIsAuthenticated(false);
         return;
       }
@@ -121,7 +120,7 @@ export const useAdminStatus = (): AdminStatus => {
     };
     
     checkAdminAuth();
-  }, [isAdmin, user, session]);
+  }, [isAdmin, user, token]); // Use token instead of session
 
   return { 
     isAdmin, 
@@ -134,7 +133,7 @@ export const useAdminStatus = (): AdminStatus => {
 
 // Hook for authenticating admin access (2FA)
 export const useAdminAuth = () => {
-  const { user, session } = useAuth();
+  const { user, token } = useAuth(); // Use token instead of session from EOSAuth
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -142,13 +141,13 @@ export const useAdminAuth = () => {
   
   // Initialize token from session
   useEffect(() => {
-    if (session) {
-      setToken(session);
+    if (token) {
+      setToken(token);
     }
-  }, [session]);
+  }, [token]);
   
   const authenticateWithTOTP = async (code: string): Promise<boolean> => {
-    if (!user || !session) {
+    if (!user || !token?.access_token) {
       toast({
         title: "Authentication Failed",
         description: "User session not found",
@@ -184,7 +183,7 @@ export const useAdminAuth = () => {
   };
   
   const authenticateWithBiometric = async (): Promise<boolean> => {
-    if (!user || !session) {
+    if (!user || !token?.access_token) {
       toast({
         title: "Authentication Failed",
         description: "User session not found",
@@ -214,7 +213,7 @@ export const useAdminAuth = () => {
   };
   
   const generateBackupCodes = async (): Promise<string[]> => {
-    if (!user || !session) {
+    if (!user || !token?.access_token) {
       toast({
         title: "Authentication Failed",
         description: "User session not found",

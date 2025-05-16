@@ -8,9 +8,9 @@ import { useAuth } from "@/modules/auth";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
+import { d1Worker } from "@/lib/cloudflare/d1Worker";
 
 const profileSchema = z.object({
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),
@@ -24,7 +24,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 const UserProfileEditor = () => {
-  const { user, userProfile, refreshProfile } = useAuth();
+  const { user, token, userProfile, refreshProfile } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const form = useForm<ProfileFormValues>({
@@ -40,16 +40,17 @@ const UserProfileEditor = () => {
   });
 
   const onSubmit = async (data: ProfileFormValues) => {
-    if (!user) return;
+    if (!user || !token?.access_token) return;
     
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(data)
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await d1Worker.update(
+        'profiles',
+        data,
+        'id = ?',
+        [user.id],
+        token.access_token
+      );
 
       await refreshProfile();
       toast({

@@ -14,7 +14,7 @@ import { Shield } from "lucide-react";
 import useAdmin from "@/hooks/useAdmin";
 
 const Navbar = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, userProfile } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);

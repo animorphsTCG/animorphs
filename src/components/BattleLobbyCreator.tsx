@@ -25,6 +25,19 @@ import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/modules/auth';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 
+interface LobbyData {
+  id: string;
+  name: string;
+  host_id: string;
+  battle_type: string;
+  max_players: number;
+  status: string;
+  use_music: number;
+  use_timer: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const BattleLobbyCreator = () => {
   const navigate = useNavigate();
   const { user, token } = useAuth();
@@ -57,7 +70,7 @@ const BattleLobbyCreator = () => {
     try {
       setLoading(true);
       
-      const lobbyData = {
+      const lobbyData: LobbyData = {
         id: crypto.randomUUID(),
         name: name.trim(),
         host_id: user.id,

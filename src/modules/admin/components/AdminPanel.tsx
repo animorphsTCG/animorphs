@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CloudflareErrors from './CloudflareErrors';
@@ -5,6 +6,7 @@ import WranglerTerminal from './WranglerTerminal';
 import MigrationPanel from './MigrationPanel';
 import SupabaseCleanup from './SupabaseCleanup';
 import { useAdminAuth } from '../hooks/useAdmin';
+import { Badge } from '@/components/ui/badge';
 
 interface AdminPanelProps {
   onClose?: () => void;
@@ -25,7 +27,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold tracking-tight">Admin Panel</h2>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Admin Panel</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="outline" className="bg-green-50 text-green-800 border-green-300">
+              Cloudflare D1
+            </Badge>
+            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-300">
+              Epic Online Services
+            </Badge>
+          </div>
+        </div>
         {onClose && (
           <button 
             onClick={onClose} 

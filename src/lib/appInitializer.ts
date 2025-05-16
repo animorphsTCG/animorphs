@@ -1,15 +1,17 @@
+
 /**
  * App Initializer
- * Handles application bootstrapping without Supabase dependency
+ * Handles application bootstrapping with Cloudflare D1 and EOS
  */
 
-import { d1Database } from './cloudflare/D1Database';
 import { initializeD1Database } from './cloudflare/D1Database';
 import { getClientCredentialsToken } from './eos/eosAuth';
+import { toast } from '@/components/ui/use-toast';
 
 interface InitializationOptions {
   enableCache?: boolean;
   checkAuthentication?: boolean;
+  silent?: boolean;
 }
 
 /**
@@ -18,7 +20,9 @@ interface InitializationOptions {
  */
 export const initializeApp = async (options: InitializationOptions = {}): Promise<void> => {
   try {
-    console.log('Initializing application...');
+    if (!options.silent) {
+      console.log('Initializing application...');
+    }
     
     // Get client credentials token for authenticated API calls
     const token = await getClientCredentialsToken();
@@ -26,9 +30,20 @@ export const initializeApp = async (options: InitializationOptions = {}): Promis
     // Initialize D1 database with the token
     initializeD1Database(token.access_token);
     
-    console.log('Application initialized successfully');
+    if (!options.silent) {
+      console.log('Application initialized successfully');
+    }
   } catch (error) {
     console.error('Failed to initialize application:', error);
+    
+    if (!options.silent) {
+      toast({
+        title: "Application Error",
+        description: "Failed to initialize services. Please refresh the page.",
+        variant: "destructive",
+      });
+    }
+    
     throw error;
   }
 };
@@ -38,7 +53,6 @@ export const initializeApp = async (options: InitializationOptions = {}): Promis
  */
 export const cleanupApp = async (): Promise<void> => {
   // Clean up any resources or connections
-  // No Supabase connections to clean up anymore!
   console.log('Application resources cleaned up');
 };
 

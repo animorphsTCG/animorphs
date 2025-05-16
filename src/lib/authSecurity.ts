@@ -1,297 +1,237 @@
-import { supabase } from "@/lib/supabase";
-import { toast } from "@/components/ui/use-toast";
 
-interface AuthAttempt {
-  timestamp: number;
-  success: boolean;
-  ipAddress?: string;
-  userAgent?: string;
-}
+import { decode } from './auth/encoding';
+import { generateTOTP, verifyTOTP } from './auth/totp';
+import { d1Worker } from './cloudflare/d1Worker';
 
-// Track login attempts in memory with more details
-const loginAttempts = new Map<string, AuthAttempt[]>();
+// Number of backup codes to generate
+const BACKUP_CODES_COUNT = 8;
+// Length of each backup code
+const BACKUP_CODE_LENGTH = 10;
+// Characters to use in backup codes (excluding similar looking characters)
+const BACKUP_CODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
-// Security configuration
-const securityConfig = {
-  maxFailedAttempts: 5,          // Maximum failed attempts before lockout
-  lockoutDuration: 15 * 60 * 1000, // 15 minutes lockout duration
-  attemptWindow: 30 * 60 * 1000, // Window for tracking attempts (30 min)
-  cleanupInterval: 60 * 60 * 1000, // Cleanup old entries every hour
-  progressiveBackoff: true       // Enable progressive backoff for repeated failures
+// Generate a random backup code
+const generateBackupCode = (length: number = BACKUP_CODE_LENGTH): string => {
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += BACKUP_CODE_CHARS.charAt(Math.floor(Math.random() * BACKUP_CODE_CHARS.length));
+  }
+  return result;
 };
 
-// Set up cleanup interval
-setInterval(() => {
-  const cutoff = Date.now() - securityConfig.attemptWindow;
-  
-  // Cleanup old entries
-  loginAttempts.forEach((attempts, key) => {
-    const validAttempts = attempts.filter(a => a.timestamp >= cutoff);
-    
-    if (validAttempts.length === 0) {
-      loginAttempts.delete(key);
-    } else if (validAttempts.length !== attempts.length) {
-      loginAttempts.set(key, validAttempts);
-    }
-  });
-}, securityConfig.cleanupInterval);
-
-/**
- * Record an authentication attempt with enhanced information
- * @param identifier Email or username used for login
- * @param success Whether the attempt was successful
- * @param metadata Additional information about the login attempt
- */
-export function recordAuthAttempt(
-  identifier: string, 
-  success: boolean, 
-  metadata: { ipAddress?: string; userAgent?: string } = {}
-): void {
-  if (!identifier) return;
-  
-  const normalizedIdentifier = identifier.toLowerCase();
-  const currentAttempts = loginAttempts.get(normalizedIdentifier) || [];
-  
-  // Add new attempt with metadata
-  currentAttempts.push({
-    timestamp: Date.now(),
-    success,
-    ipAddress: metadata.ipAddress,
-    userAgent: metadata.userAgent
-  });
-  
-  // Only keep attempts within the window
-  const cutoff = Date.now() - securityConfig.attemptWindow;
-  const validAttempts = currentAttempts.filter(a => a.timestamp >= cutoff);
-  
-  loginAttempts.set(normalizedIdentifier, validAttempts);
-  
-  // If successful login, reset failed attempts
-  if (success) {
-    const successfulAttempt = validAttempts[validAttempts.length - 1];
-    loginAttempts.set(normalizedIdentifier, [successfulAttempt]);
-    
-    // Log the successful login
-    console.log(`Successful login for ${normalizedIdentifier}`);
-  } else {
-    // Calculate failed attempts
-    const recentFailedAttempts = validAttempts.filter(a => !a.success);
-    
-    if (recentFailedAttempts.length >= securityConfig.maxFailedAttempts) {
-      // Calculate lockout time based on progressive backoff
-      const lockoutMultiplier = securityConfig.progressiveBackoff ? 
-        Math.min(recentFailedAttempts.length - securityConfig.maxFailedAttempts + 1, 5) : 
-        1;
-      
-      const lockoutTime = Math.floor((securityConfig.lockoutDuration * lockoutMultiplier) / 1000 / 60);
-      console.warn(`Account ${normalizedIdentifier} locked for ${lockoutTime} minutes after ${recentFailedAttempts.length} failed attempts`);
-      
-      // You could also add actual logging to a security log table in your database here
-    }
+// Generate multiple backup codes
+export const generateBackupCodes = (count: number = BACKUP_CODES_COUNT): string[] => {
+  const codes: string[] = [];
+  for (let i = 0; i < count; i++) {
+    codes.push(generateBackupCode());
   }
-}
+  return codes;
+};
 
-/**
- * Check if an account is locked out with progressive backoff
- * @param identifier Email or username to check
- * @returns Whether the account is currently locked out
- */
-export function isAccountLocked(identifier: string): boolean {
-  if (!identifier) return false;
-  
-  const normalizedIdentifier = identifier.toLowerCase();
-  const attempts = loginAttempts.get(normalizedIdentifier);
-  
-  // No attempts recorded
-  if (!attempts || attempts.length === 0) return false;
-  
-  // Check failed attempts
-  const recentFailedAttempts = attempts.filter(a => !a.success);
-  
-  // Check if we've had too many failed attempts
-  if (recentFailedAttempts.length >= securityConfig.maxFailedAttempts) {
-    // Find most recent failed attempt
-    const mostRecentAttempt = Math.max(...recentFailedAttempts.map(a => a.timestamp));
+// Helper function to hash a string using SHA-256
+const hashString = async (str: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
+// Set up TOTP for a user
+export const setupTOTP = async (
+  userId: string, 
+  token: string
+): Promise<{ secret: string; url: string; backupCodes: string[] }> => {
+  try {
+    // Generate a new TOTP secret
+    const totpData = generateTOTP(userId);
+    const backupCodes = generateBackupCodes();
     
-    // Calculate lockout duration based on number of failed attempts (progressive backoff)
-    const lockoutMultiplier = securityConfig.progressiveBackoff ? 
-      Math.min(recentFailedAttempts.length - securityConfig.maxFailedAttempts + 1, 5) : 
-      1;
+    // Hash the backup codes for storage
+    const hashedBackupCodes = await Promise.all(
+      backupCodes.map(code => hashString(code))
+    );
     
-    const lockoutDuration = securityConfig.lockoutDuration * lockoutMultiplier;
-    const lockedUntil = mostRecentAttempt + lockoutDuration;
+    // Store the TOTP secret and backup codes in the database
+    await d1Worker.transaction([
+      {
+        sql: `INSERT INTO totp_secrets (user_id, secret, created_at, updated_at) 
+              VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+              ON CONFLICT (user_id) 
+              DO UPDATE SET 
+                secret = EXCLUDED.secret,
+                updated_at = CURRENT_TIMESTAMP`,
+        params: [userId, totpData.secret]
+      },
+      {
+        sql: `DELETE FROM backup_codes WHERE user_id = ?`,
+        params: [userId]
+      }
+    ], token);
     
-    // If lockout period has passed, account is not locked
-    if (Date.now() > lockedUntil) return false;
+    // Insert each backup code
+    for (const hashedCode of hashedBackupCodes) {
+      await d1Worker.query(
+        `INSERT INTO backup_codes (user_id, code_hash, used, created_at)
+         VALUES (?, ?, 0, CURRENT_TIMESTAMP)`,
+        { params: [userId, hashedCode] },
+        token
+      );
+    }
+    
+    return {
+      secret: totpData.secret,
+      url: totpData.url,
+      backupCodes
+    };
+  } catch (error) {
+    console.error('Error setting up TOTP:', error);
+    throw new Error('Failed to set up two-factor authentication');
+  }
+};
+
+// Verify a TOTP code for a user
+export const verifyTOTPCode = async (
+  userId: string, 
+  code: string,
+  token: string
+): Promise<boolean> => {
+  try {
+    // Get the user's TOTP secret
+    const totpSecretResult = await d1Worker.getOne<{ secret: string }>(
+      'SELECT secret FROM totp_secrets WHERE user_id = ?',
+      { params: [userId] },
+      token
+    );
+    
+    if (!totpSecretResult || !totpSecretResult.secret) {
+      console.error('TOTP secret not found for user:', userId);
+      return false;
+    }
+    
+    // Verify the TOTP code
+    return verifyTOTP(code, totpSecretResult.secret);
+  } catch (error) {
+    console.error('Error verifying TOTP code:', error);
+    return false;
+  }
+};
+
+// Verify a backup code for a user
+export const verifyBackupCode = async (
+  userId: string, 
+  code: string,
+  token: string
+): Promise<boolean> => {
+  try {
+    // Hash the provided backup code
+    const hashedCode = await hashString(code);
+    
+    // Check if the code exists and is unused
+    const backupCodeResult = await d1Worker.getOne<{ id: number }>(
+      'SELECT id FROM backup_codes WHERE user_id = ? AND code_hash = ? AND used = 0',
+      { params: [userId, hashedCode] },
+      token
+    );
+    
+    if (!backupCodeResult || !backupCodeResult.id) {
+      return false;
+    }
+    
+    // Mark the backup code as used
+    await d1Worker.query(
+      'UPDATE backup_codes SET used = 1, used_at = CURRENT_TIMESTAMP WHERE id = ?',
+      { params: [backupCodeResult.id] },
+      token
+    );
     
     return true;
+  } catch (error) {
+    console.error('Error verifying backup code:', error);
+    return false;
   }
-  
-  return false;
-}
+};
 
-/**
- * Get time remaining in lockout in seconds with progressive backoff
- * @param identifier Email or username to check
- * @returns Seconds remaining in lockout or 0 if not locked
- */
-export function getLockoutTimeRemaining(identifier: string): number {
-  if (!identifier) return 0;
-  
-  const normalizedIdentifier = identifier.toLowerCase();
-  const attempts = loginAttempts.get(normalizedIdentifier);
-  
-  // No attempts recorded
-  if (!attempts || attempts.length === 0) return 0;
-  
-  // Get failed attempts
-  const recentFailedAttempts = attempts.filter(a => !a.success);
-  
-  // Check if we've had too many failed attempts
-  if (recentFailedAttempts.length >= securityConfig.maxFailedAttempts) {
-    // Find most recent failed attempt
-    const mostRecentAttempt = Math.max(...recentFailedAttempts.map(a => a.timestamp));
-    
-    // Calculate lockout duration based on number of failed attempts (progressive backoff)
-    const lockoutMultiplier = securityConfig.progressiveBackoff ? 
-      Math.min(recentFailedAttempts.length - securityConfig.maxFailedAttempts + 1, 5) : 
-      1;
-    
-    const lockoutDuration = securityConfig.lockoutDuration * lockoutMultiplier;
-    const lockedUntil = mostRecentAttempt + lockoutDuration;
-    
-    // If still in lockout period, return remaining time
-    if (Date.now() < lockedUntil) {
-      return Math.ceil((lockedUntil - Date.now()) / 1000);
-    }
-  }
-  
-  return 0;
-}
-
-/**
- * Get friendly lockout message for display
- * @param identifier Email or username to check
- * @returns A user-friendly message about the lockout status
- */
-export function getLockoutMessage(identifier: string): string {
-  const remainingSeconds = getLockoutTimeRemaining(identifier);
-  
-  if (remainingSeconds <= 0) {
-    return '';
-  }
-  
-  // Format time nicely
-  if (remainingSeconds < 60) {
-    return `Too many failed attempts. Please try again in ${remainingSeconds} seconds.`;
-  } else if (remainingSeconds < 3600) {
-    const minutes = Math.ceil(remainingSeconds / 60);
-    return `Too many failed attempts. Your account is temporarily locked. Please try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
-  } else {
-    const hours = Math.floor(remainingSeconds / 3600);
-    const minutes = Math.ceil((remainingSeconds % 3600) / 60);
-    return `Too many failed attempts. Your account is temporarily locked. Please try again in ${hours} hour${hours === 1 ? '' : 's'} and ${minutes} minute${minutes === 1 ? '' : 's'}.`;
-  }
-}
-
-/**
- * Attempt to login with security checks
- * @param email User email
- * @param password User password
- * @returns Success status and message/error
- */
-export async function secureLogin(email: string, password: string): Promise<{success: boolean; message?: string; data?: any}> {
+// Get the TOTP setup status for a user
+export const getTOTPStatus = async (
+  userId: string,
+  token: string
+): Promise<{ enabled: boolean; createdAt?: string }> => {
   try {
-    if (isAccountLocked(email)) {
-      const message = getLockoutMessage(email);
-      return { 
-        success: false,
-        message
-      };
+    const result = await d1Worker.getOne<{ created_at: string }>(
+      'SELECT created_at FROM totp_secrets WHERE user_id = ?',
+      { params: [userId] },
+      token
+    );
+    
+    if (!result) {
+      return { enabled: false };
     }
     
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (error) {
-      // Record failed attempt
-      recordAuthAttempt(email, false);
-      
-      // Check if account is now locked after this attempt
-      if (isAccountLocked(email)) {
-        return { 
-          success: false, 
-          message: getLockoutMessage(email)
-        };
-      }
-      
-      return { 
-        success: false, 
-        message: error.message
-      };
-    }
-    
-    // Record successful attempt
-    recordAuthAttempt(email, true);
-    
-    return { 
-      success: true, 
-      data
+    return {
+      enabled: true,
+      createdAt: result.created_at
     };
-    
-  } catch (error: any) {
-    // Record failed attempt
-    recordAuthAttempt(email, false);
-    
-    return { 
-      success: false, 
-      message: error.message || 'An unexpected error occurred'
-    };
+  } catch (error) {
+    console.error('Error getting TOTP status:', error);
+    return { enabled: false };
   }
-}
+};
 
-/**
- * Manually unlock an account
- * @param identifier Email or username to unlock
- */
-export function unlockAccount(identifier: string): void {
-  if (!identifier) return;
-  
-  const normalizedIdentifier = identifier.toLowerCase();
-  loginAttempts.delete(normalizedIdentifier);
-}
+// Get the remaining backup codes for a user
+export const getRemainingBackupCodes = async (
+  userId: string,
+  token: string
+): Promise<number> => {
+  try {
+    const result = await d1Worker.getOne<{ count: number }>(
+      'SELECT COUNT(*) as count FROM backup_codes WHERE user_id = ? AND used = 0',
+      { params: [userId] },
+      token
+    );
+    
+    return result?.count || 0;
+  } catch (error) {
+    console.error('Error getting remaining backup codes:', error);
+    return 0;
+  }
+};
 
-/**
- * Get login attempts statistics
- */
-export function getLoginStats(): Record<string, any> {
-  const stats = {
-    totalTrackedAccounts: loginAttempts.size,
-    lockedAccounts: 0,
-    recentFailedAttempts: 0,
-    recentSuccessfulAttempts: 0
-  };
-  
-  // Last hour stats
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  
-  loginAttempts.forEach((attempts, identifier) => {
-    if (isAccountLocked(identifier)) {
-      stats.lockedAccounts++;
+// Generate new backup codes for a user, invalidating old ones
+export const regenerateBackupCodes = async (
+  userId: string,
+  token: string
+): Promise<string[]> => {
+  try {
+    // Generate new backup codes
+    const backupCodes = generateBackupCodes();
+    
+    // Hash the backup codes for storage
+    const hashedBackupCodes = await Promise.all(
+      backupCodes.map(code => hashString(code))
+    );
+    
+    // Delete old backup codes
+    await d1Worker.query(
+      'DELETE FROM backup_codes WHERE user_id = ?',
+      { params: [userId] },
+      token
+    );
+    
+    // Insert each new backup code
+    for (const hashedCode of hashedBackupCodes) {
+      await d1Worker.query(
+        `INSERT INTO backup_codes (user_id, code_hash, used, created_at)
+         VALUES (?, ?, 0, CURRENT_TIMESTAMP)`,
+        { params: [userId, hashedCode] },
+        token
+      );
     }
     
-    attempts.forEach(attempt => {
-      if (attempt.timestamp >= oneHourAgo) {
-        if (attempt.success) {
-          stats.recentSuccessfulAttempts++;
-        } else {
-          stats.recentFailedAttempts++;
-        }
-      }
-    });
-  });
-  
-  return stats;
-}
+    return backupCodes;
+  } catch (error) {
+    console.error('Error regenerating backup codes:', error);
+    throw new Error('Failed to regenerate backup codes');
+  }
+};

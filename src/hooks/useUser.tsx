@@ -39,52 +39,31 @@ export const useUser = (userId?: string) => {
         }
         
         // Get user profile from D1
-        const profileResult = await d1Worker.getOne(
+        const profile = await d1Worker.getOne(
           'SELECT * FROM profiles WHERE id = ?',
           { params: [targetId] },
           token.access_token
         );
         
-        if (!profileResult) {
+        if (!profile) {
           setLoading(false);
           setError("User not found");
           return;
         }
         
-        // Ensure we have a proper object, not an array
-        const profile = Array.isArray(profileResult) 
-          ? (profileResult.length > 0 ? profileResult[0] : null)
-          : profileResult;
-          
-        if (!profile) {
-          setLoading(false);
-          setError("User profile data is invalid");
-          return;
-        }
-        
         // Get payment status
-        const paymentStatusResult = await d1Worker.getOne(
+        const paymentStatus = await d1Worker.getOne(
           'SELECT has_paid FROM payment_status WHERE user_id = ?',
           { params: [targetId] },
           token.access_token
         );
         
-        // Ensure proper object handling
-        const paymentStatus = Array.isArray(paymentStatusResult)
-          ? (paymentStatusResult.length > 0 ? paymentStatusResult[0] : null)
-          : paymentStatusResult;
-        
         // Get music subscription if any
-        const musicSubResult = await d1Worker.getOne(
+        const musicSub = await d1Worker.getOne(
           'SELECT subscription_type, end_date FROM music_subscriptions WHERE user_id = ? AND end_date > NOW()',
           { params: [targetId] },
           token.access_token
         );
-        
-        // Ensure proper object handling
-        const musicSubscription = Array.isArray(musicSubResult)
-          ? (musicSubResult.length > 0 ? musicSubResult[0] : null)
-          : musicSubResult;
         
         const userData: UserData = {
           id: targetId,
@@ -95,7 +74,7 @@ export const useUser = (userId?: string) => {
           country: profile.country,
           created_at: profile.created_at || new Date().toISOString(),
           has_paid: paymentStatus?.has_paid || false,
-          music_subscription: musicSubscription || null
+          music_subscription: musicSub || null
         };
         
         setUserData(userData);

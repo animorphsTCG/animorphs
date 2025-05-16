@@ -66,15 +66,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (paymentError) {
             console.error("Error checking payment status:", paymentError);
             // Still return profile without payment status
-            setUserProfile(data);
-            return data;
+            const profileData: UserProfile = {
+              id: data.id,
+              username: data.username || 'User-' + data.id.substring(0, 5),
+              name: data.name,
+              surname: data.surname,
+              email: data.email,
+              country: data.country,
+              created_at: data.created_at,
+              is_admin: data.is_admin || false
+            };
+            setUserProfile(profileData);
+            return profileData;
           }
           
           console.log("Payment status result:", hasPaid);
           
           // Add the has_paid property to the profile
-          const completeProfile = {
-            ...data,
+          const completeProfile: UserProfile = {
+            id: data.id,
+            username: data.username || 'User-' + data.id.substring(0, 5),
+            name: data.name,
+            surname: data.surname,
+            email: data.email,
+            country: data.country,
+            created_at: data.created_at,
+            is_admin: data.is_admin || false,
             has_paid: hasPaid || false
           };
           
@@ -87,8 +104,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return completeProfile;
         } catch (paymentError) {
           console.error("Exception checking payment:", paymentError);
-          setUserProfile(data);
-          return data;
+          
+          const profileData: UserProfile = {
+            id: data.id,
+            username: data.username || 'User-' + data.id.substring(0, 5),
+            name: data.name,
+            surname: data.surname,
+            email: data.email,
+            country: data.country,
+            created_at: data.created_at,
+            is_admin: data.is_admin || false
+          };
+          
+          setUserProfile(profileData);
+          return profileData;
         }
       }
       return null;
@@ -102,9 +131,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshProfile = async () => {
     if (user?.id) {
       console.log("Refreshing profile for user:", user.id);
-      return await fetchUserProfile(user.id);
+      await fetchUserProfile(user.id);
     }
-    return null;
   };
 
   /* ---- REALTIME ---- */
@@ -118,37 +146,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     console.log("Setting up realtime listener for payment status changes, user:", userId);
     const channel = supabase
-      .channel(`payment-status-${userId}`)
-      .on('postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'payment_status',
-          filter: `id=eq.${userId}`
-        },
-        (payload) => {
-          console.log("Payment status changed:", payload);
-          setUserProfile(prev =>
-            prev ? { ...prev, has_paid: payload.new.has_paid } : prev
-          );
-          if (payload.new.has_paid) {
-            toast({
-              title: "Payment Status Updated",
-              description: "Your account now has full access to all game modes!",
-            });
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log("Realtime subscription status:", status);
-        if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to payment changes');
-        } else {
-          // fallback setup
-          console.log('Failed to subscribe to realtime, using polling fallback');
-          setupPollingFallback(userId);
-        }
-      });
+      .channel(`payment-status-${userId}`);
+      
+    channel.subscribe((status) => {
+      console.log("Realtime subscription status:", status);
+      if (status === 'SUBSCRIBED') {
+        console.log('Successfully subscribed to payment changes');
+      } else {
+        // fallback setup
+        console.log('Failed to subscribe to realtime, using polling fallback');
+        setupPollingFallback(userId);
+      }
+    });
 
     paymentChannelRef.current = channel;
   };
@@ -264,7 +273,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
         options: {
           data: metadata,
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;

@@ -64,7 +64,7 @@ const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }
     
     try {
       // Check if user is already in another battle or lobby
-      const { data: userInBattle } = await supabase
+      const { data: userInBattle, error: battleError } = await supabase
         .rpc('user_in_battle', { user_id: user.id });
         
       if (userInBattle) {
@@ -77,7 +77,7 @@ const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }
         return;
       }
       
-      const { data: userInLobby } = await supabase
+      const { data: userInLobby, error: lobbyError } = await supabase
         .rpc('user_in_lobby', { user_id: user.id });
         
       if (userInLobby) {
@@ -94,7 +94,7 @@ const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }
                         playerCount === '3player' ? 3 : 4;
                         
       // Create the lobby
-      const { data: lobby, error: lobbyError } = await supabase
+      const { data, error: lobbyError2 } = await supabase
         .from('battle_lobbies')
         .insert({
           name: lobbyName,
@@ -108,7 +108,10 @@ const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }
         .select()
         .single();
 
-      if (lobbyError) throw lobbyError;
+      if (lobbyError2) throw lobbyError2;
+      
+      // Ensure we have a proper object
+      const lobby = data;
 
       // Add host as first participant
       const { error: participantError } = await supabase
@@ -287,13 +290,17 @@ const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }
           onOpenChange={(open) => {
             setShowInviteModal(open);
             if (!open) {
-              handleContinue();
+              navigate(playerCount === "1v1" 
+                ? `/battle/multiplayer/${createdLobbyId}`
+                : playerCount === "3player"
+                  ? `/3-player-battle/${createdLobbyId}`
+                  : `/4-player-user-lobby/${createdLobbyId}`);
             }
           }}
           lobbyId={createdLobbyId}
           lobbyName={lobbyName}
           battleType={playerCount}
-          maxPlayers={playerCount === '1v1' ? 2 : playerCount === '3player' ? 3 : 4}
+          maxPlayers={maxPlayers}
         />
       )}
     </>

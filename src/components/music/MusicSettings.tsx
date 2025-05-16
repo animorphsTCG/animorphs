@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { useAuth } from "@/modules/auth"; // Updated import path
+import { useAuth } from "@/modules/auth";
 import { useD1MusicSubscription, useD1UserSongs } from "@/hooks/useD1Database";
 import { d1Worker } from "@/lib/cloudflare/d1Worker";
 import SongBrowser from './SongBrowser';
@@ -10,7 +10,7 @@ import MusicSubscription from './MusicSubscription';
 import SettingsControls from './SettingsControls';
 import SongCollection from './SongCollection';
 
-interface MusicSubscription {
+interface MusicSubscriptionType {
   subscription_type: 'monthly' | 'yearly';
   end_date: string;
 }
@@ -20,7 +20,7 @@ const MusicSettings: React.FC = () => {
   const [selectedSongs, setSelectedSongs] = useState<string[]>([]);
   const [showSongBrowser, setShowSongBrowser] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
-  const [subscription, setSubscription] = useState<MusicSubscription | null>(null);
+  const [subscription, setSubscription] = useState<MusicSubscriptionType | null>(null);
   const [hasSubscription, setHasSubscription] = useState(false);
   
   // Use the D1 hooks
@@ -56,14 +56,16 @@ const MusicSettings: React.FC = () => {
       
       // Then check for an active subscription
       if (musicSubscription) {
-        const endDate = new Date(musicSubscription.end_date);
-        const now = new Date();
-        
-        if (endDate > now) {
-          console.log("User has active music subscription until:", endDate.toISOString());
-          return true;
-        } else {
-          console.log("User has expired music subscription:", endDate.toISOString());
+        if (typeof musicSubscription === 'object' && 'end_date' in musicSubscription) {
+          const endDate = new Date(musicSubscription.end_date);
+          const now = new Date();
+          
+          if (endDate > now) {
+            console.log("User has active music subscription until:", endDate.toISOString());
+            return true;
+          } else {
+            console.log("User has expired music subscription:", endDate.toISOString());
+          }
         }
       }
       
@@ -89,10 +91,14 @@ const MusicSettings: React.FC = () => {
       
       // Update subscription details if available
       if (!subscriptionLoading && musicSubscription) {
-        setSubscription({
-          subscription_type: musicSubscription.subscription_type as 'monthly' | 'yearly',
-          end_date: musicSubscription.end_date
-        });
+        if (typeof musicSubscription === 'object' && 
+            'subscription_type' in musicSubscription && 
+            'end_date' in musicSubscription) {
+          setSubscription({
+            subscription_type: musicSubscription.subscription_type as 'monthly' | 'yearly',
+            end_date: musicSubscription.end_date
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching user data:", error);

@@ -40,11 +40,18 @@ export const resetSupabaseConnection = () => {
   return Promise.resolve();
 };
 
+// Helper function to create result objects consistent with Supabase return types
+const createResultObject = <T = any>(data: T | null = null, error: Error | null = null) => {
+  return {
+    data,
+    error
+  };
+};
+
 /**
  * Create a dummy data object that can be used in Supabase query results
- * This helps type checking by ensuring data is an object, not an array
  */
-const createDummyData = (tableName: string) => {
+const createDummyData = (tableName: string, asArray = false) => {
   // Create a base object with common properties for all tables
   const baseObject = {
     id: 'dummy-id',
@@ -52,9 +59,10 @@ const createDummyData = (tableName: string) => {
   };
 
   // Add table-specific properties
+  let result;
   switch (tableName) {
     case 'profiles':
-      return {
+      result = {
         ...baseObject,
         username: 'dummy-user',
         name: 'Dummy User',
@@ -62,8 +70,9 @@ const createDummyData = (tableName: string) => {
         country: 'Country',
         is_admin: false
       };
+      break;
     case 'payment_status':
-      return {
+      result = {
         ...baseObject,
         has_paid: false,
         payment_method: null,
@@ -71,23 +80,26 @@ const createDummyData = (tableName: string) => {
         transaction_id: null,
         updated_at: new Date().toISOString()
       };
+      break;
     case 'music_subscriptions':
-      return {
+      result = {
         ...baseObject,
         subscription_type: 'monthly',
         start_date: new Date().toISOString(),
         end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         user_id: 'dummy-user-id'
       };
+      break;
     case 'user_music_settings':
-      return {
+      result = {
         ...baseObject,
         volume_level: 0.5,
         music_enabled: true,
         user_id: 'dummy-user-id'
       };
+      break;
     case 'battle_lobbies':
-      return {
+      result = {
         ...baseObject,
         name: 'Dummy Lobby',
         host_id: 'dummy-host-id',
@@ -98,8 +110,9 @@ const createDummyData = (tableName: string) => {
         use_timer: true,
         updated_at: new Date().toISOString()
       };
+      break;
     case 'battle_invites':
-      return {
+      result = {
         ...baseObject,
         user_id: 'dummy-user-id',
         lobby_id: 'dummy-lobby-id',
@@ -110,81 +123,88 @@ const createDummyData = (tableName: string) => {
         is_rejected: false,
         responded_at: null
       };
+      break;
     case 'songs':
-      return {
+      result = {
         ...baseObject,
         title: 'Dummy Song',
         youtube_url: 'https://youtube.com/watch?v=dummyId',
         preview_start_seconds: 0,
         preview_duration_seconds: 30
       };
+      break;
     case 'user_song_selections':
-      return {
+      result = {
         ...baseObject,
         user_id: 'dummy-user-id',
         song_id: 'dummy-song-id'
       };
+      break;
     default:
-      return baseObject;
+      result = baseObject;
   }
+
+  return asArray ? [result] : result;
+};
+
+// Create a final query result function to standardize promises
+const finalQueryResult = <T = any>(data: T, error = null) => {
+  return Promise.resolve({ data, error });
 };
 
 // Helper to create a standard query result with full chaining
-const createQueryResult = (tableName: string, isMultiple = false) => {
-  const errorMsg = `Supabase query to ${tableName} has been deprecated`;
+const createQueryBuilder = (tableName: string, isMultiple = false) => {
+  // Create appropriate dummy data
+  const dummyData = createDummyData(tableName, isMultiple);
   
-  // Create appropriate dummy data based on whether we expect multiple results
-  const dummyData = isMultiple ? [createDummyData(tableName)] : createDummyData(tableName);
-  
-  // Create common result with data and error
-  const result = {
-    data: dummyData,
-    error: null
-  };
+  // This stores the terminal operation function
+  let terminalOperation = () => finalQueryResult(dummyData);
   
   // Chain methods that return the same chain for further method calls
-  const chainMethods = {
+  const builder = {
     // Filter methods
-    eq: (column: string, value: any) => chainMethods,
-    neq: (column: string, value: any) => chainMethods,
-    gt: (column: string, value: any) => chainMethods,
-    gte: (column: string, value: any) => chainMethods,
-    lt: (column: string, value: any) => chainMethods,
-    lte: (column: string, value: any) => chainMethods,
-    like: (column: string, value: any) => chainMethods,
-    ilike: (column: string, pattern: string) => chainMethods,
-    is: (column: string, value: any) => chainMethods,
-    in: (column: string, values: any[]) => chainMethods,
-    contains: (column: any, value: any) => chainMethods,
-    containedBy: (column: any, value: any) => chainMethods,
-    not: (column: string, value: any) => chainMethods,
-    or: (filter: string, values: any[]) => chainMethods,
-    filter: (column: string, operator: string, value: any) => chainMethods,
+    eq: (column: string, value: any) => builder,
+    neq: (column: string, value: any) => builder,
+    gt: (column: string, value: any) => builder,
+    gte: (column: string, value: any) => builder,
+    lt: (column: string, value: any) => builder,
+    lte: (column: string, value: any) => builder,
+    like: (column: string, value: any) => builder,
+    ilike: (column: string, pattern: string) => builder,
+    is: (column: string, value: any) => builder,
+    in: (column: string, values: any[]) => builder,
+    contains: (column: any, value: any) => builder,
+    containedBy: (column: any, value: any) => builder,
+    not: (column: string, value: any) => builder,
+    or: (filter: string, values: any[]) => builder,
+    filter: (column: string, operator: string, value: any) => builder,
     
     // Query modification methods
-    order: (column: string, { ascending = true } = {}) => chainMethods,
-    limit: (count: number) => chainMethods,
-    range: (from: number, to: number) => chainMethods,
-    match: (query: any) => chainMethods,
+    order: (column: string, { ascending = true } = {}) => builder,
+    limit: (count: number) => builder,
+    range: (from: number, to: number) => builder,
+    match: (query: any) => builder,
     
-    // Terminal methods that return a promise
-    select: (columns: string = '*') => Promise.resolve(result),
-    single: () => Promise.resolve(result),
-    maybeSingle: () => Promise.resolve(result),
-    execute: () => Promise.resolve(result),
+    // Terminal methods that return a promise with the correct structure
+    select: (columns: string = '*') => terminalOperation(),
+    single: () => finalQueryResult(isMultiple ? dummyData[0] : dummyData),
+    maybeSingle: () => finalQueryResult(isMultiple ? dummyData[0] : dummyData), 
+    execute: () => terminalOperation(),
     
-    // Support direct promise chaining
-    then: (onfulfilled: any) => Promise.resolve(result).then(onfulfilled),
+    // Support direct promise chaining - crucial for await compatibility
+    then: (onfulfilled: any) => terminalOperation().then(onfulfilled),
+    catch: (onrejected: any) => terminalOperation().catch(onrejected),
+    finally: (onfinally: any) => terminalOperation().finally(onfinally),
     
-    // Include data and error for immediate access
+    // Expose data and error directly for synchronous access
     data: dummyData,
     error: null
   };
   
-  return chainMethods;
+  return builder;
 };
 
-// Create a complete fake Supabase client with all stub methods
+// Create a complete fake Supabase client with all necessary methods
 export const supabase = {
   auth: {
     getSession: () => Promise.resolve({ data: { session: null }, error: null }),
@@ -213,42 +233,39 @@ export const supabase = {
   },
   
   from: (tableName: string) => {
-    // Create a query chain with appropriate chainable methods
-    const queryChain = createQueryResult(tableName, true);
+    const queryBuilder = createQueryBuilder(tableName, true);
     
-    // Return a full query builder with all methods
     return {
-      select: (columns: string = '*') => queryChain,
+      select: (columns: string = '*') => queryBuilder,
       insert: (data: any) => {
-        const result = { 
-          data: createDummyData(tableName), 
+        const result = {
+          data: createDummyData(tableName),
           error: null,
-          select: () => queryChain
+          select: () => queryBuilder
         };
         return result;
       },
       update: (data: any) => {
         return {
-          eq: (column: string, value: any) => Promise.resolve({ data: createDummyData(tableName), error: null }),
-          match: (criteria: any) => Promise.resolve({ data: createDummyData(tableName), error: null }),
-          in: (column: string, values: any[]) => Promise.resolve({ data: createDummyData(tableName), error: null }),
-          filter: (column: string, operator: string, value: any) => Promise.resolve({ data: createDummyData(tableName), error: null })
+          eq: (column: string, value: any) => finalQueryResult(createDummyData(tableName)),
+          match: (criteria: any) => finalQueryResult(createDummyData(tableName)),
+          in: (column: string, values: any[]) => finalQueryResult(createDummyData(tableName)),
+          filter: (column: string, operator: string, value: any) => finalQueryResult(createDummyData(tableName))
         };
       },
       upsert: (data: any) => {
-        const result = {
+        return {
           data: createDummyData(tableName), 
           error: null,
-          select: () => queryChain
+          select: () => queryBuilder
         };
-        return result;
       },
       delete: () => {
         return {
-          eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
-          match: (criteria: any) => Promise.resolve({ data: null, error: null }),
-          in: (column: string, values: any[]) => Promise.resolve({ data: null, error: null }),
-          filter: (column: string, operator: string, value: any) => Promise.resolve({ data: null, error: null })
+          eq: (column: string, value: any) => finalQueryResult(null),
+          match: (criteria: any) => finalQueryResult(null),
+          in: (column: string, values: any[]) => finalQueryResult(null),
+          filter: (column: string, operator: string, value: any) => finalQueryResult(null)
         };
       }
     };
@@ -256,17 +273,17 @@ export const supabase = {
   
   storage: {
     from: (bucket: string) => ({
-      upload: (path: string, file: any) => Promise.resolve({ data: { path }, error: null }),
-      download: (path: string) => Promise.resolve({ data: new Blob(), error: null }),
+      upload: (path: string, file: any) => finalQueryResult({ path }),
+      download: (path: string) => finalQueryResult(new Blob()),
       getPublicUrl: (path: string) => ({ data: { publicUrl: `https://stub-storage/${bucket}/${path}` } }),
-      remove: (paths: string[]) => Promise.resolve({ data: { paths }, error: null })
+      remove: (paths: string[]) => finalQueryResult({ paths })
     })
   },
   
-  rpc: (func: string, params?: any) => Promise.resolve({ data: null, error: new Error(`Supabase RPC call to ${func} has been deprecated`) }),
+  rpc: (func: string, params?: any) => finalQueryResult(null, new Error(`Supabase RPC call to ${func} has been deprecated`)),
   
   channel: (channelName: string) => {
-    const channelObj = {
+    return {
       on: (event: string, filter?: any, callback?: any) => {
         // Handle both forms of the on() method
         if (typeof filter === 'function' && callback === undefined) {
@@ -288,15 +305,14 @@ export const supabase = {
       presenceState: () => ({}),
       unsubscribe: () => {}
     };
-    return channelObj;
   },
   
   removeChannel: (channel: any) => {},
   
-  // Add functions property for compatibility with some components
+  // Add functions property for compatibility with components that use it
   functions: {
     invoke: (functionName: string, options?: { body?: any }) => 
-      Promise.resolve({ data: null, error: null }),
+      finalQueryResult(null),
   }
 };
 

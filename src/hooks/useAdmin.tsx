@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth'; 
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
@@ -48,15 +49,20 @@ export const useAdmin = () => {
         
         // Otherwise, check the database for admin status
         console.log("Checking database for admin status");
-        const profileData = await d1Worker.getOne(
+        const profileDataResult = await d1Worker.getOne(
           'SELECT is_admin FROM profiles WHERE id = ?',
           { params: [user.id] },
           token.access_token
         );
 
-        if (!profileData) {
+        if (!profileDataResult) {
           throw new Error("Profile not found");
         }
+        
+        // Ensure we have a proper object, not an array
+        const profileData = Array.isArray(profileDataResult) 
+          ? (profileDataResult.length > 0 ? profileDataResult[0] : null)
+          : profileDataResult;
         
         console.log("Admin check result:", profileData);
         setIsAdmin(profileData?.is_admin || false);

@@ -39,31 +39,52 @@ export const useUser = (userId?: string) => {
         }
         
         // Get user profile from D1
-        const profile = await d1Worker.getOne(
+        const profileResult = await d1Worker.getOne(
           'SELECT * FROM profiles WHERE id = ?',
           { params: [targetId] },
           token.access_token
         );
         
-        if (!profile) {
+        if (!profileResult) {
           setLoading(false);
           setError("User not found");
           return;
         }
         
+        // Ensure we have a proper object, not an array
+        const profile = Array.isArray(profileResult) 
+          ? (profileResult.length > 0 ? profileResult[0] : null)
+          : profileResult;
+          
+        if (!profile) {
+          setLoading(false);
+          setError("User profile data is invalid");
+          return;
+        }
+        
         // Get payment status
-        const paymentStatus = await d1Worker.getOne(
+        const paymentStatusResult = await d1Worker.getOne(
           'SELECT has_paid FROM payment_status WHERE user_id = ?',
           { params: [targetId] },
           token.access_token
         );
         
+        // Ensure proper object handling
+        const paymentStatus = Array.isArray(paymentStatusResult)
+          ? (paymentStatusResult.length > 0 ? paymentStatusResult[0] : null)
+          : paymentStatusResult;
+        
         // Get music subscription if any
-        const musicSubscription = await d1Worker.getOne(
+        const musicSubResult = await d1Worker.getOne(
           'SELECT subscription_type, end_date FROM music_subscriptions WHERE user_id = ? AND end_date > NOW()',
           { params: [targetId] },
           token.access_token
         );
+        
+        // Ensure proper object handling
+        const musicSubscription = Array.isArray(musicSubResult)
+          ? (musicSubResult.length > 0 ? musicSubResult[0] : null)
+          : musicSubResult;
         
         const userData: UserData = {
           id: targetId,

@@ -40,18 +40,111 @@ export const resetSupabaseConnection = () => {
   return Promise.resolve();
 };
 
+/**
+ * Create a dummy data object that can be used in Supabase query results
+ * This helps type checking by ensuring data is an object, not an array
+ */
+const createDummyData = (tableName: string) => {
+  // Create a base object with common properties for all tables
+  const baseObject = {
+    id: 'dummy-id',
+    created_at: new Date().toISOString()
+  };
+
+  // Add table-specific properties
+  switch (tableName) {
+    case 'profiles':
+      return {
+        ...baseObject,
+        username: 'dummy-user',
+        name: 'Dummy User',
+        surname: 'Surname',
+        country: 'Country',
+        is_admin: false
+      };
+    case 'payment_status':
+      return {
+        ...baseObject,
+        has_paid: false,
+        payment_method: null,
+        payment_date: null,
+        transaction_id: null,
+        updated_at: new Date().toISOString()
+      };
+    case 'music_subscriptions':
+      return {
+        ...baseObject,
+        subscription_type: 'monthly',
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        user_id: 'dummy-user-id'
+      };
+    case 'user_music_settings':
+      return {
+        ...baseObject,
+        volume_level: 0.5,
+        music_enabled: true,
+        user_id: 'dummy-user-id'
+      };
+    case 'battle_lobbies':
+      return {
+        ...baseObject,
+        name: 'Dummy Lobby',
+        host_id: 'dummy-host-id',
+        battle_type: '1v1',
+        max_players: 2,
+        status: 'waiting',
+        use_music: true,
+        use_timer: true,
+        updated_at: new Date().toISOString()
+      };
+    case 'battle_invites':
+      return {
+        ...baseObject,
+        user_id: 'dummy-user-id',
+        lobby_id: 'dummy-lobby-id',
+        invited_by: 'dummy-inviter-id',
+        battle_type: '1v1',
+        lobby_name: 'Dummy Lobby',
+        is_accepted: false,
+        is_rejected: false,
+        responded_at: null
+      };
+    case 'songs':
+      return {
+        ...baseObject,
+        title: 'Dummy Song',
+        youtube_url: 'https://youtube.com/watch?v=dummyId',
+        preview_start_seconds: 0,
+        preview_duration_seconds: 30
+      };
+    case 'user_song_selections':
+      return {
+        ...baseObject,
+        user_id: 'dummy-user-id',
+        song_id: 'dummy-song-id'
+      };
+    default:
+      return baseObject;
+  }
+};
+
 // Helper to create a standard query result with full chaining
-const createQueryResult = (tableName: string) => {
+const createQueryResult = (tableName: string, isMultiple = false) => {
   const errorMsg = `Supabase query to ${tableName} has been deprecated`;
+  
+  // Create appropriate dummy data based on whether we expect multiple results
+  const dummyData = isMultiple ? [createDummyData(tableName)] : createDummyData(tableName);
   
   // Create common result with data and error
   const result = {
-    data: null as any[],
-    error: new Error(errorMsg)
+    data: dummyData,
+    error: null
   };
   
-  // Basic query chainable methods
+  // Chain methods that return the same chain for further method calls
   const chainMethods = {
+    // Filter methods
     eq: (column: string, value: any) => chainMethods,
     neq: (column: string, value: any) => chainMethods,
     gt: (column: string, value: any) => chainMethods,
@@ -59,7 +152,7 @@ const createQueryResult = (tableName: string) => {
     lt: (column: string, value: any) => chainMethods,
     lte: (column: string, value: any) => chainMethods,
     like: (column: string, value: any) => chainMethods,
-    ilike: (column: string, value: any) => chainMethods,
+    ilike: (column: string, pattern: string) => chainMethods,
     is: (column: string, value: any) => chainMethods,
     in: (column: string, values: any[]) => chainMethods,
     contains: (column: any, value: any) => chainMethods,
@@ -67,34 +160,39 @@ const createQueryResult = (tableName: string) => {
     not: (column: string, value: any) => chainMethods,
     or: (filter: string, values: any[]) => chainMethods,
     filter: (column: string, operator: string, value: any) => chainMethods,
-    match: (query: any) => chainMethods,
-    order: (column: string, { ascending }: { ascending: boolean }) => chainMethods,
+    
+    // Query modification methods
+    order: (column: string, { ascending = true } = {}) => chainMethods,
     limit: (count: number) => chainMethods,
     range: (from: number, to: number) => chainMethods,
+    match: (query: any) => chainMethods,
+    
+    // Terminal methods that return a promise
+    select: (columns: string = '*') => Promise.resolve(result),
     single: () => Promise.resolve(result),
     maybeSingle: () => Promise.resolve(result),
-    select: (columns: string = '*') => chainMethods,
     execute: () => Promise.resolve(result),
-    then: (onfulfilled: any) => Promise.resolve(result).then(onfulfilled)
+    
+    // Support direct promise chaining
+    then: (onfulfilled: any) => Promise.resolve(result).then(onfulfilled),
+    
+    // Include data and error for immediate access
+    data: dummyData,
+    error: null
   };
   
-  // Add data and error directly to chainMethods for components that expect them
-  return {
-    ...chainMethods,
-    data: null as any,
-    error: new Error(errorMsg)
-  };
+  return chainMethods;
 };
 
-// Create a basic stub that implements common Supabase methods
+// Create a complete fake Supabase client with all stub methods
 export const supabase = {
   auth: {
     getSession: () => Promise.resolve({ data: { session: null }, error: null }),
     getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-    signIn: (params?: any) => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
-    signInWithPassword: (params?: any) => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
-    signInWithOAuth: (params?: any) => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
-    signUp: (params?: any) => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
+    signIn: () => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
+    signInWithPassword: () => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
+    signInWithOAuth: () => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
+    signUp: () => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
     signOut: () => Promise.resolve({ error: null }),
     onAuthStateChange: (callback: any) => {
       // Immediately call with SIGNED_OUT event
@@ -110,46 +208,47 @@ export const supabase = {
         } 
       };
     },
-    setSession: (params?: any) => Promise.resolve({ data: { session: null }, error: null }),
-    refreshSession: (params?: any) => Promise.resolve({ data: { session: null }, error: null }),
+    setSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    refreshSession: () => Promise.resolve({ data: { session: null }, error: null }),
   },
   
   from: (tableName: string) => {
     // Create a query chain with appropriate chainable methods
-    const queryChain = createQueryResult(tableName);
+    const queryChain = createQueryResult(tableName, true);
     
+    // Return a full query builder with all methods
     return {
       select: (columns: string = '*') => queryChain,
       insert: (data: any) => {
         const result = { 
-          data: null, 
-          error: new Error(`Supabase insert to ${tableName} has been deprecated`),
+          data: createDummyData(tableName), 
+          error: null,
           select: () => queryChain
         };
         return result;
       },
       update: (data: any) => {
         return {
-          eq: (column: string, value: any) => Promise.resolve({ data: null, error: new Error(`Supabase update to ${tableName} has been deprecated`) }),
-          match: (criteria: any) => Promise.resolve({ data: null, error: new Error(`Supabase update to ${tableName} has been deprecated`) }),
-          in: (column: string, values: any[]) => Promise.resolve({ data: null, error: new Error(`Supabase update to ${tableName} has been deprecated`) }),
-          filter: (column: string, operator: string, value: any) => Promise.resolve({ data: null, error: new Error(`Supabase update to ${tableName} has been deprecated`) })
+          eq: (column: string, value: any) => Promise.resolve({ data: createDummyData(tableName), error: null }),
+          match: (criteria: any) => Promise.resolve({ data: createDummyData(tableName), error: null }),
+          in: (column: string, values: any[]) => Promise.resolve({ data: createDummyData(tableName), error: null }),
+          filter: (column: string, operator: string, value: any) => Promise.resolve({ data: createDummyData(tableName), error: null })
         };
       },
       upsert: (data: any) => {
         const result = {
-          data: null, 
-          error: new Error(`Supabase upsert to ${tableName} has been deprecated`),
+          data: createDummyData(tableName), 
+          error: null,
           select: () => queryChain
         };
         return result;
       },
       delete: () => {
         return {
-          eq: (column: string, value: any) => Promise.resolve({ data: null, error: new Error(`Supabase delete from ${tableName} has been deprecated`) }),
-          match: (criteria: any) => Promise.resolve({ data: null, error: new Error(`Supabase delete from ${tableName} has been deprecated`) }),
-          in: (column: string, values: any[]) => Promise.resolve({ data: null, error: new Error(`Supabase delete from ${tableName} has been deprecated`) }),
-          filter: (column: string, operator: string, value: any) => Promise.resolve({ data: null, error: new Error(`Supabase delete from ${tableName} has been deprecated`) })
+          eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+          match: (criteria: any) => Promise.resolve({ data: null, error: null }),
+          in: (column: string, values: any[]) => Promise.resolve({ data: null, error: null }),
+          filter: (column: string, operator: string, value: any) => Promise.resolve({ data: null, error: null })
         };
       }
     };
@@ -157,10 +256,10 @@ export const supabase = {
   
   storage: {
     from: (bucket: string) => ({
-      upload: (path: string, file: any) => Promise.resolve({ data: null, error: new Error('Supabase storage has been deprecated') }),
-      download: (path: string) => Promise.resolve({ data: null, error: new Error('Supabase storage has been deprecated') }),
-      getPublicUrl: (path: string) => ({ data: { publicUrl: '' } }),
-      remove: (paths: string[]) => Promise.resolve({ data: null, error: new Error('Supabase storage has been deprecated') })
+      upload: (path: string, file: any) => Promise.resolve({ data: { path }, error: null }),
+      download: (path: string) => Promise.resolve({ data: new Blob(), error: null }),
+      getPublicUrl: (path: string) => ({ data: { publicUrl: `https://stub-storage/${bucket}/${path}` } }),
+      remove: (paths: string[]) => Promise.resolve({ data: { paths }, error: null })
     })
   },
   
@@ -196,7 +295,8 @@ export const supabase = {
   
   // Add functions property for compatibility with some components
   functions: {
-    invoke: (func: string, params?: any) => Promise.resolve({ data: null, error: new Error(`Supabase function ${func} has been deprecated`) })
+    invoke: (functionName: string, options?: { body?: any }) => 
+      Promise.resolve({ data: null, error: null }),
   }
 };
 

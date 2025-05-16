@@ -1,309 +1,184 @@
 
-import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/modules/auth"; // Updated import
-import { toast } from "@/components/ui/use-toast";
-import { supabase } from '@/lib/supabase';
-import { Loader2, Users } from "lucide-react";
-import InviteUserModal from "./battle/InviteUserModal";
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from '@/components/ui/use-toast';
+import { useAuth } from '@/modules/auth';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
 
-interface BattleLobbyCreatorProps {
-  onLobbyCreate?: (lobbyData: any) => void;
-}
-
-const BattleLobbyCreator: React.FC<BattleLobbyCreatorProps> = ({ onLobbyCreate }) => {
+const BattleLobbyCreator = () => {
   const navigate = useNavigate();
-  const { user, userProfile } = useAuth();
-  
-  const [lobbyName, setLobbyName] = useState("");
-  const [playerCount, setPlayerCount] = useState<"1v1" | "3player" | "4player">("1v1");
+  const { user, token } = useAuth();
+  const [name, setName] = useState('');
+  const [battleType, setBattleType] = useState('1v1');
+  const [maxPlayers, setMaxPlayers] = useState(2);
+  const [useMusic, setUseMusic] = useState(true);
   const [useTimer, setUseTimer] = useState(true);
-  const [useMusic, setUseMusic] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [createdLobbyId, setCreatedLobbyId] = useState<string | null>(null);
-  
-  const userHasPaid = userProfile?.has_paid === true;
-  
+  const [loading, setLoading] = useState(false);
+
   const handleCreateLobby = async () => {
-    if (!user) {
+    if (!user || !token?.access_token) {
       toast({
-        title: "Authentication Required",
-        description: "You need to be logged in to create a battle lobby.",
-        variant: "destructive",
-      });
-      navigate("/login");
-      return;
-    }
-    
-    if (!userHasPaid) {
-      toast({
-        title: "Full Access Required",
-        description: "You need to upgrade your account to create custom battle lobbies.",
-        variant: "destructive",
-      });
-      navigate("/profile");
-      return;
-    }
-    
-    if (!lobbyName.trim()) {
-      toast({
-        title: "Lobby Name Required",
-        description: "Please enter a name for your battle lobby.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'You must be logged in to create a lobby',
+        variant: 'destructive',
       });
       return;
     }
-    
-    setIsCreating(true);
-    
+
+    if (!name.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a lobby name',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      // Check if user is already in another battle or lobby
-      const { data: userInBattle, error: battleError } = await supabase
-        .rpc('user_in_battle', { user_id: user.id });
-        
-      if (userInBattle) {
-        toast({
-          title: 'Already in battle',
-          description: 'You are already participating in a battle',
-          variant: 'destructive'
-        });
-        setIsCreating(false);
-        return;
-      }
-      
-      const { data: userInLobby, error: lobbyError } = await supabase
-        .rpc('user_in_lobby', { user_id: user.id });
-        
-      if (userInLobby) {
-        toast({
-          title: 'Already in lobby',
-          description: 'You are already participating in a lobby',
-          variant: 'destructive'
-        });
-        setIsCreating(false);
-        return;
-      }
-    
-      const maxPlayers = playerCount === '1v1' ? 2 : 
-                        playerCount === '3player' ? 3 : 4;
-                        
-      // Create the lobby
-      const { data, error: lobbyError2 } = await supabase
-        .from('battle_lobbies')
-        .insert({
-          name: lobbyName,
-          host_id: user.id,
-          battle_type: playerCount,
-          max_players: maxPlayers,
-          use_timer: useTimer,
-          use_music: useMusic,
-          requires_payment: true // All custom lobbies require payment
-        })
-        .select()
-        .single();
-
-      if (lobbyError2) throw lobbyError2;
-      
-      // Ensure we have a proper object
-      const lobby = data;
-
-      // Add host as first participant
-      const { error: participantError } = await supabase
-        .from('lobby_participants')
-        .insert({
-          lobby_id: lobby.id,
-          user_id: user.id,
-          player_number: 1
-        });
-
-      if (participantError) throw participantError;
+      setLoading(true);
       
       const lobbyData = {
-        id: lobby.id,
-        name: lobbyName,
-        playerCount,
-        useTimer,
-        useMusic,
-        hostId: user.id
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        host_id: user.id,
+        battle_type: battleType,
+        max_players: maxPlayers,
+        status: 'waiting',
+        use_music: useMusic ? 1 : 0,
+        use_timer: useTimer ? 1 : 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
-      
-      // Set the created lobby ID for the invite modal
-      setCreatedLobbyId(lobby.id);
-      
-      if (onLobbyCreate) {
-        onLobbyCreate(lobbyData);
-      }
-      
-      // Show invite modal
-      setShowInviteModal(true);
-      setIsCreating(false);
+
+      await d1Worker.insert('battle_lobbies', lobbyData, token.access_token);
       
       toast({
-        title: "Lobby Created",
-        description: "Your battle lobby has been created successfully.",
+        title: 'Success',
+        description: 'Lobby created successfully',
       });
+      
+      navigate(`/battle/lobby/${lobbyData.id}`);
       
     } catch (error) {
-      console.error("Error creating lobby:", error);
+      console.error('Error creating lobby:', error);
       toast({
-        title: "Error",
-        description: "Failed to create battle lobby. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to create lobby',
+        variant: 'destructive',
       });
-      setIsCreating(false);
+    } finally {
+      setLoading(false);
     }
   };
-  
-  const handleContinue = () => {
-    if (!createdLobbyId) return;
-    
-    // Navigate to appropriate battle page
-    let route = "";
-    
-    switch (playerCount) {
-      case "1v1":
-        route = "/battle/multiplayer/" + createdLobbyId;
-        break;
-      case "3player": 
-        route = "/3-player-battle/" + createdLobbyId;
-        break;
-      case "4player":
-        route = "/4-player-user-lobby/" + createdLobbyId;
-        break;
-    }
-    
-    navigate(route);
-  };
-  
+
   return (
-    <>
-      <Card className="border-2 border-fantasy-primary bg-black/70">
-        <CardHeader>
-          <CardTitle className="text-3xl font-fantasy text-fantasy-accent">Create Battle Lobby</CardTitle>
-          <CardDescription>
-            Set up a custom battle lobby and invite other players
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="lobbyName">Lobby Name</Label>
-            <Input 
-              id="lobbyName" 
-              placeholder="Enter a name for your lobby"
-              value={lobbyName}
-              onChange={(e) => setLobbyName(e.target.value)}
-              className="bg-gray-900/70"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Battle Mode</Label>
-            <RadioGroup 
-              value={playerCount} 
-              onValueChange={(value) => setPlayerCount(value as "1v1" | "3player" | "4player")}
-              className="flex flex-col md:flex-row gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="1v1" id="mode-1v1" />
-                <Label htmlFor="mode-1v1">1v1 Battle</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="3player" id="mode-3player" />
-                <Label htmlFor="mode-3player">3-Player Tournament</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="4player" id="mode-4player" />
-                <Label htmlFor="mode-4player">4-Player Lobby</Label>
-              </div>
-            </RadioGroup>
-          </div>
-          
-          {(playerCount === "3player" || playerCount === "4player") && (
-            <div className="space-y-2">
-              <Label>Game Timer</Label>
-              <RadioGroup 
-                value={useTimer ? "yes" : "no"} 
-                onValueChange={(value) => setUseTimer(value === "yes")}
-                className="flex gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="yes" id="timer-yes" />
-                  <Label htmlFor="timer-yes">Use 10-min Timer</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="no" id="timer-no" />
-                  <Label htmlFor="timer-no">No Timer</Label>
-                </div>
-              </RadioGroup>
-            </div>
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle>Create Battle Lobby</CardTitle>
+        <CardDescription>
+          Set up a new battle lobby for players to join
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Lobby Name</Label>
+          <Input
+            id="name"
+            placeholder="Enter lobby name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="battle-type">Battle Type</Label>
+          <Select value={battleType} onValueChange={setBattleType}>
+            <SelectTrigger id="battle-type">
+              <SelectValue placeholder="Select battle type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1v1">1v1</SelectItem>
+              <SelectItem value="2v2">2v2</SelectItem>
+              <SelectItem value="free-for-all">Free-for-all</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="max-players">Max Players</Label>
+          <Select 
+            value={maxPlayers.toString()} 
+            onValueChange={(value) => setMaxPlayers(parseInt(value))}
+          >
+            <SelectTrigger id="max-players">
+              <SelectValue placeholder="Select max players" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="2">2 Players</SelectItem>
+              <SelectItem value="4">4 Players</SelectItem>
+              <SelectItem value="6">6 Players</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Label htmlFor="use-music" className="flex-1">
+            Enable Music
+          </Label>
+          <Switch
+            id="use-music"
+            checked={useMusic}
+            onCheckedChange={setUseMusic}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Label htmlFor="use-timer" className="flex-1">
+            Enable Timer
+          </Label>
+          <Switch
+            id="use-timer"
+            checked={useTimer}
+            onCheckedChange={setUseTimer}
+          />
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button
+          className="w-full"
+          onClick={handleCreateLobby}
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
+            </>
+          ) : (
+            'Create Lobby'
           )}
-          
-          <div className="space-y-2">
-            <Label>Background Music</Label>
-            <RadioGroup 
-              value={useMusic ? "yes" : "no"} 
-              onValueChange={(value) => setUseMusic(value === "yes")}
-              className="flex gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="yes" id="music-yes" />
-                <Label htmlFor="music-yes">Play My Playlist</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="no" id="music-no" />
-                <Label htmlFor="music-no">No Music</Label>
-              </div>
-            </RadioGroup>
-          </div>
-          
-          <div className="pt-4">
-            <Button 
-              className="w-full fantasy-button" 
-              onClick={handleCreateLobby}
-              disabled={isCreating || !userHasPaid}
-            >
-              {isCreating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : !userHasPaid ? (
-                'Upgrade Account to Create Lobby'
-              ) : (
-                'Create Battle Lobby'
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {createdLobbyId && (
-        <InviteUserModal
-          open={showInviteModal}
-          onOpenChange={(open) => {
-            setShowInviteModal(open);
-            if (!open) {
-              navigate(playerCount === "1v1" 
-                ? `/battle/multiplayer/${createdLobbyId}`
-                : playerCount === "3player"
-                  ? `/3-player-battle/${createdLobbyId}`
-                  : `/4-player-user-lobby/${createdLobbyId}`);
-            }
-          }}
-          lobbyId={createdLobbyId}
-          lobbyName={lobbyName}
-          battleType={playerCount}
-          maxPlayers={maxPlayers}
-        />
-      )}
-    </>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 

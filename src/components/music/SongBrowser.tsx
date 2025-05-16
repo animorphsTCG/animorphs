@@ -11,9 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/modules/auth';
 import { Check, Music, Search, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
-import { useD1Songs } from '@/hooks/useD1Database';
+import { useD1Songs } from '@/hooks/useD1Songs';
 
 interface Song {
   id: string;

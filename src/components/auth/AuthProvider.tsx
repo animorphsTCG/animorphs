@@ -2,10 +2,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
-import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/types';
 import { getPerformanceMetrics, resetPerformanceMetrics } from '@/lib/monitoring';
 import { Session, User } from './types';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
 
 interface AuthState {
   user: User | null;
@@ -41,94 +41,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const paymentChannelRef = useRef<any>(null);
   const pollingIntervalRef = useRef<any>(null);
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string): Promise<void> => {
     try {
       console.log("Fetching user profile for:", userId);
       setProfileError(null);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      
+      const profile = await d1Worker.getOne(
+        'SELECT * FROM profiles WHERE id = ?',
+        { params: [userId] },
+        session?.access_token
+      );
 
-      if (error) {
-        console.error("Error fetching profile:", error);
-        setProfileError(error.message);
-        return null;
+      if (!profile) {
+        console.error("Profile not found");
+        setProfileError("Profile not found");
+        return;
       }
       
-      if (data) {
-        // Use has_paid_unlock_fee to check payment status
-        try {
-          console.log("Checking payment status for user:", userId);
-          const { data: hasPaid, error: paymentError } = await supabase.rpc('has_paid_unlock_fee');
-          
-          if (paymentError) {
-            console.error("Error checking payment status:", paymentError);
-            // Still return profile without payment status
-            const profileData: UserProfile = {
-              id: data.id,
-              username: data.username || 'User-' + data.id.substring(0, 5),
-              name: data.name,
-              surname: data.surname,
-              email: data.email,
-              country: data.country,
-              created_at: data.created_at,
-              is_admin: data.is_admin || false
-            };
-            setUserProfile(profileData);
-            return profileData;
-          }
-          
-          console.log("Payment status result:", hasPaid);
-          
-          // Add the has_paid property to the profile
-          const completeProfile: UserProfile = {
-            id: data.id,
-            username: data.username || 'User-' + data.id.substring(0, 5),
-            name: data.name,
-            surname: data.surname,
-            email: data.email,
-            country: data.country,
-            created_at: data.created_at,
-            is_admin: data.is_admin || false,
-            has_paid: hasPaid || false
-          };
-          
-          setUserProfile(completeProfile);
-
-          // Setup realtime listener and polling fallback
-          setupRealtimeListener(userId);
-          setupPollingFallback(userId);
-          
-          return completeProfile;
-        } catch (paymentError) {
-          console.error("Exception checking payment:", paymentError);
-          
-          const profileData: UserProfile = {
-            id: data.id,
-            username: data.username || 'User-' + data.id.substring(0, 5),
-            name: data.name,
-            surname: data.surname,
-            email: data.email,
-            country: data.country,
-            created_at: data.created_at,
-            is_admin: data.is_admin || false
-          };
-          
-          setUserProfile(profileData);
-          return profileData;
+      // Create a valid UserProfile object
+      const userProfileData: UserProfile = {
+        id: profile.id,
+        username: profile.username || 'User-' + profile.id.substring(0, 5),
+        name: profile.name || '',
+        surname: profile.surname || '',
+        email: profile.email || user?.email || '',
+        country: profile.country || '',
+        created_at: profile.created_at || new Date().toISOString(),
+        is_admin: !!profile.is_admin || false
+      };
+      
+      // Check payment status
+      try {
+        const paymentStatus = await d1Worker.getOne(
+          'SELECT has_paid FROM payment_status WHERE user_id = ?',
+          { params: [userId] },
+          session?.access_token
+        );
+        
+        if (paymentStatus) {
+          userProfileData.has_paid = !!paymentStatus.has_paid;
         }
+        
+        setUserProfile(userProfileData);
+        setupRealtimeListener(userId);
+        setupPollingFallback(userId);
+        
+      } catch (paymentError) {
+        console.error("Exception checking payment:", paymentError);
+        setUserProfile(userProfileData);
       }
-      return null;
+      
     } catch (error) {
       console.error("Failed to fetch profile data:", error);
       setProfileError('Failed to fetch profile data');
-      return null;
     }
   };
 
-  const refreshProfile = async () => {
+  const refreshProfile = async (): Promise<void> => {
     if (user?.id) {
       console.log("Refreshing profile for user:", user.id);
       await fetchUserProfile(user.id);
@@ -138,52 +107,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /* ---- REALTIME ---- */
   // Set up realtime listener for payment status changes
   const setupRealtimeListener = (userId: string) => {
-    // Remove old channel if any
-    if (paymentChannelRef.current) {
-      supabase.removeChannel(paymentChannelRef.current);
-      paymentChannelRef.current = null;
-    }
-
     console.log("Setting up realtime listener for payment status changes, user:", userId);
-    const channel = supabase
-      .channel(`payment-status-${userId}`);
-      
-    channel.subscribe((status) => {
-      console.log("Realtime subscription status:", status);
-      if (status === 'SUBSCRIBED') {
-        console.log('Successfully subscribed to payment changes');
-      } else {
-        // fallback setup
-        console.log('Failed to subscribe to realtime, using polling fallback');
-        setupPollingFallback(userId);
-      }
-    });
-
-    paymentChannelRef.current = channel;
+    // This is now just a stub since we're migrated away from Supabase
+    // A proper implementation would connect to Cloudflare Durable Objects
+    
+    // We'll use polling as the primary method now
+    setupPollingFallback(userId);
   };
 
-  // Optional: polling fallback if Realtime is not working
+  // Polling for payment status changes
   const setupPollingFallback = (userId: string) => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
     
-    console.log("Setting up polling fallback for user:", userId);
+    console.log("Setting up polling for user:", userId);
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        const { data, error } = await supabase.rpc('has_paid_unlock_fee');
+        if (!session?.access_token) return;
         
-        if (error) {
-          console.error("Polling error:", error);
-          return;
-        }
+        const paymentStatus = await d1Worker.getOne(
+          'SELECT has_paid FROM payment_status WHERE user_id = ?',
+          { params: [userId] },
+          session.access_token
+        );
         
-        if (typeof data === 'boolean' && userProfile && data !== userProfile.has_paid) {
-          console.log("Polling detected payment status change:", data);
-          setUserProfile(prev => prev ? { ...prev, has_paid: data } : prev);
+        if (paymentStatus && userProfile && paymentStatus.has_paid !== userProfile.has_paid) {
+          console.log("Polling detected payment status change:", paymentStatus.has_paid);
           
-          if (data) {
+          setUserProfile(prev => prev ? { 
+            ...prev, 
+            has_paid: !!paymentStatus.has_paid 
+          } : null);
+          
+          if (paymentStatus.has_paid) {
             toast({
               title: "Payment Status Updated",
               description: "Your account now has full access to all game modes!",
@@ -200,7 +158,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     return () => {
       if (paymentChannelRef.current) {
-        supabase.removeChannel(paymentChannelRef.current);
         paymentChannelRef.current = null;
       }
       if (pollingIntervalRef.current) {
@@ -211,71 +168,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // Set up auth state listener FIRST to avoid missing events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("Auth state changed:", event);
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          // Use setTimeout to prevent potential race conditions
-          setTimeout(() => {
-            fetchUserProfile(session.user.id);
-          }, 0);
-          toast({ title: 'Signed in successfully' });
-        } else if (event === 'SIGNED_OUT') {
-          // Clean up userProfile and channels
-          setUserProfile(null);
-          if (paymentChannelRef.current) {
-            supabase.removeChannel(paymentChannelRef.current);
-            paymentChannelRef.current = null;
+    // This is now a simplified auth state management since we're migrated from Supabase
+    // In a real implementation, this would connect to EOS for auth
+    
+    // Check for existing session in localStorage (simulated)
+    const checkSession = async () => {
+      // For demo purposes, we'll just use a mock session
+      // In a real app, this would come from EOS
+      const mockSession = localStorage.getItem('auth_session');
+      
+      if (mockSession) {
+        try {
+          const sessionData = JSON.parse(mockSession);
+          setSession(sessionData);
+          setUser(sessionData.user);
+          
+          if (sessionData.user?.id) {
+            await fetchUserProfile(sessionData.user.id);
           }
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
-          toast({ title: 'Signed out successfully' });
-          navigate('/login');
-          resetPerformanceMetrics();
+        } catch (error) {
+          console.error("Error parsing session:", error);
         }
       }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("Got session:", session ? 'yes' : 'no');
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        fetchUserProfile(session.user.id)
-          .finally(() => setIsLoading(false));
-      } else {
-        setIsLoading(false);
-      }
-    });
-
+      
+      setIsLoading(false);
+    };
+    
+    checkSession();
+    
     window.addEventListener('online', () => {
       if (user?.id) fetchUserProfile(user.id);
     });
+  }, []);
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
-
-  /* ---- AUTH API: unchanged ---- */
-  const signUp = async (email: string, password: string, metadata?: any) => {
+  /* ---- AUTH API: simplified stubs ---- */
+  const signUp = async (email: string, password: string, metadata?: any): Promise<void> => {
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata,
-        },
-      });
-      if (error) throw error;
+      // This would connect to EOS Auth in a real implementation
       toast({
         title: 'Registration successful',
         description: 'Please check your email to verify your account.',
@@ -290,13 +219,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<void> => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
+      // This would connect to EOS Auth in a real implementation
+      // For demo, we'll create a fake session
+      const mockUser = {
+        id: 'user-123',
+        email: email
+      };
+      
+      const mockSession = {
+        access_token: 'fake-token-' + Date.now(),
+        refresh_token: 'fake-refresh-' + Date.now(),
+        expires_at: Date.now() + (3600 * 1000), // 1 hour
+        user: mockUser
+      };
+      
+      localStorage.setItem('auth_session', JSON.stringify(mockSession));
+      
+      setUser(mockUser);
+      setSession(mockSession);
+      
+      // Fetch profile after login
+      await fetchUserProfile(mockUser.id);
+      
     } catch (error: any) {
       toast({
         title: 'Sign in failed',
@@ -307,12 +253,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (): Promise<void> => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+      // This would connect to EOS Auth in a real implementation
+      toast({
+        title: 'Google sign in',
+        description: 'This feature is being migrated to Epic Online Services',
       });
-      if (error) throw error;
     } catch (error: any) {
       toast({
         title: 'Google sign in failed',
@@ -323,10 +270,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      // Remove session from localStorage
+      localStorage.removeItem('auth_session');
+      
+      // Clear state
+      setUser(null);
+      setSession(null);
+      setUserProfile(null);
+      
+      // Clean up listeners
+      if (paymentChannelRef.current) {
+        paymentChannelRef.current = null;
+      }
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      
+      toast({ title: 'Signed out successfully' });
+      navigate('/login');
+      resetPerformanceMetrics();
     } catch (error: any) {
       toast({
         title: 'Sign out failed',

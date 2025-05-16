@@ -1,260 +1,229 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
-import { Loader2, Search, X } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Search, Users, Loader2, Send, Check } from 'lucide-react';
 import { useAuth } from '@/modules/auth';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { toast } from '@/components/ui/use-toast';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
+
+interface User {
+  id: string;
+  username: string;
+  name?: string;
+  surname?: string;
+  email?: string;
+}
 
 interface InviteUserModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lobbyId: string;
   lobbyName: string;
-  battleType: '1v1' | '3player' | '4player';
-  maxPlayers: number;
+  battleType: string;
 }
 
-export default function InviteUserModal({
-  open,
-  onOpenChange,
-  lobbyId,
-  lobbyName,
-  battleType,
-  maxPlayers
-}: InviteUserModalProps) {
-  const { user } = useAuth();
+const InviteUserModal = ({ open, onOpenChange, lobbyId, lobbyName, battleType }: InviteUserModalProps) => {
+  const { user: currentUser, token } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [sentInvites, setSentInvites] = useState<string[]>([]);
-  const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
-  const realtimeChannelRef = useRef<any>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [invitedUsers, setInvitedUsers] = useState<string[]>([]);
+  const [sendingInvite, setSendingInvite] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open && lobbyId) {
-      fetchInvitedUsers();
-      setupRealtimeListener();
+    // Reset search when modal opens
+    if (open) {
+      setSearchQuery('');
+      setUsers([]);
+      setInvitedUsers([]);
     }
+  }, [open]);
 
-    return () => {
-      if (realtimeChannelRef.current) {
-        supabase.removeChannel(realtimeChannelRef.current);
-      }
-    };
-  }, [open, lobbyId]);
-
-  const fetchInvitedUsers = async () => {
-    if (!lobbyId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('battle_invites')
-        .select('*, profiles:user_id(username, profile_image_url)')
-        .eq('lobby_id', lobbyId);
-      
-      if (error) throw error;
-      
-      if (data) {
-        setInvitedUsers(data);
-        setSentInvites(data.map(invite => invite.user_id));
-      }
-    } catch (error) {
-      console.error('Error fetching invited users:', error);
-    }
-  };
-
-  const setupRealtimeListener = () => {
-    if (realtimeChannelRef.current) {
-      supabase.removeChannel(realtimeChannelRef.current);
-    }
-
-    const channel = supabase.channel(`lobby_invites:${lobbyId}`);
+  const handleSearch = async () => {
+    if (!searchQuery || !token?.access_token) return;
     
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log('Subscribed to battle invites updates');
-      }
-    });
-
-    realtimeChannelRef.current = channel;
-  };
-
-  const searchUsers = async () => {
-    if (!searchQuery.trim()) return;
-
-    setIsSearching(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, profile_image_url')
-        .ilike('username', `%${searchQuery}%`)
-        .limit(5);
-
-      if (error) throw error;
+      setIsSearching(true);
       
-      if (data) {
-        // Filter out current user and already invited users
-        const filteredResults = data.filter(
-          (profile) => 
-            profile.id !== user?.id && 
-            !sentInvites.includes(profile.id)
-        );
-        setSearchResults(filteredResults);
-      }
+      // Query D1 for users
+      const results = await d1Worker.query(
+        `SELECT id, username, name, surname, email 
+         FROM profiles 
+         WHERE username LIKE ? OR email LIKE ? OR name LIKE ?
+         LIMIT 10`,
+        { 
+          params: [
+            `%${searchQuery}%`, 
+            `%${searchQuery}%`,
+            `%${searchQuery}%`
+          ] 
+        },
+        token.access_token
+      );
+
+      // Filter out current user
+      setUsers(results.filter(u => u.id !== currentUser?.id));
     } catch (error) {
       console.error('Error searching users:', error);
       toast({
+        title: 'Error',
+        description: 'Failed to search users',
         variant: 'destructive',
-        title: 'Search failed',
-        description: 'Failed to search for users'
       });
     } finally {
       setIsSearching(false);
     }
   };
 
-  const inviteUser = async (userId: string, username: string) => {
-    if (!lobbyId || !user) return;
-
+  const sendInvite = async (invitedUserId: string) => {
+    if (!currentUser || !token?.access_token) return;
+    
     try {
-      const { error } = await supabase
-        .from('battle_invites')
-        .insert({
-          user_id: userId,
+      setSendingInvite(invitedUserId);
+
+      // Add invite to D1
+      const inviteId = crypto.randomUUID();
+      await d1Worker.insert(
+        'battle_invites',
+        {
+          id: inviteId,
+          user_id: invitedUserId,
           lobby_id: lobbyId,
-          invited_by: user.id,
+          invited_by: currentUser.id,
+          battle_type: battleType,
           lobby_name: lobbyName,
-          battle_type: battleType
-        });
-
-      if (error) throw error;
-
-      // Update local state
-      setSentInvites([...sentInvites, userId]);
+          is_accepted: false,
+          is_rejected: false,
+          created_at: new Date().toISOString(),
+          responded_at: null
+        },
+        token.access_token
+      );
+      
+      // Mark as invited
+      setInvitedUsers([...invitedUsers, invitedUserId]);
+      
       toast({
-        title: 'Invite sent',
-        description: `Invite sent to ${username}`
+        title: 'Invite Sent',
+        description: 'Battle invitation has been sent!',
       });
-
-      // Refresh the invited users list
-      fetchInvitedUsers();
     } catch (error) {
-      console.error('Error sending invite:', error);
+      console.error('Error sending invitation:', error);
       toast({
+        title: 'Error',
+        description: 'Failed to send invite',
         variant: 'destructive',
-        title: 'Invite failed',
-        description: 'Failed to send battle invite'
       });
-    }
-  };
-
-  const handleSearchKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      searchUsers();
+    } finally {
+      setSendingInvite(null);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Invite Players</DialogTitle>
+          <DialogTitle>Invite Users to Battle</DialogTitle>
+          <DialogDescription>
+            Search for users to invite to your battle lobby.
+          </DialogDescription>
         </DialogHeader>
-        
+
         <div className="grid gap-4 py-4">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Input
-              placeholder="Search for players..."
+              placeholder="Search by username or email"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearchKeyPress}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
-            <Button onClick={searchUsers} disabled={isSearching}>
-              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            <Button variant="secondary" size="icon" onClick={handleSearch} disabled={isSearching}>
+              {isSearching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
             </Button>
           </div>
 
-          {searchResults.length > 0 && (
-            <div className="border rounded-md p-2">
-              <h3 className="text-sm font-medium mb-2">Search Results</h3>
-              <div className="space-y-2">
-                {searchResults.map((result) => (
-                  <div key={result.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        {result.profile_image_url ? (
-                          <AvatarImage src={result.profile_image_url} />
-                        ) : (
-                          <AvatarFallback>{result.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-                        )}
-                      </Avatar>
-                      <span>{result.username}</span>
+          <div className="space-y-2 max-h-[240px] overflow-y-auto">
+            {users.length > 0 ? (
+              users.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between p-2 rounded-md hover:bg-accent/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarFallback>
+                        {user.username ? user.username.substring(0, 2).toUpperCase() : 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{user.username}</p>
+                      {user.email && (
+                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                      )}
                     </div>
-                    <Button 
-                      size="sm" 
-                      onClick={() => inviteUser(result.id, result.username)}
-                      disabled={sentInvites.includes(result.id)}
-                    >
-                      {sentInvites.includes(result.id) ? 'Invited' : 'Invite'}
+                  </div>
+                  {invitedUsers.includes(user.id) ? (
+                    <Button variant="ghost" size="sm" disabled>
+                      <Check className="h-4 w-4 mr-2" /> Invited
                     </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <Separator />
-
-          <div>
-            <h3 className="text-sm font-medium mb-2">Invited Players ({invitedUsers.length}/{maxPlayers - 1})</h3>
-            {invitedUsers.length > 0 ? (
-              <div className="space-y-2">
-                {invitedUsers.map((invite) => (
-                  <div key={invite.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        {invite.profiles?.profile_image_url ? (
-                          <AvatarImage src={invite.profiles?.profile_image_url} />
-                        ) : (
-                          <AvatarFallback>
-                            {(invite.profiles?.username || 'U').substring(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <div>
-                        <div>{invite.profiles?.username || 'Unknown User'}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {invite.is_accepted ? 
-                            'Accepted' : invite.is_rejected ? 
-                            'Declined' : 'Pending'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => sendInvite(user.id)}
+                      disabled={sendingInvite === user.id}
+                    >
+                      {sendingInvite === user.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" /> Invite
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              ))
+            ) : searchQuery ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Users className="h-10 w-10 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">No users found</p>
+                <p className="text-xs text-muted-foreground">Try a different search term</p>
               </div>
             ) : (
-              <div className="text-center text-sm text-muted-foreground p-2">
-                No players invited yet
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <Search className="h-10 w-10 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">Search for users to invite</p>
               </div>
             )}
           </div>
         </div>
-        
-        <div className="flex justify-between">
+
+        <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            Close
           </Button>
-          <Button onClick={() => onOpenChange(false)}>
-            Continue to Battle
-          </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+export default InviteUserModal;

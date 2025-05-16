@@ -85,7 +85,7 @@ export const supabase = {
           execute: () => Promise.resolve({ data: [], error: new Error(`Supabase query to ${tableName} has been deprecated`) })
         }),
         single: () => Promise.resolve({ data: null, error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
-        maybeSingle: () => Promise.resolve({ data: null, error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
+        maybeSingle: () => Promise.resolve({ data: null, error: new Error(`Supabase query to ${tableName} has been deprecated`) })
       };
       
       // Return the query builder object directly for proper chaining
@@ -100,7 +100,7 @@ export const supabase = {
     delete: () => ({
       eq: (column, value) => Promise.resolve({ data: null, error: new Error(`Supabase delete from ${tableName} has been deprecated`) }),
       match: (criteria) => Promise.resolve({ data: null, error: new Error(`Supabase delete from ${tableName} has been deprecated`) })
-    }),
+    })
   }),
   storage: {
     from: (bucket) => ({
@@ -124,7 +124,7 @@ export const supabase = {
     },
     track: (presence) => Promise.resolve({}),
     presenceState: () => ({}),
-    removeChannel: () => {}
+    unsubscribe: () => {}
   }),
   removeChannel: (channel) => {}
 };

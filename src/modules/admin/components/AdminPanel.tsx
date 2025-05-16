@@ -3,11 +3,15 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CloudflareErrors from './CloudflareErrors';
 import WranglerTerminal from './WranglerTerminal';
-import MigrationPanel from './MigrationPanel'; // Import the new component
+import MigrationPanel from './MigrationPanel';
 import { useAdminAuth } from '../hooks/useAdmin';
 
-const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>("migration"); // Set initial tab to migration
+interface AdminPanelProps {
+  onClose?: () => void; // Make onClose prop optional
+}
+
+const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
+  const [activeTab, setActiveTab] = useState<string>("migration");
   const { isAuthenticated } = useAdminAuth();
   
   if (!isAuthenticated) {
@@ -20,12 +24,21 @@ const AdminPanel: React.FC = () => {
   
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold tracking-tight">Admin Panel</h2>
-        <p className="text-muted-foreground">
-          Manage your Animorphs TCG application
-        </p>
+        {onClose && (
+          <button 
+            onClick={onClose} 
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Close
+          </button>
+        )}
       </div>
+      
+      <p className="text-muted-foreground">
+        Manage your Animorphs TCG application
+      </p>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid grid-cols-3 w-[400px]">

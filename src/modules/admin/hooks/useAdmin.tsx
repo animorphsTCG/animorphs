@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
@@ -136,6 +137,15 @@ export const useAdminAuth = () => {
   const { user, session } = useAuth();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [token, setToken] = useState<any>(null); // Add token state
+  
+  // Initialize token from session
+  useEffect(() => {
+    if (session) {
+      setToken(session);
+    }
+  }, [session]);
   
   const authenticateWithTOTP = async (code: string): Promise<boolean> => {
     if (!user || !session) {
@@ -158,6 +168,7 @@ export const useAdminAuth = () => {
       if (isValidFormat) {
         // Set admin auth time in local storage
         localStorage.setItem('admin_auth_time', Date.now().toString());
+        setIsAuthenticated(true);
         return true;
       } else {
         setError('Invalid verification code format');
@@ -191,6 +202,7 @@ export const useAdminAuth = () => {
       
       // Set admin auth time in local storage
       localStorage.setItem('admin_auth_time', Date.now().toString());
+      setIsAuthenticated(true);
       return true;
     } catch (err) {
       console.error('Biometric verification error:', err);
@@ -236,6 +248,8 @@ export const useAdminAuth = () => {
     authenticateWithBiometric,
     generateBackupCodes,
     isAuthenticating,
+    isAuthenticated,
+    token,
     error
   };
 };

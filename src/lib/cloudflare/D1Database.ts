@@ -265,7 +265,8 @@ export class D1Database {
   
   async getAllCards(): Promise<AnimorphCard[]> {
     try {
-      return await d1Worker.query<AnimorphCard>(
+      // Remove the type argument from query method
+      return await d1Worker.query(
         'SELECT * FROM animorph_cards',
         {},
         this.token || undefined

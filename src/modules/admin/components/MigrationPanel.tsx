@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +24,7 @@ const MigrationPanel: React.FC = () => {
   const [isCompleted, setIsCompleted] = useState(false);
   
   const runDataMigration = async () => {
-    if (!token) {
+    if (!token || !token.access_token) {
       toast({
         title: "Authentication Required",
         description: "You must be authenticated as an admin to run migrations",
@@ -38,7 +37,7 @@ const MigrationPanel: React.FC = () => {
     setIsCompleted(false);
     
     try {
-      const status = await runMigration(token);
+      const status = await runMigration(token.access_token);
       setMigrationStatus(status);
       setIsCompleted(true);
       

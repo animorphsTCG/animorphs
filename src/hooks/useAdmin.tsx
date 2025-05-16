@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth'; 
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
@@ -39,7 +38,6 @@ export const useAdmin = () => {
             { is_admin: true },
             'id = ?',
             [user.id],
-            '',
             token.access_token
           );
           

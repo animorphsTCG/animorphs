@@ -20,33 +20,46 @@ const SettingsControls: React.FC = () => {
   const fetchSettings = async () => {
     if (!user) return;
 
-    const { data: settings, error } = await supabase
-      .from('user_music_settings')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    try {
+      const { data: settings, error } = await supabase
+        .from('user_music_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-    if (!error && settings) {
-      setVolume(settings.volume_level * 100);
-      setMusicEnabled(settings.music_enabled);
+      if (!error && settings) {
+        setVolume(settings.volume_level * 100);
+        setMusicEnabled(settings.music_enabled);
+      }
+    } catch (err) {
+      console.error("Error fetching music settings:", err);
     }
   };
 
   const updateSettings = async (newVolume?: number, newEnabled?: boolean) => {
     if (!user) return;
 
-    const volumeToSave = (newVolume ?? volume) / 100;
-    const enabledToSave = newEnabled ?? musicEnabled;
+    try {
+      const volumeToSave = (newVolume ?? volume) / 100;
+      const enabledToSave = newEnabled ?? musicEnabled;
 
-    const { error } = await supabase
-      .from('user_music_settings')
-      .upsert({
-        user_id: user.id,
-        volume_level: volumeToSave,
-        music_enabled: enabledToSave,
-      });
+      const { error } = await supabase
+        .from('user_music_settings')
+        .upsert({
+          user_id: user.id,
+          volume_level: volumeToSave,
+          music_enabled: enabledToSave,
+        });
 
-    if (error) {
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to update settings",
+        });
+      }
+    } catch (err) {
+      console.error("Error updating music settings:", err);
       toast({
         variant: "destructive",
         title: "Error",
@@ -85,4 +98,3 @@ const SettingsControls: React.FC = () => {
 };
 
 export default SettingsControls;
-

@@ -38,62 +38,21 @@ export const useUser = (userId?: string) => {
           return;
         }
         
-        // Get profile data
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', targetId)
-          .single();
-          
-        if (profileError) {
-          console.error("Error fetching user profile:", profileError);
-          throw new Error("Could not load user profile");
-        }
+        // Creating placeholder data since this is a stub
+        // In the real implementation, we'd get this data from D1/EOS
+        const placeholderUserData: UserData = {
+          id: targetId,
+          username: 'User-' + targetId.substring(0, 5),
+          email: user?.email || undefined,
+          created_at: new Date().toISOString(),
+          has_paid: false,
+          music_subscription: null
+        };
         
-        // Get user email
-        const { data: emailData, error: emailError } = await supabase
-          .rpc('get_user_emails');
-          
-        if (emailError) {
-          console.error("Error fetching user email:", emailError);
-          throw new Error("Could not load user email");
-        }
+        setUserData(placeholderUserData);
+        console.log("Stub useUser hook returned placeholder data");
         
-        const userEmail = emailData.find(item => item.id === targetId);
-        
-        // Get payment status
-        const { data: paymentData, error: paymentError } = await supabase
-          .from('payment_status')
-          .select('*')
-          .eq('id', targetId)
-          .maybeSingle();
-          
-        if (paymentError) {
-          console.error("Error fetching payment status:", paymentError);
-          throw new Error("Could not load payment status");
-        }
-        
-        // Get music subscription
-        const { data: musicSub, error: musicError } = await supabase
-          .from('music_subscriptions')
-          .select('*')
-          .eq('user_id', targetId)
-          .maybeSingle();
-          
-        if (musicError) {
-          console.error("Error fetching music subscription:", musicError);
-          throw new Error("Could not load music subscription");
-        }
-        
-        // Combine data
-        setUserData({
-          ...profile,
-          email: userEmail?.email,
-          has_paid: paymentData?.has_paid || false,
-          music_subscription: musicSub || null
-        });
-        
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error in useUser hook:", error);
         setError(error.message || "Failed to load user data");
       } finally {

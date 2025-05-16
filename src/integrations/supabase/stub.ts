@@ -15,3 +15,4 @@
  */
 
 export const SUPABASE_MIGRATION_COMPLETED = true;
+export const SUPABASE_STUB_VERSION = '2.0.0'; // Stub version to track compatibility

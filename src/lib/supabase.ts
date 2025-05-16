@@ -27,7 +27,7 @@ export interface User {
   email?: string;
 }
 
-// Add Error extension to support code property
+// Add Error extension to support code property for error checking
 declare global {
   interface Error {
     code?: string;
@@ -40,6 +40,14 @@ export const resetSupabaseConnection = () => {
   return Promise.resolve();
 };
 
+// Helper function to create a standard response object
+const createResponse = <T>(data: T | null = null, errorMessage?: string) => {
+  return {
+    data,
+    error: errorMessage ? new Error(errorMessage) : null
+  };
+};
+
 // Create a basic stub that implements common Supabase methods
 export const supabase = {
   auth: {
@@ -48,7 +56,7 @@ export const supabase = {
     signIn: () => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
     signInWithPassword: (creds: any) => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
     signInWithOAuth: (params: any) => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
-    signUp: () => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
+    signUp: (params: any) => Promise.resolve({ data: null, error: new Error('Supabase auth has been deprecated') }),
     signOut: () => Promise.resolve({ error: null }),
     onAuthStateChange: (callback: any) => {
       // Immediately call with SIGNED_OUT event
@@ -69,38 +77,65 @@ export const supabase = {
   },
   from: (tableName: string) => ({
     select: (columns = '*') => {
-      const selectResult = {
-        data: null,
+      // Create a base query result that includes data and error properties
+      const baseResult = {
+        data: null as any, 
         error: new Error(`Supabase query to ${tableName} has been deprecated`),
-        
-        eq: (column: string, value: any) => ({
-          single: () => Promise.resolve({ data: null, error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
-          maybeSingle: () => Promise.resolve({ data: null, error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
-          limit: (limit: number) => ({
+      };
+
+      // Create a query builder with all the methods that might be chained
+      const queryBuilder = {
+        ...baseResult, // Include data and error directly in the object
+        eq: (column: string, value: any) => {
+          const eqResult = {
+            ...baseResult,
+            single: () => Promise.resolve(baseResult),
+            maybeSingle: () => Promise.resolve(baseResult),
+            limit: (limit: number) => ({
+              ...baseResult,
+              order: (column: string, { ascending }: { ascending: boolean }) => 
+                Promise.resolve(baseResult),
+              execute: () => Promise.resolve({...baseResult, data: []}),
+            }),
             order: (column: string, { ascending }: { ascending: boolean }) => 
-              Promise.resolve({ data: [], error: new Error(`Supabase query to ${tableName} has been deprecated`) })
-          }),
-          order: (column: string, { ascending }: { ascending: boolean }) => 
-            Promise.resolve({ data: [], error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
-          execute: () => Promise.resolve({ data: [], error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
-          select: (columns: string) => selectResult
-        }),
+              Promise.resolve({...baseResult, data: []}),
+            execute: () => Promise.resolve({...baseResult, data: []}),
+            select: (columns: string) => queryBuilder
+          };
+          return eqResult;
+        },
         neq: (column: string, value: any) => ({
-          execute: () => Promise.resolve({ data: [], error: new Error(`Supabase query to ${tableName} has been deprecated`) })
+          ...baseResult,
+          execute: () => Promise.resolve({...baseResult, data: []}),
         }),
-        execute: () => Promise.resolve({ data: [], error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
+        execute: () => Promise.resolve({...baseResult, data: []}),
         order: (column: string, { ascending }: { ascending: boolean }) => ({
-          execute: () => Promise.resolve({ data: [], error: new Error(`Supabase query to ${tableName} has been deprecated`) })
+          ...baseResult,
+          execute: () => Promise.resolve({...baseResult, data: []}),
         }),
         limit: (limit: number) => ({
-          execute: () => Promise.resolve({ data: [], error: new Error(`Supabase query to ${tableName} has been deprecated`) })
+          ...baseResult,
+          execute: () => Promise.resolve({...baseResult, data: []}),
         }),
-        single: () => Promise.resolve({ data: null, error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
-        maybeSingle: () => Promise.resolve({ data: null, error: new Error(`Supabase query to ${tableName} has been deprecated`) }),
+        range: (from: number, to: number) => ({
+          ...baseResult,
+          execute: () => Promise.resolve({...baseResult, data: []}),
+        }),
+        single: () => Promise.resolve(baseResult),
+        maybeSingle: () => Promise.resolve(baseResult),
+        not: (column: string, value: any) => ({
+          ...baseResult,
+          execute: () => Promise.resolve({...baseResult, data: []}),
+        }),
+        in: (column: string, values: any[]) => ({
+          ...baseResult,
+          execute: () => Promise.resolve({...baseResult, data: []}),
+        }),
+        select: (columns: string) => queryBuilder, // Allow select chaining
       };
       
-      // Return the query builder object with custom properties
-      return selectResult;
+      // Return the query builder object with all methods
+      return queryBuilder;
     },
     insert: (data: any) => Promise.resolve({ data: null, error: new Error(`Supabase insert to ${tableName} has been deprecated`) }),
     update: (data: any) => ({
@@ -122,27 +157,30 @@ export const supabase = {
     })
   },
   rpc: (func: string, params?: any) => Promise.resolve({ data: null, error: new Error(`Supabase RPC call to ${func} has been deprecated`) }),
-  channel: (channel: string) => ({
-    on: (event: string, filter?: any, callback?: any) => {
-      if (typeof filter === 'function' && callback === undefined) {
-        callback = filter;
-        filter = undefined;
-      }
-      return {
-        subscribe: (cb?: any) => {
-          if (cb) cb('SUBSCRIBED');
-          return { unsubscribe: () => {} };
+  channel: (channelName: string) => {
+    const channelObj = {
+      on: (event: string, filter?: any, callback?: any) => {
+        if (typeof filter === 'function' && callback === undefined) {
+          callback = filter;
+          filter = undefined;
         }
-      };
-    },
-    subscribe: (callback?: any) => {
-      if (callback) callback('SUBSCRIBED');
-      return { unsubscribe: () => {} };
-    },
-    track: (presence?: any) => Promise.resolve({}),
-    presenceState: () => ({}),
-    unsubscribe: () => {}
-  }),
+        return {
+          subscribe: (cb?: any) => {
+            if (cb) cb('SUBSCRIBED');
+            return { unsubscribe: () => {} };
+          }
+        };
+      },
+      subscribe: (callback?: any) => {
+        if (callback) callback('SUBSCRIBED');
+        return { unsubscribe: () => {} };
+      },
+      track: (presence?: any) => Promise.resolve({}),
+      presenceState: () => ({}),
+      unsubscribe: () => {}
+    };
+    return channelObj;
+  },
   removeChannel: (channel: any) => {}
 };
 

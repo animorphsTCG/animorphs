@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -203,15 +204,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener FIRST to avoid missing events
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      async (event, session) => {
         console.log("Auth state changed:", event);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
+        setSession(session);
+        setUser(session?.user ?? null);
 
-        if (event === 'SIGNED_IN' && currentSession?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
           // Use setTimeout to prevent potential race conditions
           setTimeout(() => {
-            fetchUserProfile(currentSession.user.id);
+            fetchUserProfile(session.user.id);
           }, 0);
           toast({ title: 'Signed in successfully' });
         } else if (event === 'SIGNED_OUT') {
@@ -233,13 +234,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log("Got session:", currentSession ? 'yes' : 'no');
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Got session:", session ? 'yes' : 'no');
+      setSession(session);
+      setUser(session?.user ?? null);
 
-      if (currentSession?.user) {
-        fetchUserProfile(currentSession.user.id)
+      if (session?.user) {
+        fetchUserProfile(session.user.id)
           .finally(() => setIsLoading(false));
       } else {
         setIsLoading(false);
@@ -247,7 +248,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     window.addEventListener('online', () => {
-      
       if (user?.id) fetchUserProfile(user.id);
     });
 

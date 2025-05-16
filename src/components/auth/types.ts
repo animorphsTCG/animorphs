@@ -5,16 +5,23 @@
  * with components that still expect Supabase auth types.
  */
 
-// Import the new types
-import { Session as EOSSession, User as EOSUser } from '@/modules/auth/context/EOSAuthContext';
+export interface Session {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  user: User;
+}
 
-// Export compatible types
-export type Session = EOSSession;
-export type User = EOSUser;
+export interface User {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, any>;
+  app_metadata?: Record<string, any>;
+}
 
 export interface AuthContextType {
-  user: EOSUser | null;
-  session: EOSSession | null;
+  user: User | null;
+  session: Session | null;
   isLoading: boolean;
   userProfile: any | null;
   signUp: (email: string, password: string, metadata?: any) => Promise<void>;

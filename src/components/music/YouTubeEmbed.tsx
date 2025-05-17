@@ -1,7 +1,7 @@
-
-import React, { useEffect, useState } from "react";
-import { Song } from "@/types/music";
-import { R2Song } from "@/hooks/useR2Songs";
+import React from 'react';
+import { useD1Songs } from '@/hooks/useD1Songs';
+import { Song } from '@/types/music';
+import { R2Song } from '@/hooks/useR2Songs';
 
 interface YouTubeEmbedProps {
   currentSong: Song | R2Song | null;

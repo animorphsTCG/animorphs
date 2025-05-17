@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -23,6 +22,8 @@ interface Song {
   youtube_url: string;
   r2_key?: string;
   r2_url?: string;
+  artist?: string;
+  genre?: string;
 }
 
 interface SongBrowserProps {

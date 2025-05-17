@@ -1,4 +1,3 @@
-
 export interface UserProfile {
   id: string;
   username: string;
@@ -10,7 +9,17 @@ export interface UserProfile {
   updated_at?: string;
   is_admin: boolean;
   music_unlocked: boolean;
+  has_paid?: boolean;
   profile_image_url?: string;
+  bio?: string;
+  favorite_animorph?: string;
+  favorite_battle_mode?: string;
+  online_times_gmt2?: string;
+  playing_times?: string;
+  mp_points?: number;
+  ai_points?: number;
+  lbp_points?: number;
+  digi_balance?: number;
 }
 
 export interface PaymentInfo {

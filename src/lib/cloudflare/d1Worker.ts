@@ -171,23 +171,28 @@ class D1WorkerClient {
     const response = await this.execute(sql, { params: whereParams }, authToken);
     return response;
   }
+
+  /**
+   * Create a query builder for a table
+   */
+  from<T = any>(table: string, authToken?: string): EnhancedD1QueryBuilder<T> {
+    return new EnhancedD1QueryBuilder<T>(`SELECT * FROM ${table}`, {}, authToken);
+  }
+  
+  /**
+   * Extract data from query results
+   */
+  extractData<T = any>(result: { data: T | null, error: Error | null }): T | null {
+    if ('error' in result && result.error) {
+      console.error('D1 query error:', result.error);
+      return null;
+    }
+    return result.data;
+  }
 }
 
 // Export a singleton instance
 export const d1Worker = new D1WorkerClient();
-
-// Add the from method and extractData method to d1Worker
-d1Worker.from = function<T = any>(table: string, authToken?: string): EnhancedD1QueryBuilder<T> {
-  return new EnhancedD1QueryBuilder<T>(`SELECT * FROM ${table}`, {}, authToken);
-};
-
-d1Worker.extractData = function<T = any>(result: { data: T | null, error: Error | null }): T | null {
-  if ('error' in result && result.error) {
-    console.error('D1 query error:', result.error);
-    return null;
-  }
-  return result.data;
-};
 
 // Export the enhanced query builder class
 export class EnhancedD1QueryBuilder<T = any> {
@@ -199,6 +204,13 @@ export class EnhancedD1QueryBuilder<T = any> {
     this.sql = sql;
     this.options = { ...options };
     this.authToken = authToken;
+  }
+  
+  select(columns: string | string[]): EnhancedD1QueryBuilder<T> {
+    const columnsStr = Array.isArray(columns) ? columns.join(', ') : columns;
+    // Replace the SELECT part of the SQL with our new columns
+    this.sql = this.sql.replace(/SELECT\s+.+?\s+FROM/i, `SELECT ${columnsStr} FROM`);
+    return this;
   }
   
   eq(column: string, value: any): EnhancedD1QueryBuilder<T> {
@@ -401,5 +413,59 @@ export class EnhancedD1QueryBuilder<T = any> {
   
   async maybeSingle(): Promise<{ data: T | null, error: null } | { data: null, error: Error }> {
     return this.single();
+  }
+  
+  async insert(data: Record<string, any>): Promise<{ data: T | null, error: null } | { data: null, error: Error }> {
+    try {
+      const result = await d1Worker.insert<T>(
+        this.sql.replace(/SELECT \* FROM ([^\s]+).*$/i, '$1'),
+        data,
+        this.authToken
+      );
+      return { data: result, error: null };
+    } catch (error) {
+      return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  }
+  
+  async update(data: Record<string, any>): Promise<{ count: number, error: null } | { count: 0, error: Error }> {
+    try {
+      // Extract the table name from the SQL
+      const tableMatch = this.sql.match(/FROM\s+([^\s]+)/i);
+      if (!tableMatch) {
+        throw new Error('Cannot determine table name from SQL');
+      }
+      const tableName = tableMatch[1];
+      
+      // Extract where clause from the SQL
+      let whereClause = '';
+      let whereParams: any[] = [];
+      
+      if (this.sql.toLowerCase().includes('where')) {
+        const whereMatch = this.sql.match(/WHERE\s+(.+?)(\s+ORDER\s+BY|\s+LIMIT|\s*$)/i);
+        if (whereMatch) {
+          whereClause = whereMatch[1];
+          whereParams = this.options.params || [];
+        }
+      }
+      
+      if (!whereClause) {
+        throw new Error('Cannot update without WHERE clause');
+      }
+      
+      const count = await d1Worker.execute(
+        `UPDATE ${tableName} SET ${
+          Object.keys(data).map(key => `${key} = ?`).join(', ')
+        } WHERE ${whereClause}`,
+        { 
+          params: [...Object.values(data), ...whereParams]
+        },
+        this.authToken
+      );
+      
+      return { count, error: null };
+    } catch (error) {
+      return { count: 0, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
   }
 }

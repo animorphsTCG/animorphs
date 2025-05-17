@@ -19,6 +19,9 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Check if the user has paid - safe access
+  const showMultiplayerContent = userProfile?.has_paid;
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/login");

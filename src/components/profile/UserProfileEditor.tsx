@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,7 @@ import { z } from "zod";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import { d1Worker } from "@/lib/cloudflare/d1Worker";
-import { UserProfile } from "@/types/user";
+import { UserProfile } from "@/modules/auth/types"; // Use correct UserProfile import
 
 const profileSchema = z.object({
   bio: z.string().max(500, "Bio must be less than 500 characters").optional(),

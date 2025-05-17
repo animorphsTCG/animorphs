@@ -20,6 +20,9 @@ export class D1Database {
 
   // Add the 'from' method for compatibility with Supabase-like queries
   from<T = any>(table: string): EnhancedD1QueryBuilder<T> {
+    if (!d1Worker.from) {
+      throw new Error("d1Worker.from is not defined");
+    }
     return d1Worker.from<T>(table, this.token || undefined);
   }
 
@@ -153,7 +156,7 @@ export class D1Database {
     }
   }
 
-  async addSongToUser(userId: string, songId: string) {
+  async addSongToUserCollection(userId: string, songId: string) {
     try {
       const id = crypto.randomUUID();
       return await d1Worker.execute(
@@ -167,7 +170,7 @@ export class D1Database {
     }
   }
 
-  async removeSongFromUser(userId: string, songId: string) {
+  async removeSongFromUserCollection(userId: string, songId: string) {
     try {
       return await d1Worker.execute(
         `DELETE FROM user_song_selections WHERE user_id = ? AND song_id = ?`,

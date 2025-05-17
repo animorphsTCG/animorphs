@@ -3,17 +3,35 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 
-interface Song {
+export interface Song {
   id: string;
   title: string;
   youtube_url: string;
   preview_start_seconds?: number;
   preview_duration_seconds?: number;
   created_at?: string;
+  artist?: string;
+  genre?: string;
+}
+
+export interface R2Song {
+  id: string;
+  name: string;
+  size: number;
+  lastModified: string;
+  url: string;
+  contentType: string;
+  etag: string;
+  title: string;
+  artist?: string;
+  genre?: string;
+  duration?: number;
+  metadata?: Record<string, string>;
 }
 
 export const useR2Songs = () => {
   const [songs, setSongs] = useState<Song[]>([]);
+  const [r2Songs, setR2Songs] = useState<R2Song[]>([]);
   const [userSongs, setUserSongs] = useState<Song[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -41,6 +59,55 @@ export const useR2Songs = () => {
       setError(err instanceof Error ? err : new Error('Failed to fetch songs'));
     } finally {
       setIsLoading(false);
+    }
+  }, [token]);
+
+  const fetchR2Songs = useCallback(async () => {
+    if (!token?.access_token) {
+      setR2Songs([]);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/r2/songs', {
+        headers: {
+          Authorization: `Bearer ${token.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch R2 songs');
+      }
+
+      const data = await response.json();
+      setR2Songs(data.songs || []);
+    } catch (err) {
+      console.error('Failed to fetch R2 songs:', err);
+      setError(err instanceof Error ? err : new Error('Failed to fetch R2 songs'));
+    }
+  }, [token]);
+
+  const getSongStreamUrl = useCallback(async (songName: string): Promise<string> => {
+    if (!token?.access_token) {
+      throw new Error('Not authenticated');
+    }
+
+    try {
+      const response = await fetch(`/api/r2/songs/${songName}/stream`, {
+        headers: {
+          Authorization: `Bearer ${token.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get song stream URL');
+      }
+
+      const data = await response.json();
+      return data.url;
+    } catch (err) {
+      console.error('Failed to get song stream URL:', err);
+      throw err;
     }
   }, [token]);
 
@@ -73,7 +140,8 @@ export const useR2Songs = () => {
 
   useEffect(() => {
     fetchSongs();
-  }, [fetchSongs]);
+    fetchR2Songs();
+  }, [fetchSongs, fetchR2Songs]);
 
   useEffect(() => {
     fetchUserSongs();
@@ -129,6 +197,7 @@ export const useR2Songs = () => {
 
   return {
     songs,
+    r2Songs,
     userSongs,
     isLoading,
     isUpdating,
@@ -136,7 +205,8 @@ export const useR2Songs = () => {
     addSongToUser,
     removeSongFromUser,
     refreshSongs: fetchSongs,
-    refreshUserSongs: fetchUserSongs
+    refreshUserSongs: fetchUserSongs,
+    getSongStreamUrl,
   };
 };
 

@@ -7,7 +7,7 @@ import { useD1MusicSubscription, useD1UserSongs } from "@/hooks/useD1Database";
 import { d1Worker } from "@/lib/cloudflare/d1Worker";
 import SongBrowser from './SongBrowser';
 import MusicSubscription from './MusicSubscription';
-import SettingsControls from './SettingsControls';
+import { SettingsControls } from './SettingsControls';
 import SongCollection from './SongCollection';
 
 interface MusicSubscriptionType {

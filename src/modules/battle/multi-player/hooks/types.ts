@@ -1,4 +1,3 @@
-
 export interface BattleLobbyConfig {
   name: string;
   battleType: '1v1' | '2v2' | '3v3' | 'free-for-all';
@@ -15,6 +14,9 @@ export interface Lobby {
   status: 'waiting' | 'in_progress' | 'completed';
   max_players: number;
   is_public: boolean;
+  // Adding camelCase versions for compatibility
+  useTimer: boolean;
+  useMusic: boolean;
 }
 
 export interface Participant {
@@ -24,6 +26,9 @@ export interface Participant {
   player_number: number;
   username?: string;
   profile_image_url?: string;
+  // Adding camelCase versions for compatibility
+  isReady: boolean;
+  isHost: boolean;
 }
 
 export interface BattleSession {

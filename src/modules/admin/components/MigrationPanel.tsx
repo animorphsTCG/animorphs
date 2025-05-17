@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { RotateCcw, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
-import { useAdminAuth } from '../hooks/useAdmin';
+import { useAdmin } from '@/hooks/useAdmin';
 import { runMigration } from '@/lib/cloudflare/migrations/migrator';
 
 // Migration status interface
@@ -18,7 +18,7 @@ interface MigrationStatus {
 }
 
 const MigrationPanel: React.FC = () => {
-  const { token } = useAdminAuth();
+  const { token } = useAdmin();
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);

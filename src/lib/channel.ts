@@ -14,16 +14,20 @@ export interface Channel {
 
 // Create a channel for real-time communication
 export function createChannel(name: string, userId: string): Channel {
+  let isSubscribed = false;
+  
   return {
     name,
     userId,
-    subscribed: false,
+    get subscribed() { return isSubscribed; },
     subscribe: async () => {
       console.log(`Subscribing to channel ${name} for user ${userId}`);
+      isSubscribed = true;
       return true;
     },
     unsubscribe: async () => {
       console.log(`Unsubscribing from channel ${name} for user ${userId}`);
+      isSubscribed = false;
       return true;
     },
     publish: async (event: string, payload: any) => {

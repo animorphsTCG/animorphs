@@ -8,6 +8,7 @@ export type EnhancedD1Database = {
   exec: (query: string, params?: any[]) => Promise<D1Result>;
   batch: (statements: string[]) => Promise<D1Result[]>;
   prepare: (query: string) => D1PreparedStatement;
+  rpc?: (procedure: string, params: any) => Promise<any>;
 };
 
 export type D1PreparedStatement = {
@@ -15,40 +16,6 @@ export type D1PreparedStatement = {
   first: <T = any>(colName?: string) => Promise<T | null>;
   run: () => Promise<D1Result>;
   all: <T = any>() => Promise<T[]>;
-};
-
-export type EnhancedD1QueryBuilder = {
-  select: (...columns: string[]) => EnhancedD1QueryBuilder;
-  insert: (data: Record<string, any> | Record<string, any>[]) => EnhancedD1QueryBuilder;
-  update: (data: Record<string, any>) => EnhancedD1QueryBuilder;
-  delete: () => EnhancedD1QueryBuilder;
-  where: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
-  whereIn: (column: string, values: any[]) => EnhancedD1QueryBuilder;
-  andWhere: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
-  orWhere: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
-  eq: (column: string, value: any) => Promise<D1Response<any>>;
-  is: (column: string, value: any) => EnhancedD1QueryBuilder;
-  not: (column: string, value: any) => EnhancedD1QueryBuilder;
-  in: (column: string, values: any[]) => EnhancedD1QueryBuilder;
-  limit: (limit: number) => EnhancedD1QueryBuilder;
-  offset: (offset: number) => EnhancedD1QueryBuilder;
-  orderBy: (column: string, direction?: 'asc' | 'desc') => EnhancedD1QueryBuilder;
-  join: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
-  leftJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
-  rightJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
-  fullJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
-  groupBy: (...columns: string[]) => EnhancedD1QueryBuilder;
-  having: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
-  count: (column?: string) => Promise<number>;
-  sum: (column: string) => Promise<number>;
-  avg: (column: string) => Promise<number>;
-  min: (column: string) => Promise<number>;
-  max: (column: string) => Promise<number>;
-  upsert: (data: Record<string, any>, conflictColumns: string[]) => EnhancedD1QueryBuilder;
-  range: (column: string, lower: any, upper: any) => EnhancedD1QueryBuilder;
-  first: <T = any>() => Promise<T | null>;
-  get: <T = any>() => Promise<T[]>;
-  execute: () => Promise<D1Response<any>>;
 };
 
 export interface D1Response<T> {
@@ -65,6 +32,45 @@ export interface D1Response<T> {
   };
   data?: T[];
 }
+
+export type EnhancedD1QueryBuilder = {
+  select: (...columns: string[]) => EnhancedD1QueryBuilder;
+  insert: (data: Record<string, any> | Record<string, any>[]) => EnhancedD1QueryBuilder;
+  update: (data: Record<string, any>) => EnhancedD1QueryBuilder;
+  delete: () => EnhancedD1QueryBuilder;
+  where: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
+  whereIn: (column: string, values: any[]) => EnhancedD1QueryBuilder;
+  andWhere: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
+  orWhere: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
+  eq: (column: string, value: any) => Promise<D1Response<any>>;
+  is: (column: string, value: any) => EnhancedD1QueryBuilder;
+  not: (column: string, value: any) => EnhancedD1QueryBuilder;
+  in: (column: string, values: any[]) => EnhancedD1QueryBuilder;
+  ilike: (column: string, value: string) => EnhancedD1QueryBuilder;
+  limit: (limit: number) => EnhancedD1QueryBuilder;
+  offset: (offset: number) => EnhancedD1QueryBuilder;
+  orderBy: (column: string, direction?: 'asc' | 'desc') => EnhancedD1QueryBuilder;
+  order: (column: string, direction?: 'asc' | 'desc') => EnhancedD1QueryBuilder; // Alias for orderBy
+  join: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
+  leftJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
+  rightJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
+  fullJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
+  groupBy: (...columns: string[]) => EnhancedD1QueryBuilder;
+  having: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
+  count: (column?: string) => Promise<number>;
+  sum: (column: string) => Promise<number>;
+  avg: (column: string) => Promise<number>;
+  min: (column: string) => Promise<number>;
+  max: (column: string) => Promise<number>;
+  upsert: (data: Record<string, any>, conflictColumns: string[]) => EnhancedD1QueryBuilder;
+  range: (column: string, lower: any, upper: any) => EnhancedD1QueryBuilder;
+  first: <T = any>() => Promise<T | null>;
+  maybeSingle: <T = any>() => Promise<T | null>;
+  get: <T = any>() => Promise<T[]>;
+  execute: () => Promise<D1Response<any>>;
+  data?: any[];
+  error?: Error;
+};
 
 // Create a mock implementation of the D1 database wrapper
 export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
@@ -158,6 +164,9 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
           } else if (condition.operator.toLowerCase() === 'between') {
             params.push(condition.value[0], condition.value[1]);
             return `${logicOperator}${condition.column} BETWEEN ? AND ?`;
+          } else if (condition.operator.toLowerCase() === 'ilike') {
+            params.push(condition.value);
+            return `${logicOperator}${condition.column} LIKE ? COLLATE NOCASE`;
           }
           params.push(condition.value);
           return `${logicOperator}${condition.column} ${condition.operator} ?`;
@@ -212,7 +221,7 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
           throw new Error(`Unsupported query type: ${query.type}`);
         }
 
-        return {
+        const response: D1Response<any> = {
           success: true,
           results: result.results || [],
           data: result.results || [],
@@ -225,10 +234,23 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
             rows_written: result.meta?.rows_written,
           }
         };
+
+        // Add data and error properties directly to the queryBuilder
+        const qb = queryBuilder as any;
+        qb.data = response.data;
+        qb.error = null;
+        
+        return response;
       } catch (error) {
+        const err = error as Error;
+        // Add error directly to the queryBuilder
+        const qb = queryBuilder as any;
+        qb.data = null;
+        qb.error = err;
+        
         return {
           success: false,
-          error: error as Error
+          error: err
         };
       }
     };
@@ -286,6 +308,10 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
         query.where.push({ column, operator: 'IN', value: values, logic: 'AND' });
         return queryBuilder;
       },
+      ilike: (column, value) => {
+        query.where.push({ column, operator: 'ILIKE', value, logic: 'AND' });
+        return queryBuilder;
+      },
       range: (column, lower, upper) => {
         query.where.push({ column, operator: 'BETWEEN', value: [lower, upper], logic: 'AND' });
         return queryBuilder;
@@ -301,6 +327,10 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
       orderBy: (column, direction = 'asc') => {
         query.orderByColumns.push({ column, direction });
         return queryBuilder;
+      },
+      order: (column, direction = 'asc') => {
+        // Alias for orderBy
+        return queryBuilder.orderBy(column, direction);
       },
       join: (table, column1, operator, column2) => {
         query.joins.push({ type: 'INNER', table, column1, operator, column2 });
@@ -374,6 +404,13 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
           ? (result.results[0] as T)
           : null;
       },
+      maybeSingle: async <T>() => {
+        query.limitValue = 1;
+        const result = await execute();
+        return result.success && result.results && result.results.length > 0
+          ? (result.results[0] as T)
+          : null;
+      },
       get: async <T>() => {
         const result = await execute();
         return result.success && result.results ? (result.results as T[]) : [];
@@ -404,10 +441,26 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
       const batch = db.batch(statements.map(s => db.prepare(s)));
       return batch.run();
     },
-    prepare: (query) => db.prepare(query)
+    prepare: (query) => db.prepare(query),
+    rpc: async (procedure, params) => {
+      const stmt = db.prepare(`CALL ${procedure}($1)`);
+      return stmt.bind(JSON.stringify(params)).run();
+    }
   };
 }
 
 // Export a mock D1 database wrapper for use in the application
 // This will be replaced in production with a real D1 database
 export const d1 = createD1DatabaseWrapper({} as D1Database);
+
+// Helper function to create a channel for real-time communication
+export function createChannel(name: string, userId: string) {
+  return {
+    name,
+    userId,
+    subscribed: false,
+    subscribe: async () => true,
+    unsubscribe: async () => true,
+    publish: async (event: string, payload: any) => true
+  };
+}

@@ -3,9 +3,28 @@ export interface Song {
   id: string;
   title: string;
   youtube_url: string;
+  r2_key?: string;
+  r2_url?: string;
   preview_start_seconds: number;
   preview_duration_seconds: number;
   created_at?: string;
+  artist?: string;
+  genre?: string;
+}
+
+export interface R2Song {
+  id: string;
+  name: string;
+  size: number;
+  lastModified: string;
+  url: string;
+  contentType: string;
+  etag: string;
+  title: string;
+  artist?: string;
+  genre?: string;
+  duration?: number;
+  metadata?: Record<string, string>;
 }
 
 export interface SongSelection {

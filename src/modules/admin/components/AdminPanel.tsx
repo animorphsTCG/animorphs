@@ -1,79 +1,84 @@
 
 import React, { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CloudflareErrors from './CloudflareErrors';
-import WranglerTerminal from './WranglerTerminal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import UserManagement from './UserManagement';
+import PaymentManagement from './PaymentManagement';
+import SubscriptionManagement from './SubscriptionManagement';
+import SongManagement from '@/components/admin/SongManagement';
+import R2SongManagement from './R2SongManagement';
+import AnalyticsDashboard from './AnalyticsDashboard';
 import MigrationPanel from './MigrationPanel';
+import CloudflareErrors from './CloudflareErrors';
 import SupabaseCleanup from './SupabaseCleanup';
-import { useAdminAuth } from '../hooks/useAdmin';
-import { Badge } from '@/components/ui/badge';
+import WranglerTerminal from './WranglerTerminal';
+import { useAdmin } from '../hooks/useAdmin';
+import { Loader2 } from 'lucide-react';
 
-interface AdminPanelProps {
-  onClose?: () => void;
-}
+const AdminPanel: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const { isAdmin, isLoading } = useAdmin();
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<string>("migration");
-  const { isAuthenticated } = useAdminAuth();
-  
-  if (!isAuthenticated) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Authentication required to access Admin Panel</p>
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
-  
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Admin Panel</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="outline" className="bg-green-50 text-green-800 border-green-300">
-              Cloudflare D1
-            </Badge>
-            <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-300">
-              Epic Online Services
-            </Badge>
-          </div>
+
+  if (!isAdmin) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="bg-red-500/20 text-red-400 p-4 rounded-md">
+          <h2 className="text-lg font-bold">Access Denied</h2>
+          <p>You do not have permission to access the admin panel.</p>
         </div>
-        {onClose && (
-          <button 
-            onClick={onClose} 
-            className="text-muted-foreground hover:text-foreground"
-          >
-            Close
-          </button>
-        )}
       </div>
-      
-      <p className="text-muted-foreground">
-        Manage your Animorphs TCG application
-      </p>
-      
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">Admin Panel</h1>
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-[600px]">
-          <TabsTrigger value="migration">Data Migration</TabsTrigger>
-          <TabsTrigger value="cleanup">Supabase Cleanup</TabsTrigger>
-          <TabsTrigger value="errors">Cloudflare Logs</TabsTrigger>
-          <TabsTrigger value="terminal">Wrangler Terminal</TabsTrigger>
+        <TabsList className="grid grid-cols-5 mb-6">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="music">Music</TabsTrigger>
+          <TabsTrigger value="system">System</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="migration" className="space-y-4">
-          <MigrationPanel />
+
+        <TabsContent value="dashboard">
+          <AnalyticsDashboard />
         </TabsContent>
-        
-        <TabsContent value="cleanup" className="space-y-4">
-          <SupabaseCleanup />
+
+        <TabsContent value="users">
+          <UserManagement />
         </TabsContent>
-        
-        <TabsContent value="errors" className="space-y-4">
-          <CloudflareErrors />
+
+        <TabsContent value="payments">
+          <div className="space-y-8">
+            <PaymentManagement />
+            <SubscriptionManagement />
+          </div>
         </TabsContent>
-        
-        <TabsContent value="terminal" className="space-y-4">
-          <WranglerTerminal />
+
+        <TabsContent value="music">
+          <div className="space-y-8">
+            <SongManagement />
+            <R2SongManagement />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="system">
+          <div className="space-y-8">
+            <MigrationPanel />
+            <CloudflareErrors />
+            <SupabaseCleanup />
+            <WranglerTerminal />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

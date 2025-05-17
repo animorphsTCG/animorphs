@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Popover,
@@ -6,12 +5,13 @@ import {
   PopoverTrigger
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/modules/auth";
 import { useNavigate } from "react-router-dom";
 import { Mail, Loader2, Check, X } from "lucide-react";
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
+import { toast } from '@/hooks/use-toast';
+import { createChannel } from '@/lib/d1Database';
 
 interface BattleInvite {
   id: string;
@@ -24,7 +24,7 @@ interface BattleInvite {
 }
 
 export const BattleInvites = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
   const [invites, setInvites] = useState<BattleInvite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,31 +32,33 @@ export const BattleInvites = () => {
   const [responding, setResponding] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
-    if (!user) return;
+    if (!user || !token?.access_token) return;
     
     const fetchInvites = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('battle_invites')
-          .select(`
-            *,
-            profiles:invited_by (username)
-          `)
-          .eq('user_id', user.id)
-          .eq('is_accepted', false)
-          .eq('is_rejected', false);
+
+        const invitesQuery = `
+          SELECT bi.*, p.username as inviter_username 
+          FROM battle_invites bi
+          JOIN profiles p ON bi.invited_by = p.id
+          WHERE bi.user_id = ? AND bi.is_accepted = 0 AND bi.is_rejected = 0
+        `;
+        
+        const data = await d1Worker.query(
+          invitesQuery,
+          { params: [user.id] },
+          token.access_token
+        );
           
-        if (error) throw error;
-        
-        const formattedInvites = data.map(invite => ({
-          ...invite,
-          inviter_username: invite.profiles?.username
-        }));
-        
-        setInvites(formattedInvites);
+        setInvites(data || []);
       } catch (err) {
         console.error("Error fetching invites:", err);
+        toast({
+          title: "Error",
+          description: "Failed to load battle invites",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
@@ -64,50 +66,49 @@ export const BattleInvites = () => {
     
     fetchInvites();
     
+    // Set up event listener for new invites
+    // This is a placeholder - in production, use EOS presence or another real-time mechanism
+    const channel = createChannel('battle-invites');
+    
     // Subscribe to changes in invites
-    const channel = supabase
-      .channel('battle-invites')
-      .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'battle_invites', filter: `user_id=eq.${user.id}` }, 
-          () => {
-            fetchInvites();
-            toast({
-              title: "New Battle Invite",
-              description: "You've received a battle invitation",
-            });
-          })
-      .subscribe();
+    const subscription = channel.subscribe(() => {
+      fetchInvites();
+    });
     
     return () => {
-      supabase.removeChannel(channel);
+      subscription.unsubscribe();
     };
-  }, [user]);
+  }, [user, token]);
   
   const handleInviteResponse = async (inviteId: string, lobbyId: string, accept: boolean) => {
-    if (!user) return;
+    if (!user || !token?.access_token) return;
     
     try {
       setResponding(prev => ({ ...prev, [inviteId]: true }));
       
       // Update invite status
-      await supabase
-        .from('battle_invites')
-        .update({
-          is_accepted: accept,
-          is_rejected: !accept,
+      await d1Worker.update(
+        'battle_invites',
+        {
+          is_accepted: accept ? 1 : 0,
+          is_rejected: accept ? 0 : 1,
           responded_at: new Date().toISOString()
-        })
-        .eq('id', inviteId);
+        },
+        'id = ?',
+        [inviteId],
+        null,
+        token.access_token
+      );
       
       if (accept) {
         // Check if lobby still exists and has space
-        const { data: lobby, error: lobbyError } = await supabase
-          .from('battle_lobbies')
-          .select('*')
-          .eq('id', lobbyId)
-          .single();
+        const lobby = await d1Worker.getOne(
+          'SELECT * FROM battle_lobbies WHERE id = ?',
+          { params: [lobbyId] },
+          token.access_token
+        );
           
-        if (lobbyError || !lobby) {
+        if (!lobby) {
           toast({
             title: "Lobby Not Available",
             description: "The battle lobby is no longer available",
@@ -117,14 +118,16 @@ export const BattleInvites = () => {
         }
         
         // Check participant count
-        const { data: participants, error: participantsError } = await supabase
-          .from('lobby_participants')
-          .select('*')
-          .eq('lobby_id', lobbyId);
+        const participantsQuery = 'SELECT COUNT(*) as count FROM lobby_participants WHERE lobby_id = ?';
+        const participantCount = await d1Worker.getOne(
+          participantsQuery,
+          { params: [lobbyId] },
+          token.access_token
+        );
           
-        if (participantsError) throw participantsError;
+        const currentCount = participantCount ? participantCount.count : 0;
         
-        if (participants && participants.length >= lobby.max_players) {
+        if (currentCount >= lobby.max_players) {
           toast({
             title: "Lobby Full",
             description: "The battle lobby is already full",
@@ -134,15 +137,16 @@ export const BattleInvites = () => {
         }
         
         // Join the lobby
-        const { error: joinError } = await supabase
-          .from('lobby_participants')
-          .insert({
+        await d1Worker.insert(
+          'lobby_participants',
+          {
             lobby_id: lobbyId,
             user_id: user.id,
-            player_number: participants ? participants.length + 1 : 1
-          });
-          
-        if (joinError) throw joinError;
+            player_number: currentCount + 1
+          },
+          null,
+          token.access_token
+        );
         
         // Close the popover
         setOpen(false);

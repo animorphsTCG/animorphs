@@ -12,6 +12,28 @@ export interface User {
   displayName?: string;
 }
 
+export interface UserProfile {
+  id: string;
+  username: string;
+  email?: string;
+  name?: string;
+  surname?: string;
+  country?: string;
+  created_at: string;
+  has_paid?: boolean;
+  is_admin?: boolean;
+  bio?: string;
+  favorite_animorph?: string;
+  favorite_battle_mode?: string;
+  online_times_gmt2?: string;
+  playing_times?: string;
+  profile_image_url?: string;
+  mp?: number;
+  ai_points?: number;
+  lbp?: number;
+  digi?: number;
+}
+
 export interface WebAuthnCredential {
   id: string;
   publicKey: string;

@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { supabase } from '@/lib/supabase';
+import { d1 } from '@/lib/d1Database';
+import { useAuth } from '@/modules/auth';
 import {
   Card,
   CardContent,
@@ -20,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { toast } from '@/hooks/use-toast';
 
 interface User {
   id: string;
@@ -33,22 +36,36 @@ interface User {
 const UserSearch = () => {
   const [users, setUsers] = useState<User[]>([]);
   const { register, handleSubmit, reset } = useForm<{ query: string }>();
+  const { token } = useAuth();
 
   const onSubmit = async (data: { query: string }) => {
     try {
-      const { data: usersData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .ilike('name', `%${data.query}%`);
-
-      if (error) {
-        console.error('Error searching users:', error);
+      if (!token?.access_token) {
+        toast({
+          title: "Authentication Required",
+          description: "You must be logged in to search users",
+          variant: "destructive",
+        });
         return;
       }
 
-      setUsers(usersData || []);
+      const searchQuery = `SELECT * FROM profiles WHERE name LIKE ? OR username LIKE ?`;
+      const searchParam = `%${data.query}%`;
+      
+      const results = await d1Worker.query(
+        searchQuery,
+        { params: [searchParam, searchParam] },
+        token.access_token
+      );
+
+      setUsers(results || []);
     } catch (error) {
       console.error('Error searching users:', error);
+      toast({
+        title: "Search Error",
+        description: "Failed to search users. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

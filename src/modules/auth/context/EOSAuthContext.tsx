@@ -1,8 +1,8 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { toast } from '@/components/ui/use-toast';
-import { Session, User } from '../types';
+import { toast } from '@/hooks/use-toast';
+import { Session, User, UserProfile } from '../types';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
+import { signUpApi, resetPasswordApi, updatePasswordApi } from '@/lib/auth/authApi';
 
 // Define the UserProfile interface
 interface UserProfile {
@@ -276,7 +276,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
       
       // In production this would call the EOS password reset API
-      // For now, we'll simulate it
       await resetPasswordApi(email);
       
       toast({
@@ -305,7 +304,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
       
       // In production this would call the EOS password update API
-      // For now, we'll just show a success message
+      if (user?.id) {
+        await updatePasswordApi(user.id, password);
+      } else {
+        throw new Error('User not authenticated');
+      }
       
       toast({
         title: "Password updated",

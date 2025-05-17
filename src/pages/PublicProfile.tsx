@@ -1,20 +1,20 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
-import { UserProfile } from '@/types';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
+import { UserProfile } from '@/modules/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Clock, Flag, Gamepad, Trophy, User2 } from 'lucide-react';
 import { useAuth } from '@/modules/auth';
+import { toast } from '@/hooks/use-toast';
 
 const PublicProfile = () => {
   const { userId } = useParams<{ userId: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,34 +24,39 @@ const PublicProfile = () => {
           throw new Error('No user ID provided');
         }
 
-        const { data, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (fetchError) {
-          console.error('Error fetching profile:', fetchError);
-          throw new Error('Failed to fetch profile');
+        if (!token?.access_token) {
+          throw new Error('Authentication required');
         }
 
-        if (!data) {
+        const profileData = await d1Worker.getOne(
+          'SELECT * FROM profiles WHERE id = ?',
+          { params: [userId] },
+          token.access_token
+        );
+
+        if (!profileData) {
           throw new Error('Profile not found');
         }
 
-        setProfile(data);
+        setProfile(profileData as UserProfile);
         setError(null);
       } catch (err: any) {
         console.error('Error in fetchProfile:', err);
         setError(err.message);
         setProfile(null);
+        
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load profile",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchProfile();
-  }, [userId]);
+  }, [userId, token]);
 
   if (loading) {
     return (

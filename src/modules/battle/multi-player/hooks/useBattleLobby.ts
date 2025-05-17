@@ -1,321 +1,142 @@
-
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/modules/auth';
+import { d1Database } from '@/lib/d1Database';
+import { createChannelWithCallback } from '@/lib/channel';
 import { toast } from '@/components/ui/use-toast';
-import { useEOSPresence } from './useEOSPresence';
 
-export interface BattleLobbyConfig {
+// Type definitions for lobby data structures
+interface Lobby {
+  id: string;
   name: string;
-  battleType: '1v1' | '3player' | '4player';
-  maxPlayers?: number;
-  useTimer?: boolean;
-  useMusic?: boolean;
-  metadata?: Record<string, any>;
+  created_by: string;
+  created_at: string;
+  battle_type: string;
+  status: 'waiting' | 'in_progress' | 'completed';
+  max_players: number;
+  is_public: boolean;
 }
 
-export interface LobbyMember {
+interface Participant {
   id: string;
-  username: string;
-  profile_image_url?: string | null;
+  lobby_id: string;
+  user_id: string;
   player_number: number;
-  is_ready: boolean;
-  is_host: boolean;
-  joined_at: string;
+  username?: string;
+  profile_image_url?: string;
 }
 
 export const useBattleLobby = (lobbyId?: string) => {
-  const { user, userProfile } = useAuth();
-  const navigate = useNavigate();
-  const [lobbyData, setLobbyData] = useState<any | null>(null);
-  const [lobbyMembers, setLobbyMembers] = useState<LobbyMember[]>([]);
-  const [isHost, setIsHost] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const [isCreatingLobby, setIsCreatingLobby] = useState(false);
-  const [isJoiningLobby, setIsJoiningLobby] = useState(false);
-  const [isLeavingLobby, setIsLeavingLobby] = useState(false);
+  const { user, token } = useAuth();
+  const [lobby, setLobby] = useState<Lobby | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [battleStarted, setBattleStarted] = useState(false);
-
-  // Initialize presence tracking
-  const presence = useEOSPresence({
-    heartbeatInterval: 10000, // More frequent for lobby members
-  });
+  const [isOwner, setIsOwner] = useState(false);
   
-  // Fetch lobby data and members
-  const fetchLobbyData = useCallback(async () => {
-    if (!lobbyId || !user) return;
+  // Check if user is lobby owner
+  useEffect(() => {
+    if (lobby && user) {
+      setIsOwner(lobby.created_by === user.id);
+    } else {
+      setIsOwner(false);
+    }
+  }, [lobby, user]);
+  
+  // Load lobby data
+  const loadLobby = useCallback(async () => {
+    if (!lobbyId || !token?.access_token) return;
     
     try {
-      // Get lobby data
-      const { data: lobbyData, error: lobbyError } = await supabase
-        .from('battle_lobbies')
-        .select('*')
+      setIsLoading(true);
+      setError(null);
+      
+      // Get lobby details
+      const lobbyResult = await d1Database
+        .from<Lobby>('battle_lobbies')
         .eq('id', lobbyId)
         .single();
-        
-      if (lobbyError) throw lobbyError;
       
-      setLobbyData(lobbyData);
-      setIsHost(lobbyData.host_id === user.id);
-      
-      // Get members data
-      const { data: membersData, error: membersError } = await supabase
-        .from('lobby_participants')
-        .select(`
-          id,
-          user_id,
-          player_number,
-          is_ready,
-          join_time,
-          profiles:user_id (
-            username,
-            profile_image_url
-          )
-        `)
-        .eq('lobby_id', lobbyId)
-        .is('left_at', null)
-        .order('player_number', { ascending: true });
-        
-      if (membersError) throw membersError;
-      
-      // Fix here: Correctly handle the profiles data structure
-      const formattedMembers: LobbyMember[] = membersData.map(member => {
-        // Extract profile data from the nested structure
-        // The profiles field is likely returning a single object, not an array
-        const profileData = member.profiles as unknown;
-        // Type assertion to help TypeScript understand the structure
-        const profile = profileData as { username?: string; profile_image_url?: string | null } | null;
-        
-        return {
-          id: member.user_id,
-          username: profile?.username || 'Unknown Player',
-          profile_image_url: profile?.profile_image_url || null,
-          player_number: member.player_number,
-          is_ready: member.is_ready,
-          is_host: member.user_id === lobbyData.host_id,
-          joined_at: member.join_time
-        };
-      });
-      
-      setLobbyMembers(formattedMembers);
-      
-      // Set user's ready status
-      const userMember = membersData.find(m => m.user_id === user.id);
-      if (userMember) {
-        setIsReady(userMember.is_ready);
+      if (lobbyResult.error) {
+        throw new Error('Lobby not found');
       }
       
-      // Check if battle has started
-      setBattleStarted(lobbyData.status === 'active');
+      setLobby(lobbyResult.data[0]);
       
-    } catch (err: any) {
-      console.error("Error fetching lobby data:", err);
-      setError(err.message || "Failed to load lobby data");
-      
-      if (err.code === 'PGRST116') { // Not found error
-        toast({
-          title: "Lobby Not Found",
-          description: "This lobby doesn't exist or has been closed",
-          variant: "destructive"
-        });
-        navigate('/battle');
+      // Check if lobby exists and isn't completed
+      if (!lobbyResult.data[0]) {
+        setError('Lobby not found');
+        return;
       }
+      
+      if (lobbyResult.data[0].status === 'completed') {
+        setError('This lobby has ended');
+        return;
+      }
+      
+      // Get participants
+      const participantsResult = await d1Database.query(`
+        SELECT lp.*, p.username, p.profile_image_url
+        FROM lobby_participants lp
+        LEFT JOIN profiles p ON lp.user_id = p.id
+        WHERE lp.lobby_id = ?
+        ORDER BY lp.player_number ASC
+      `, { params: [lobbyId] });
+      
+      setParticipants(participantsResult || []);
+      
+    } catch (err) {
+      console.error('Error loading lobby:', err);
+      setError('Failed to load lobby data');
+    } finally {
+      setIsLoading(false);
     }
-  }, [lobbyId, user, navigate]);
+  }, [lobbyId, token]);
+  
+  // Initial load
+  useEffect(() => {
+    loadLobby();
+  }, [loadLobby]);
   
   // Subscribe to lobby updates
   useEffect(() => {
     if (!lobbyId || !user) return;
     
-    fetchLobbyData();
-    
-    // Subscribe to lobby changes
-    const lobbyChannel = supabase
-      .channel(`lobby_updates:${lobbyId}`)
-      .on('postgres_changes', 
-          { event: 'UPDATE', schema: 'public', table: 'battle_lobbies', filter: `id=eq.${lobbyId}` },
-          (payload) => {
-            console.log('Lobby updated:', payload);
-            const updatedLobby = payload.new as any;
-            setLobbyData(updatedLobby);
-            
-            if (updatedLobby.status === 'active' && !battleStarted) {
-              setBattleStarted(true);
-              handleBattleStart(updatedLobby.battle_type);
-            }
-          })
-      .subscribe();
-      
-    // Subscribe to members changes
-    const membersChannel = supabase
-      .channel(`lobby_members:${lobbyId}`)
-      .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'lobby_participants', filter: `lobby_id=eq.${lobbyId}` }, 
-          () => fetchLobbyData())
-      .on('postgres_changes', 
-          { event: 'UPDATE', schema: 'public', table: 'lobby_participants', filter: `lobby_id=eq.${lobbyId}` }, 
-          () => fetchLobbyData())
-      .on('postgres_changes', 
-          { event: 'DELETE', schema: 'public', table: 'lobby_participants', filter: `lobby_id=eq.${lobbyId}` }, 
-          () => fetchLobbyData())
-      .subscribe();
+    const { subscription } = createChannelWithCallback(
+      `lobby:${lobbyId}`,
+      'player_joined',
+      () => {
+        loadLobby();
+      }
+    );
     
     return () => {
-      supabase.removeChannel(lobbyChannel);
-      supabase.removeChannel(membersChannel);
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
-  }, [lobbyId, user, fetchLobbyData, battleStarted]);
+  }, [lobbyId, user, loadLobby]);
   
-  // Create a new lobby
-  const createLobby = useCallback(async (config: BattleLobbyConfig) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "You need to be logged in to create a battle lobby",
-        variant: "destructive"
-      });
-      return null;
-    }
-    
-    if (!userProfile?.has_paid) {
-      toast({
-        title: "Full Access Required",
-        description: "Only paid users can create battle lobbies",
-        variant: "destructive"
-      });
-      return null;
-    }
-    
-    setIsCreatingLobby(true);
-    setError(null);
+  // Join lobby function
+  const joinLobby = useCallback(async () => {
+    if (!lobbyId || !user || !token?.access_token) return false;
     
     try {
-      // Check user is not already in a battle or lobby
-      const { data: userInBattle } = await supabase
-        .rpc('user_in_battle', { user_id: user.id });
-        
-      if (userInBattle) {
+      setIsUpdating(true);
+      
+      // Check if user is already in the lobby
+      const existingParticipant = participants.find(p => p.user_id === user.id);
+      
+      if (existingParticipant) {
         toast({
-          title: 'Already in Battle',
-          description: 'You are already participating in a battle',
-          variant: 'destructive'
+          title: "Already Joined",
+          description: "You're already in this lobby",
         });
-        setIsCreatingLobby(false);
-        return null;
+        return true;
       }
       
-      const { data: userInLobby } = await supabase
-        .rpc('user_in_lobby', { user_id: user.id });
-        
-      if (userInLobby) {
-        toast({
-          title: 'Already in Lobby',
-          description: 'You are already participating in a lobby',
-          variant: 'destructive'
-        });
-        setIsCreatingLobby(false);
-        return null;
-      }
-      
-      // Determine max players based on battle type
-      const maxPlayers = config.maxPlayers || 
-        (config.battleType === '1v1' ? 2 : 
-         config.battleType === '3player' ? 3 : 4);
-      
-      // Create lobby
-      const { data: lobby, error: lobbyError } = await supabase
-        .from('battle_lobbies')
-        .insert({
-          name: config.name,
-          host_id: user.id,
-          battle_type: config.battleType,
-          max_players: maxPlayers,
-          use_timer: config.useTimer || false,
-          use_music: config.useMusic || false,
-          requires_payment: true,
-          metadata: config.metadata || {}
-        })
-        .select()
-        .single();
-        
-      if (lobbyError) throw lobbyError;
-      
-      // Join as first participant
-      const { error: participantError } = await supabase
-        .from('lobby_participants')
-        .insert({
-          lobby_id: lobby.id,
-          user_id: user.id,
-          player_number: 1,
-          is_ready: false
-        });
-        
-      if (participantError) throw participantError;
-      
-      // Update presence for lobby
-      presence.setStatus('online');
-      
-      return lobby;
-    } catch (err: any) {
-      console.error("Error creating lobby:", err);
-      setError(err.message || "Failed to create lobby");
-      toast({
-        title: "Error",
-        description: "Failed to create battle lobby",
-        variant: "destructive"
-      });
-      return null;
-    } finally {
-      setIsCreatingLobby(false);
-    }
-  }, [user, userProfile, presence]);
-  
-  // Join an existing lobby
-  const joinLobby = useCallback(async (lobbyId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "You need to be logged in to join a battle lobby",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    if (!userProfile?.has_paid) {
-      toast({
-        title: "Full Access Required",
-        description: "Only paid users can join battle lobbies",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    setIsJoiningLobby(true);
-    setError(null);
-    
-    try {
-      // Check if lobby exists and isn't full
-      const { data: lobbyData, error: lobbyError } = await supabase
-        .from('battle_lobbies')
-        .select('*, lobby_participants(count)')
-        .eq('id', lobbyId)
-        .single();
-        
-      if (lobbyError) throw lobbyError;
-      
-      if (lobbyData.status !== 'waiting') {
-        toast({
-          title: "Cannot Join",
-          description: "This lobby is no longer accepting new players",
-          variant: "destructive"
-        });
-        return false;
-      }
-      
-      const participantCount = lobbyData.lobby_participants?.[0]?.count || 0;
-      if (participantCount >= lobbyData.max_players) {
+      // Check if lobby is full
+      if (participants.length >= (lobby?.max_players || 2)) {
         toast({
           title: "Lobby Full",
           description: "This lobby is already full",
@@ -324,227 +145,332 @@ export const useBattleLobby = (lobbyId?: string) => {
         return false;
       }
       
-      // Get current player number
-      const { data: participants, error: countError } = await supabase
-        .from('lobby_participants')
-        .select('player_number')
-        .eq('lobby_id', lobbyId)
-        .order('player_number', { ascending: false })
-        .limit(1);
-        
-      if (countError) throw countError;
+      // Join the lobby
+      await d1Database.query(`
+        INSERT INTO lobby_participants (lobby_id, user_id, player_number)
+        VALUES (?, ?, ?)
+      `, {
+        params: [
+          lobbyId,
+          user.id,
+          participants.length + 1
+        ]
+      });
       
-      const nextPlayerNumber = (participants && participants.length > 0) 
-        ? participants[0].player_number + 1 : 1;
+      // Update local state
+      await loadLobby();
       
-      // Join lobby
-      const { error: joinError } = await supabase
-        .from('lobby_participants')
-        .insert({
-          lobby_id: lobbyId,
-          user_id: user.id,
-          player_number: nextPlayerNumber,
-          is_ready: false
-        });
-        
-      if (joinError) throw joinError;
-      
-      // Update presence
-      presence.setStatus('online');
+      // Notify other users
+      toast({
+        title: "Lobby Joined",
+        description: "You've joined the battle lobby",
+      });
       
       return true;
-    } catch (err: any) {
-      console.error("Error joining lobby:", err);
-      setError(err.message || "Failed to join lobby");
+    } catch (err) {
+      console.error('Error joining lobby:', err);
       toast({
-        title: "Error",
-        description: "Failed to join battle lobby",
+        title: "Join Failed",
+        description: "Failed to join the lobby",
         variant: "destructive"
       });
       return false;
     } finally {
-      setIsJoiningLobby(false);
+      setIsUpdating(false);
     }
-  }, [user, userProfile, presence]);
+  }, [lobbyId, user, token, participants, lobby, loadLobby]);
   
-  // Leave lobby
+  // Leave lobby function
   const leaveLobby = useCallback(async () => {
-    if (!user || !lobbyId) return false;
-    
-    setIsLeavingLobby(true);
+    if (!lobbyId || !user || !token?.access_token) return false;
     
     try {
-      // Add left_at timestamp
-      const { error: leaveError } = await supabase
-        .from('lobby_participants')
-        .update({ left_at: new Date().toISOString() })
-        .eq('lobby_id', lobbyId)
-        .eq('user_id', user.id);
-        
-      if (leaveError) throw leaveError;
+      setIsUpdating(true);
       
-      // If host is leaving, either assign new host or delete lobby
-      if (isHost) {
-        // Find next player to be host
-        const { data: remainingMembers } = await supabase
-          .from('lobby_participants')
-          .select('user_id')
-          .eq('lobby_id', lobbyId)
-          .is('left_at', null)
-          .neq('user_id', user.id)
-          .order('player_number', { ascending: true })
-          .limit(1);
-          
-        if (remainingMembers && remainingMembers.length > 0) {
-          // Transfer host status
-          await supabase
-            .from('battle_lobbies')
-            .update({ host_id: remainingMembers[0].user_id })
-            .eq('id', lobbyId);
-        } else {
-          // Delete lobby if empty
-          await supabase
-            .from('battle_lobbies')
-            .update({ status: 'closed' })
-            .eq('id', lobbyId);
-        }
-      }
+      // Remove participant
+      await d1Database.query(`
+        DELETE FROM lobby_participants 
+        WHERE lobby_id = ? AND user_id = ?
+      `, {
+        params: [lobbyId, user.id]
+      });
+      
+      toast({
+        title: "Lobby Left",
+        description: "You've left the battle lobby",
+      });
       
       return true;
-    } catch (err: any) {
-      console.error("Error leaving lobby:", err);
+    } catch (err) {
+      console.error('Error leaving lobby:', err);
       toast({
         title: "Error",
-        description: "Failed to leave lobby properly",
+        description: "Failed to leave the lobby",
         variant: "destructive"
       });
       return false;
     } finally {
-      setIsLeavingLobby(false);
+      setIsUpdating(false);
     }
-  }, [user, lobbyId, isHost]);
+  }, [lobbyId, user, token]);
   
-  // Set ready status
-  const setReadyStatus = useCallback(async (ready: boolean) => {
-    if (!user || !lobbyId) return false;
-    
-    try {
-      const { error } = await supabase
-        .from('lobby_participants')
-        .update({ is_ready: ready })
-        .eq('lobby_id', lobbyId)
-        .eq('user_id', user.id);
-        
-      if (error) throw error;
-      
-      setIsReady(ready);
-      return true;
-    } catch (err: any) {
-      console.error("Error setting ready status:", err);
-      toast({
-        title: "Error",
-        description: "Failed to update ready status",
-        variant: "destructive"
-      });
-      return false;
-    }
-  }, [user, lobbyId]);
-  
-  // Start battle (host only)
+  // Start battle function
   const startBattle = useCallback(async () => {
-    if (!user || !lobbyId || !isHost) return false;
+    if (!lobbyId || !user || !token?.access_token || !isOwner) return false;
     
     try {
-      // Check if all members are ready
-      const notReadyMembers = lobbyMembers.filter(member => !member.is_ready);
-      if (notReadyMembers.length > 0) {
+      setIsUpdating(true);
+      
+      // Check if we have enough players
+      if (participants.length < 2) {
         toast({
-          title: "Cannot Start Battle",
-          description: "All players must be ready to start",
+          title: "Not Enough Players",
+          description: "You need at least 2 players to start a battle",
           variant: "destructive"
         });
         return false;
       }
       
-      // Check sufficient players
-      if (lobbyMembers.length < 2) {
-        toast({
-          title: "Cannot Start Battle",
-          description: "At least 2 players are required to start",
-          variant: "destructive"
+      // Update lobby status
+      await d1Database.query(`
+        UPDATE battle_lobbies
+        SET status = 'in_progress'
+        WHERE id = ?
+      `, {
+        params: [lobbyId]
+      });
+      
+      // Create battle session
+      const battleId = crypto.randomUUID();
+      await d1Database.query(`
+        INSERT INTO battle_sessions (
+          id, 
+          lobby_id, 
+          battle_type, 
+          created_by, 
+          status,
+          current_round,
+          current_player_index,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, 'in_progress', 1, 0, CURRENT_TIMESTAMP)
+      `, {
+        params: [
+          battleId,
+          lobbyId,
+          lobby?.battle_type || '1v1',
+          user.id
+        ]
+      });
+      
+      // Add participants to battle
+      for (let i = 0; i < participants.length; i++) {
+        const participant = participants[i];
+        await d1Database.query(`
+          INSERT INTO battle_participants (
+            battle_id,
+            user_id,
+            player_number,
+            rounds_won
+          )
+          VALUES (?, ?, ?, 0)
+        `, {
+          params: [
+            battleId,
+            participant.user_id,
+            participant.player_number
+          ]
         });
-        return false;
       }
       
-      // Update lobby status to active
-      const { error } = await supabase
-        .from('battle_lobbies')
-        .update({ 
-          status: 'active',
-          started_at: new Date().toISOString()
-        })
-        .eq('id', lobbyId);
-        
-      if (error) throw error;
+      // Notify all participants
+      toast({
+        title: "Battle Started",
+        description: "The battle has begun!",
+      });
       
-      setBattleStarted(true);
-      return true;
-    } catch (err: any) {
-      console.error("Error starting battle:", err);
+      return battleId;
+    } catch (err) {
+      console.error('Error starting battle:', err);
       toast({
         title: "Error",
-        description: "Failed to start battle",
+        description: "Failed to start the battle",
         variant: "destructive"
       });
       return false;
+    } finally {
+      setIsUpdating(false);
     }
-  }, [user, lobbyId, isHost, lobbyMembers]);
+  }, [lobbyId, user, token, isOwner, participants, lobby]);
   
-  // Handle battle start navigation
-  const handleBattleStart = useCallback((battleType: string) => {
-    if (!lobbyId) return;
+  // Kick player function (owner only)
+  const kickPlayer = useCallback(async (userId: string) => {
+    if (!lobbyId || !user || !token?.access_token || !isOwner) return false;
     
-    toast({
-      title: "Battle Starting",
-      description: "Preparing the arena...",
-    });
-    
-    setTimeout(() => {
-      let battleRoute = '';
+    try {
+      setIsUpdating(true);
       
-      switch (battleType) {
-        case '1v1':
-          battleRoute = `/battle/multiplayer/${lobbyId}`;
-          break;
-        case '3player':
-          battleRoute = `/3-player-battle/${lobbyId}`;
-          break;
-        case '4player':
-          battleRoute = `/4-player-user-lobby/${lobbyId}`;
-          break;
-        default:
-          battleRoute = `/battle/multiplayer/${lobbyId}`;
+      // Can't kick yourself
+      if (userId === user.id) {
+        toast({
+          title: "Cannot Kick Self",
+          description: "You cannot kick yourself from the lobby",
+          variant: "destructive"
+        });
+        return false;
       }
       
-      navigate(battleRoute);
-    }, 1000);
-  }, [lobbyId, navigate]);
+      // Remove participant
+      await d1Database.query(`
+        DELETE FROM lobby_participants 
+        WHERE lobby_id = ? AND user_id = ?
+      `, {
+        params: [lobbyId, userId]
+      });
+      
+      // Update local state
+      await loadLobby();
+      
+      toast({
+        title: "Player Kicked",
+        description: "Player has been removed from the lobby",
+      });
+      
+      return true;
+    } catch (err) {
+      console.error('Error kicking player:', err);
+      toast({
+        title: "Error",
+        description: "Failed to kick player",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [lobbyId, user, token, isOwner, loadLobby]);
+  
+  // Update lobby settings (owner only)
+  const updateLobbySettings = useCallback(async (settings: Partial<Lobby>) => {
+    if (!lobbyId || !user || !token?.access_token || !isOwner) return false;
+    
+    try {
+      setIsUpdating(true);
+      
+      // Build update query
+      const updates: string[] = [];
+      const values: any[] = [];
+      
+      if (settings.name) {
+        updates.push('name = ?');
+        values.push(settings.name);
+      }
+      
+      if (settings.max_players) {
+        updates.push('max_players = ?');
+        values.push(settings.max_players);
+      }
+      
+      if (settings.is_public !== undefined) {
+        updates.push('is_public = ?');
+        values.push(settings.is_public ? 1 : 0);
+      }
+      
+      if (updates.length === 0) {
+        return true; // Nothing to update
+      }
+      
+      // Add lobby ID to values
+      values.push(lobbyId);
+      
+      // Execute update
+      await d1Database.query(`
+        UPDATE battle_lobbies
+        SET ${updates.join(', ')}
+        WHERE id = ?
+      `, {
+        params: values
+      });
+      
+      // Update local state
+      await loadLobby();
+      
+      toast({
+        title: "Settings Updated",
+        description: "Lobby settings have been updated",
+      });
+      
+      return true;
+    } catch (err) {
+      console.error('Error updating lobby settings:', err);
+      toast({
+        title: "Error",
+        description: "Failed to update lobby settings",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [lobbyId, user, token, isOwner, loadLobby]);
+  
+  // Delete lobby (owner only)
+  const deleteLobby = useCallback(async () => {
+    if (!lobbyId || !user || !token?.access_token || !isOwner) return false;
+    
+    try {
+      setIsUpdating(true);
+      
+      // Delete participants first (foreign key constraint)
+      await d1Database.query(`
+        DELETE FROM lobby_participants 
+        WHERE lobby_id = ?
+      `, {
+        params: [lobbyId]
+      });
+      
+      // Delete lobby
+      await d1Database.query(`
+        DELETE FROM battle_lobbies 
+        WHERE id = ?
+      `, {
+        params: [lobbyId]
+      });
+      
+      toast({
+        title: "Lobby Deleted",
+        description: "The lobby has been deleted",
+      });
+      
+      return true;
+    } catch (err) {
+      console.error('Error deleting lobby:', err);
+      toast({
+        title: "Error",
+        description: "Failed to delete lobby",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [lobbyId, user, token, isOwner]);
   
   return {
-    lobbyData,
-    lobbyMembers,
-    isHost,
-    isReady,
-    isCreatingLobby,
-    isJoiningLobby, 
-    isLeavingLobby,
+    lobby,
+    participants,
+    isLoading,
+    isUpdating,
     error,
-    battleStarted,
-    createLobby,
+    isOwner,
     joinLobby,
     leaveLobby,
-    setReadyStatus,
     startBattle,
-    refreshLobby: fetchLobbyData
+    kickPlayer,
+    updateLobbySettings,
+    deleteLobby,
+    refreshLobby: loadLobby
   };
 };
+
+export default useBattleLobby;

@@ -10,8 +10,8 @@ import { useAuth } from "@/modules/auth";
 import { useNavigate } from "react-router-dom";
 import { Mail, Loader2, Check, X } from "lucide-react";
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
-import { toast } from '@/hooks/use-toast';
-import { createChannel } from '@/lib/channel';
+import { toast } from '@/components/ui/use-toast';
+import { createChannelWithCallback } from '@/lib/channel';
 
 interface BattleInvite {
   id: string;
@@ -67,16 +67,16 @@ export const BattleInvites = () => {
     fetchInvites();
     
     // Set up event listener for new invites
-    // This is a placeholder - in production, use EOS presence or another real-time mechanism
-    const channel = createChannel('battle-invites');
-    
-    // Subscribe to changes in invites
-    const subscription = channel.subscribe(() => {
-      fetchInvites();
-    });
+    const { subscription } = createChannelWithCallback(
+      'battle-invites',
+      'INSERT',
+      () => fetchInvites()
+    );
     
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, [user, token]);
   

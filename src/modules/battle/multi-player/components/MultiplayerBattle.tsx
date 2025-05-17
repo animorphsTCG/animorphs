@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +6,7 @@ import { useBattleMultiplayer } from '../hooks/useBattleMultiplayer';
 import BattleCardDisplay from '@/components/BattleCardDisplay';
 import { useAuth } from '@/modules/auth';
 
-export const MultiplayerBattle = () => {
+const MultiplayerBattle = () => {
   const { battleId } = useParams<{ battleId: string }>();
   const { user } = useAuth();
   const {
@@ -86,3 +85,7 @@ export const MultiplayerBattle = () => {
     </div>
   );
 };
+
+// Export both named and default
+export { MultiplayerBattle };
+export default MultiplayerBattle;

@@ -1,29 +1,33 @@
 
-import { d1, createChannel } from './d1Database';
+import { d1Database } from './d1Database';
+import { createChannel, createChannelWithCallback } from './channel';
 
 /**
  * @deprecated This is a compatibility layer for the migration from Supabase to D1.
- * New code should use d1Worker or d1 directly instead.
+ * New code should use d1Database directly instead.
  */
 export const supabase = {
-  ...d1,
+  ...d1Database,
   from: (table: string) => {
-    return d1.from(table);
+    return d1Database.from(table);
   },
   channel: (name: string) => {
     return {
-      on: () => {
+      on: (event: string) => {
         return {
-          subscribe: () => {
-            console.log(`Subscribing to channel ${name}`);
-            return {};
+          subscribe: (callback: (payload: any) => void) => {
+            console.log(`Subscribing to channel ${name}, event: ${event}`);
+            const { subscription } = createChannelWithCallback(name, event, callback);
+            return subscription;
           }
         };
       }
     };
   },
   removeChannel: (channel: any) => {
-    console.log('Removing channel', channel);
+    if (channel && typeof channel.unsubscribe === 'function') {
+      channel.unsubscribe();
+    }
   },
   rpc: (functionName: string, params?: any) => {
     console.log(`RPC call to ${functionName}`, params);

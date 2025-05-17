@@ -1,6 +1,6 @@
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 import type { UserProfile } from '@/modules/auth/types';
-import { EnhancedD1QueryBuilderImpl as EnhancedD1QueryBuilder } from '@/lib/cloudflare/d1Types';
+import { EnhancedD1QueryBuilder } from '@/lib/cloudflare/d1Types';
 
 /**
  * Cloudflare D1 database adapter for the Animorphs app

@@ -2,31 +2,31 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/EOSAuthContext';
-import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  adminOnly?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, token, isLoading } = useAuth();
-
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = false }) => {
+  const { user, userProfile, isLoading } = useAuth();
+  
+  // Show loading state while checking authentication
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="flex flex-col items-center">
-          <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
-
-  // Redirect to login if user is not authenticated
-  if (!user || !token) {
-    return <Navigate to={`/login?redirectTo=${encodeURIComponent(window.location.pathname)}`} replace />;
+  
+  // If not authenticated, redirect to login
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
-
+  
+  // If adminOnly and user is not an admin, redirect to home
+  if (adminOnly && (!userProfile || !userProfile.is_admin)) {
+    return <Navigate to="/" replace />;
+  }
+  
+  // User is authenticated (and is admin if adminOnly), render the children
   return <>{children}</>;
 };
 

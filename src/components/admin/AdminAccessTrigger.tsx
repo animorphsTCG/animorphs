@@ -1,13 +1,14 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { toast } from "@/components/ui/use-toast";
+import { d1 } from "@/lib/d1Database";
+import { useAuth } from "@/modules/auth/context/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 const ADMIN_PASSWORD = "Adanacia23.";
+const ADMIN_EMAIL = "adanacia23d@gmail.com";
 
 interface AdminAccessTriggerProps {
   onAuthenticated?: () => void;
@@ -80,15 +81,23 @@ const AdminAccessTrigger: React.FC<AdminAccessTriggerProps> = ({ onAuthenticated
       return;
     }
 
-    try {
-      // Set the user as an admin
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_admin: true })
-        .eq('id', user.id);
+    // Verify user is the admin email
+    if (user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      toast({
+        title: "Authentication Failed",
+        description: "You do not have admin privileges",
+        variant: "destructive"
+      });
+      return;
+    }
 
-      if (error) {
-        throw error;
+    try {
+      // Set the user as an admin using the d1 wrapper
+      const db = d1.from('profiles');
+      await db.update({ is_admin: true }).eq('id', user.id);
+
+      if (db.error) {
+        throw db.error;
       }
 
       toast({

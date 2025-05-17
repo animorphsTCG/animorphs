@@ -32,6 +32,12 @@ export interface UserProfile {
   ai_points?: number;
   lbp?: number;
   digi?: number;
+  gold?: number;
+  music_unlocked?: boolean;
+  music_subscription?: {
+    subscription_type: string;
+    end_date: string;
+  } | null;
 }
 
 export interface WebAuthnCredential {

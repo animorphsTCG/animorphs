@@ -2,7 +2,7 @@
 import { d1Worker } from './cloudflare/d1Worker';
 
 // Mock database response format
-type D1Response<T> = {
+export type D1Response<T> = {
   data: T | null;
   error: Error | null;
 }
@@ -26,6 +26,8 @@ export class D1Database {
   private table: string;
   private token: string | null;
   private whereConditions: Array<{field: string, op: string, value: any}> = [];
+  private _data: any = null;
+  private _error: Error | null = null;
   
   constructor(table: string, token?: string) {
     this.table = table;
@@ -38,6 +40,20 @@ export class D1Database {
   setToken(token: string): D1Database {
     this.token = token;
     return this;
+  }
+
+  /**
+   * Access data from the last operation
+   */
+  get data() {
+    return this._data;
+  }
+
+  /**
+   * Access error from the last operation
+   */
+  get error() {
+    return this._error;
   }
   
   /**
@@ -91,15 +107,23 @@ export class D1Database {
   /**
    * Single result
    */
-  single(): Promise<D1Response<any>> {
+  async single(): Promise<D1Response<any>> {
     return this.execute(true);
   }
   
   /**
    * Maybe single result (doesn't throw on no results)
    */
-  maybeSingle(): Promise<D1Response<any>> {
+  async maybeSingle(): Promise<D1Response<any>> {
     return this.execute(true, true);
+  }
+  
+  /**
+   * Return promise with data and error properties like Supabase
+   */
+  async then(resolve: (value: D1Response<any>) => any): Promise<any> {
+    const result = await this.execute();
+    return resolve(result);
   }
   
   /**
@@ -114,12 +138,19 @@ export class D1Database {
         this.token || undefined
       );
       
+      this._data = result;
+      this._error = null;
+      
       return {
         data: result,
         error: null
       };
     } catch (err) {
       console.error(`Error inserting into ${this.table}:`, err);
+      
+      this._data = null;
+      this._error = err instanceof Error ? err : new Error(String(err));
+      
       return {
         data: null,
         error: err instanceof Error ? err : new Error(String(err))
@@ -148,12 +179,19 @@ export class D1Database {
         this.token || undefined
       );
       
+      this._data = result;
+      this._error = null;
+      
       return {
         data: result,
         error: null
       };
     } catch (err) {
       console.error(`Error updating ${this.table}:`, err);
+      
+      this._data = null;
+      this._error = err instanceof Error ? err : new Error(String(err));
+      
       return {
         data: null,
         error: err instanceof Error ? err : new Error(String(err))
@@ -180,12 +218,19 @@ export class D1Database {
         this.token || undefined
       );
       
+      this._data = { count };
+      this._error = null;
+      
       return {
         data: { count },
         error: null
       };
     } catch (err) {
       console.error(`Error deleting from ${this.table}:`, err);
+      
+      this._data = null;
+      this._error = err instanceof Error ? err : new Error(String(err));
+      
       return {
         data: null,
         error: err instanceof Error ? err : new Error(String(err))
@@ -210,12 +255,18 @@ export class D1Database {
           throw new Error('No rows returned');
         }
         
+        this._data = result;
+        this._error = null;
+        
         return {
           data: result,
           error: null
         };
       } else {
         const results = await d1Worker.query(sql, { params: whereParams }, this.token || undefined);
+        
+        this._data = results;
+        this._error = null;
         
         return {
           data: results,
@@ -224,6 +275,10 @@ export class D1Database {
       }
     } catch (err) {
       console.error(`Error executing query on ${this.table}:`, err);
+      
+      this._data = null;
+      this._error = err instanceof Error ? err : new Error(String(err));
+      
       return {
         data: null,
         error: err instanceof Error ? err : new Error(String(err))
@@ -253,7 +308,7 @@ export class D1Database {
 }
 
 /**
- * D1 database client to replace Supabase
+ * D1 database client with Supabase-like interface for compatibility
  */
 export const d1 = {
   from: (table: string) => new D1Database(table),
@@ -270,11 +325,17 @@ export const d1 = {
       download: async () => ({ data: null, error: new Error('Not implemented') })
     })
   },
-  rpc: async () => ({ data: null, error: new Error('Not implemented') }),
-  channel: () => ({
-    on: () => ({}),
-    subscribe: () => ({})
-  }),
+  rpc: async (functionName: string, params = {}) => {
+    console.warn(`RPC function "${functionName}" called with params:`, params);
+    return { data: null, error: new Error(`RPC not implemented: ${functionName}`) };
+  },
+  channel: (channelName: string) => {
+    console.warn(`Channel "${channelName}" requested, but channels are not supported`);
+    return {
+      on: () => ({}),
+      subscribe: () => ({})
+    };
+  },
   removeChannel: () => {}
 };
 

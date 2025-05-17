@@ -1,6 +1,6 @@
-
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 import type { UserProfile } from '@/modules/auth/types';
+import { EnhancedD1QueryBuilder } from '@/lib/cloudflare/d1Worker';
 
 /**
  * Cloudflare D1 database adapter for the Animorphs app
@@ -18,8 +18,21 @@ export class D1Database {
     this.token = token;
   }
 
+  // Add the 'from' method for compatibility with Supabase-like queries
+  from<T = any>(table: string): EnhancedD1QueryBuilder<T> {
+    return d1Worker.from<T>(table, this.token || undefined);
+  }
+
   async executeQuery(sql: string, params: any[] = []) {
     return await d1Worker.query(sql, { params }, this.token || undefined);
+  }
+
+  async query<T = any>(sql: string, options: { params?: any[] } = {}): Promise<T[]> {
+    return await d1Worker.query<T>(sql, { params: options.params || [] }, this.token || undefined);
+  }
+
+  async execute(sql: string, params: any[] = []): Promise<number> {
+    return await d1Worker.execute(sql, { params }, this.token || undefined);
   }
 
   async getProfile(userId: string) {
@@ -98,7 +111,7 @@ export class D1Database {
     }
   }
 
-  async getSongs() {
+  async getAllSongs() {
     try {
       return await d1Worker.query(
         'SELECT * FROM songs',
@@ -106,8 +119,21 @@ export class D1Database {
         this.token || undefined
       );
     } catch (err) {
-      console.error('Failed to get songs:', err);
+      console.error('Failed to get all songs:', err);
       return [];
+    }
+  }
+
+  async getMusicSubscription(userId: string) {
+    try {
+      return await d1Worker.getOne(
+        'SELECT * FROM music_subscriptions WHERE user_id = ? ORDER BY end_date DESC LIMIT 1', 
+        { params: [userId] },
+        this.token || undefined
+      );
+    } catch (err) {
+      console.error('Failed to get music subscription:', err);
+      return null;
     }
   }
 
@@ -162,4 +188,5 @@ export const d1 = d1Database; // Alias for compatibility
 // Helper function to initialize D1 database with auth token
 export function initD1Database(token: string) {
   d1Database.setToken(token);
+  d1.setToken(token); // Also set the token on the alias
 }

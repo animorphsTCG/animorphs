@@ -1,17 +1,4 @@
 
-export interface Session {
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
-  user: User;
-}
-
-export interface User {
-  id: string;
-  email?: string;
-  displayName?: string;
-}
-
 export interface UserProfile {
   id: string;
   username: string;
@@ -19,29 +6,51 @@ export interface UserProfile {
   name?: string;
   surname?: string;
   country?: string;
-  created_at: string;
-  has_paid?: boolean;
-  is_admin?: boolean;
-  bio?: string;
-  favorite_animorph?: string;
-  favorite_battle_mode?: string;
-  online_times_gmt2?: string;
-  playing_times?: string;
+  created_at?: string;
+  updated_at?: string;
+  is_admin: boolean;
+  music_unlocked: boolean;
   profile_image_url?: string;
-  mp?: number;
-  ai_points?: number;
-  lbp?: number;
-  digi?: number;
-  gold?: number;
-  music_unlocked?: boolean;
-  music_subscription?: {
-    subscription_type: string;
-    end_date: string;
-  } | null;
 }
 
-export interface WebAuthnCredential {
+export interface PaymentInfo {
+  has_paid: boolean;
+  payment_date?: string;
+  payment_method?: string;
+  transaction_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  id?: string;
+}
+
+export interface MusicSubscription {
   id: string;
-  publicKey: string;
-  algorithm: string;
+  user_id: string;
+  subscription_type: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  displayName?: string;
+  email?: string;
+  profile?: UserProfile;
+  paymentInfo?: PaymentInfo;
+  musicSubscription?: MusicSubscription;
+}
+
+export interface AuthToken {
+  access_token: string;
+  refresh_token?: string;
+  expires_at?: number;
+}
+
+export interface AuthState {
+  user: User | null;
+  token: AuthToken | null;
+  loading: boolean;
+  error: Error | null;
 }

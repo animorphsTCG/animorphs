@@ -77,14 +77,14 @@ export async function updateUserPaymentStatus(
            transaction_id = ?, 
            updated_at = ?
        WHERE id = ?`,
-      [
+      { params: [
         1, // true for SQLite
         now,
         paymentDetails.method,
         paymentDetails.transactionId || null,
         now,
         profile.id
-      ]
+      ] }
     );
 
     return true;

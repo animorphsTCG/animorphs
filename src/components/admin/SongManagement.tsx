@@ -4,16 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { d1Database } from '@/lib/d1Database';
-import { useD1Songs } from '@/hooks/useD1Songs';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
+import { useAuth } from '@/modules/auth';
 import { useAdmin } from '@/modules/admin';
 import { Pencil, Trash, Save, X, PlusCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 
 export function SongManagement() {
-  const { songs, isLoading, error } = useD1Songs();
+  const { token } = useAuth();
   const { isAdmin } = useAdmin();
   const { toast } = useToast();
+  const [songs, setSongs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [editingSong, setEditingSong] = useState<string | null>(null);
   const [songData, setSongData] = useState<Record<string, any>>({});
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -23,6 +26,34 @@ export function SongManagement() {
     preview_start_seconds: 0,
     preview_duration_seconds: 30
   });
+  
+  // Load songs
+  useEffect(() => {
+    const fetchSongs = async () => {
+      if (!token?.access_token) {
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        setIsLoading(true);
+        const result = await d1Worker.query(
+          'SELECT * FROM songs ORDER BY title ASC',
+          {},
+          token.access_token
+        );
+        setSongs(result || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error loading songs:', err);
+        setError(err instanceof Error ? err : new Error('Failed to load songs'));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchSongs();
+  }, [token]);
   
   // Reset editing state when songs change
   useEffect(() => {
@@ -63,9 +94,24 @@ export function SongManagement() {
   
   const handleSaveEdit = async (songId: string) => {
     try {
-      await d1Database.from('songs')
-        .update(songData)
-        .eq('id', songId);
+      await d1Worker.execute(
+        `UPDATE songs 
+         SET title = ?, youtube_url = ?, preview_start_seconds = ?, preview_duration_seconds = ? 
+         WHERE id = ?`,
+        { params: [
+          songData.title, 
+          songData.youtube_url, 
+          songData.preview_start_seconds, 
+          songData.preview_duration_seconds, 
+          songId
+        ] },
+        token?.access_token
+      );
+      
+      // Update local state
+      setSongs(prev => prev.map(song => 
+        song.id === songId ? { ...song, ...songData } : song
+      ));
       
       toast({
         title: 'Song Updated',
@@ -73,7 +119,6 @@ export function SongManagement() {
       });
       
       setEditingSong(null);
-      // In a real implementation, we would refresh the songs list here
     } catch (err) {
       toast({
         title: 'Error',
@@ -87,15 +132,19 @@ export function SongManagement() {
     if (!confirm('Are you sure you want to delete this song?')) return;
     
     try {
-      await d1Database.from('songs')
-        .delete()
-        .eq('id', songId);
+      await d1Worker.execute(
+        'DELETE FROM songs WHERE id = ?',
+        { params: [songId] },
+        token?.access_token
+      );
+      
+      // Update local state
+      setSongs(prev => prev.filter(song => song.id !== songId));
       
       toast({
         title: 'Song Deleted',
         description: 'The song has been permanently deleted.'
       });
-      // In a real implementation, we would refresh the songs list here
     } catch (err) {
       toast({
         title: 'Error',
@@ -116,7 +165,27 @@ export function SongManagement() {
         return;
       }
       
-      await d1Database.from('songs').insert(newSong);
+      const id = crypto.randomUUID();
+      
+      await d1Worker.execute(
+        `INSERT INTO songs (id, title, youtube_url, preview_start_seconds, preview_duration_seconds, created_at)
+         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        { params: [
+          id,
+          newSong.title,
+          newSong.youtube_url,
+          newSong.preview_start_seconds,
+          newSong.preview_duration_seconds
+        ] },
+        token?.access_token
+      );
+      
+      // Update local state
+      setSongs(prev => [...prev, { 
+        id, 
+        ...newSong,
+        created_at: new Date().toISOString()
+      }]);
       
       toast({
         title: 'Song Added',
@@ -130,7 +199,6 @@ export function SongManagement() {
         preview_start_seconds: 0,
         preview_duration_seconds: 30
       });
-      // In a real implementation, we would refresh the songs list here
     } catch (err) {
       toast({
         title: 'Error',

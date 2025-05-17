@@ -1,119 +1,144 @@
 
 import React, { useState, useEffect } from 'react';
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
-import { useAuth } from "@/modules/auth";
-import { d1Worker } from "@/lib/cloudflare/d1Worker";
-import { toast } from "@/components/ui/use-toast";
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import { Volume2, VolumeX } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/modules/auth';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
 
-const SettingsControls: React.FC = () => {
+interface MusicSettings {
+  volume_level: number;
+  music_enabled: boolean;
+}
+
+interface SettingsControlsProps {
+  onSettingsChange?: (settings: MusicSettings) => void;
+}
+
+export function SettingsControls({ onSettingsChange }: SettingsControlsProps) {
   const { user, token } = useAuth();
-  const [volume, setVolume] = useState(50);
-  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [volume, setVolume] = useState(0.5);
+  const [enabled, setEnabled] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      fetchSettings();
-    }
-  }, [user]);
-
-  const fetchSettings = async () => {
-    if (!user || !token?.access_token) return;
-
-    try {
-      // Fetch music settings from D1
-      const settings = await d1Worker.getOne(
-        'SELECT * FROM user_music_settings WHERE user_id = ?',
-        { params: [user.id] },
-        token.access_token
-      );
-
-      if (settings) {
-        setVolume(settings.volume_level * 100);
-        setMusicEnabled(settings.music_enabled);
+    const fetchSettings = async () => {
+      if (!user?.id || !token?.access_token) {
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error("Error fetching music settings:", err);
-    }
-  };
 
-  const updateSettings = async (newVolume?: number, newEnabled?: boolean) => {
-    if (!user || !token?.access_token) return;
+      try {
+        setLoading(true);
+        const result = await d1Worker.getOne<MusicSettings>(
+          'SELECT * FROM user_music_settings WHERE user_id = ?',
+          { params: [user.id] },
+          token.access_token
+        );
+
+        if (result) {
+          setVolume(result.volume_level);
+          setEnabled(Boolean(result.music_enabled));
+        }
+      } catch (error) {
+        console.error('Error fetching music settings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, [user, token]);
+
+  useEffect(() => {
+    if (onSettingsChange) {
+      onSettingsChange({ volume_level: volume, music_enabled: enabled });
+    }
+  }, [volume, enabled, onSettingsChange]);
+
+  const updateSettings = async () => {
+    if (!user?.id || !token?.access_token) return;
 
     try {
-      const volumeToSave = (newVolume ?? volume) / 100;
-      const enabledToSave = newEnabled ?? musicEnabled;
-
-      // Check if settings exist
-      const existingSettings = await d1Worker.getOne(
-        'SELECT * FROM user_music_settings WHERE user_id = ?',
+      const existing = await d1Worker.getOne(
+        'SELECT id FROM user_music_settings WHERE user_id = ?',
         { params: [user.id] },
         token.access_token
       );
 
-      if (!existingSettings) {
-        // Create new settings
-        await d1Worker.insert(
-          'user_music_settings',
-          {
-            user_id: user.id,
-            volume_level: volumeToSave,
-            music_enabled: enabledToSave
-          },
-          '',
+      if (existing) {
+        await d1Worker.execute(
+          `UPDATE user_music_settings 
+           SET volume_level = ?, music_enabled = ? 
+           WHERE user_id = ?`,
+          { params: [volume, enabled ? 1 : 0, user.id] },
           token.access_token
         );
       } else {
-        // Update existing settings
-        await d1Worker.update(
-          'user_music_settings',
-          {
-            volume_level: volumeToSave,
-            music_enabled: enabledToSave
-          },
-          'user_id = ?',
-          [user.id],
-          '',
+        const id = crypto.randomUUID();
+        await d1Worker.execute(
+          `INSERT INTO user_music_settings (id, user_id, volume_level, music_enabled) 
+           VALUES (?, ?, ?, ?)`,
+          { params: [id, user.id, volume, enabled ? 1 : 0] },
           token.access_token
         );
       }
-    } catch (err) {
-      console.error("Error updating music settings:", err);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update settings",
-      });
+    } catch (error) {
+      console.error('Error saving music settings:', error);
     }
   };
 
+  const handleVolumeChange = (value: number[]) => {
+    const newVolume = value[0];
+    setVolume(newVolume);
+    updateSettings();
+  };
+
+  const handleToggle = (checked: boolean) => {
+    setEnabled(checked);
+    updateSettings();
+  };
+
+  if (loading) {
+    return <div className="text-center py-2">Loading settings...</div>;
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <span>Music Enabled</span>
-        <Switch
-          checked={musicEnabled}
-          onCheckedChange={(checked) => {
-            setMusicEnabled(checked);
-            updateSettings(undefined, checked);
-          }}
-        />
-      </div>
+    <Card className="border-none shadow-none">
+      <CardContent className="p-0 space-y-4">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="music-toggle" className="font-medium">
+            Music
+          </Label>
+          <Switch
+            id="music-toggle"
+            checked={enabled}
+            onCheckedChange={handleToggle}
+          />
+        </div>
 
-      <div>
-        <label className="block mb-2">Volume</label>
-        <Slider
-          value={[volume]}
-          max={100}
-          step={1}
-          onValueChange={(value) => {
-            setVolume(value[0]);
-            updateSettings(value[0]);
-          }}
-        />
-      </div>
-    </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="volume-slider" className="flex items-center gap-2">
+              {enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              <span>Volume</span>
+            </Label>
+            <span className="text-sm text-muted-foreground w-10 text-right">
+              {Math.round(volume * 100)}%
+            </span>
+          </div>
+          <Slider
+            id="volume-slider"
+            defaultValue={[volume]}
+            max={1}
+            step={0.01}
+            disabled={!enabled}
+            onValueChange={handleVolumeChange}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
-};
-
-export default SettingsControls;
+}

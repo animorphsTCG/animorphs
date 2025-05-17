@@ -1,18 +1,22 @@
+
 import { useState, useEffect } from 'react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, CheckCircle, XCircle, Search, BadgeCheck } from 'lucide-react';
-import { d1Database } from '@/lib/d1Database';
-import { toast } from '@/components/ui/use-toast';
-import { UserProfile } from '@/types/user';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
+import { useToast } from '@/components/ui/use-toast';
+import { UserProfile } from '@/modules/auth/types';
+import { useAuth } from '@/modules/auth';
 
 export const UserManagement = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [processingUser, setProcessingUser] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { token } = useAuth();
 
   useEffect(() => {
     loadUsers();
@@ -22,17 +26,14 @@ export const UserManagement = () => {
     try {
       setLoading(true);
       
-      // Use our updated d1Database API
-      const result = await d1Database
-        .from<UserProfile>('profiles')
-        .order('created_at', 'desc')
-        .get();
+      // Use d1Worker directly
+      const result = await d1Worker.query<UserProfile>(
+        'SELECT * FROM profiles ORDER BY username ASC',
+        {},
+        token?.access_token
+      );
       
-      if (result.error) {
-        throw result.error;
-      }
-      
-      setUsers(result.data);
+      setUsers(result || []);
     } catch (error) {
       console.error('Error loading users:', error);
       toast({
@@ -49,9 +50,10 @@ export const UserManagement = () => {
     try {
       setLoading(true);
       
-      const result = await d1Database.query<UserProfile>(
+      const result = await d1Worker.query<UserProfile>(
         `SELECT * FROM profiles WHERE username LIKE ? OR email LIKE ?`,
-        { params: [`%${searchTerm}%`, `%${searchTerm}%`] }
+        { params: [`%${searchTerm}%`, `%${searchTerm}%`] },
+        token?.access_token
       );
       
       setUsers(result || []);
@@ -71,23 +73,22 @@ export const UserManagement = () => {
     setProcessingUser(userId);
     
     try {
-      const newStatus = !currentStatus;
-      
-      await d1Database.execute(
+      await d1Worker.execute(
         `UPDATE profiles SET is_admin = ? WHERE id = ?`,
-        [newStatus ? 1 : 0, userId]
+        { params: [currentStatus ? 0 : 1, userId] },
+        token?.access_token
       );
       
       // Update local state
       setUsers(prevUsers =>
         prevUsers.map(user =>
-          user.id === userId ? { ...user, is_admin: newStatus } : user
+          user.id === userId ? { ...user, is_admin: !currentStatus } : user
         )
       );
       
       toast({
         title: 'User Updated',
-        description: `Admin status toggled ${newStatus ? 'on' : 'off'}`,
+        description: `Admin status toggled ${!currentStatus ? 'on' : 'off'}`,
       });
     } catch (error) {
       console.error('Error toggling admin status:', error);

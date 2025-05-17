@@ -1,29 +1,10 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth';
 import { d1Database } from '@/lib/d1Database';
 import { createChannelWithCallback } from '@/lib/channel';
 import { toast } from '@/components/ui/use-toast';
-
-// Type definitions for lobby data structures
-interface Lobby {
-  id: string;
-  name: string;
-  created_by: string;
-  created_at: string;
-  battle_type: string;
-  status: 'waiting' | 'in_progress' | 'completed';
-  max_players: number;
-  is_public: boolean;
-}
-
-interface Participant {
-  id: string;
-  lobby_id: string;
-  user_id: string;
-  player_number: number;
-  username?: string;
-  profile_image_url?: string;
-}
+import { BattleLobbyConfig, Lobby, Participant } from './types';
 
 export const useBattleLobby = (lobbyId?: string) => {
   const { user, token } = useAuth();
@@ -31,15 +12,26 @@ export const useBattleLobby = (lobbyId?: string) => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isCreatingLobby, setIsCreatingLobby] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isHost, setIsHost] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [isLeavingLobby, setIsLeavingLobby] = useState(false);
+  const [battleStarted, setBattleStarted] = useState(false);
+  
+  // For compatibility with old code using these properties
+  const lobbyData = lobby;
+  const lobbyMembers = participants;
   
   // Check if user is lobby owner
   useEffect(() => {
     if (lobby && user) {
       setIsOwner(lobby.created_by === user.id);
+      setIsHost(lobby.created_by === user.id);
     } else {
       setIsOwner(false);
+      setIsHost(false);
     }
   }, [lobby, user]);
   
@@ -61,15 +53,15 @@ export const useBattleLobby = (lobbyId?: string) => {
         throw new Error('Lobby not found');
       }
       
-      setLobby(lobbyResult.data[0]);
+      setLobby(lobbyResult.data);
       
       // Check if lobby exists and isn't completed
-      if (!lobbyResult.data[0]) {
+      if (!lobbyResult.data) {
         setError('Lobby not found');
         return;
       }
       
-      if (lobbyResult.data[0].status === 'completed') {
+      if (lobbyResult.data.status === 'completed') {
         setError('This lobby has ended');
         return;
       }
@@ -117,6 +109,76 @@ export const useBattleLobby = (lobbyId?: string) => {
     };
   }, [lobbyId, user, loadLobby]);
   
+  // Create new lobby function
+  const createLobby = useCallback(async (config: BattleLobbyConfig) => {
+    if (!user || !token?.access_token) return null;
+    
+    try {
+      setIsCreatingLobby(true);
+      
+      // Generate a unique ID for the lobby
+      const newLobbyId = crypto.randomUUID();
+      
+      // Create the lobby
+      await d1Database.query(`
+        INSERT INTO battle_lobbies (
+          id, 
+          name, 
+          created_by, 
+          battle_type, 
+          max_players, 
+          is_public,
+          status,
+          created_at
+        ) 
+        VALUES (?, ?, ?, ?, ?, ?, 'waiting', CURRENT_TIMESTAMP)
+      `, {
+        params: [
+          newLobbyId,
+          config.name,
+          user.id,
+          config.battleType,
+          config.maxPlayers,
+          config.isPublic ? 1 : 0
+        ]
+      });
+      
+      // Add creator as first participant
+      await d1Database.query(`
+        INSERT INTO lobby_participants (
+          id,
+          lobby_id, 
+          user_id, 
+          player_number
+        )
+        VALUES (?, ?, ?, 1)
+      `, {
+        params: [
+          crypto.randomUUID(),
+          newLobbyId,
+          user.id
+        ]
+      });
+      
+      toast({
+        title: "Lobby Created",
+        description: `${config.name} lobby is ready`,
+      });
+      
+      return newLobbyId;
+    } catch (err) {
+      console.error('Error creating lobby:', err);
+      toast({
+        title: "Error",
+        description: "Failed to create lobby",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setIsCreatingLobby(false);
+    }
+  }, [user, token]);
+  
   // Join lobby function
   const joinLobby = useCallback(async () => {
     if (!lobbyId || !user || !token?.access_token) return false;
@@ -147,10 +209,11 @@ export const useBattleLobby = (lobbyId?: string) => {
       
       // Join the lobby
       await d1Database.query(`
-        INSERT INTO lobby_participants (lobby_id, user_id, player_number)
-        VALUES (?, ?, ?)
+        INSERT INTO lobby_participants (id, lobby_id, user_id, player_number)
+        VALUES (?, ?, ?, ?)
       `, {
         params: [
+          crypto.randomUUID(),
           lobbyId,
           user.id,
           participants.length + 1
@@ -185,7 +248,7 @@ export const useBattleLobby = (lobbyId?: string) => {
     if (!lobbyId || !user || !token?.access_token) return false;
     
     try {
-      setIsUpdating(true);
+      setIsLeavingLobby(true);
       
       // Remove participant
       await d1Database.query(`
@@ -210,7 +273,7 @@ export const useBattleLobby = (lobbyId?: string) => {
       });
       return false;
     } finally {
-      setIsUpdating(false);
+      setIsLeavingLobby(false);
     }
   }, [lobbyId, user, token]);
   
@@ -268,14 +331,16 @@ export const useBattleLobby = (lobbyId?: string) => {
         const participant = participants[i];
         await d1Database.query(`
           INSERT INTO battle_participants (
+            id,
             battle_id,
             user_id,
             player_number,
             rounds_won
           )
-          VALUES (?, ?, ?, 0)
+          VALUES (?, ?, ?, ?, 0)
         `, {
           params: [
+            crypto.randomUUID(),
             battleId,
             participant.user_id,
             participant.player_number
@@ -288,6 +353,8 @@ export const useBattleLobby = (lobbyId?: string) => {
         title: "Battle Started",
         description: "The battle has begun!",
       });
+      
+      setBattleStarted(true);
       
       return battleId;
     } catch (err) {
@@ -469,7 +536,17 @@ export const useBattleLobby = (lobbyId?: string) => {
     kickPlayer,
     updateLobbySettings,
     deleteLobby,
-    refreshLobby: loadLobby
+    refreshLobby: loadLobby,
+    createLobby,
+    isCreatingLobby,
+    
+    // For backward compatibility
+    lobbyData,
+    lobbyMembers,
+    isHost,
+    isReady,
+    isLeavingLobby,
+    battleStarted,
   };
 };
 

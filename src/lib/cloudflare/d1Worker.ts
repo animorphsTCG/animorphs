@@ -176,7 +176,20 @@ class D1WorkerClient {
 // Export a singleton instance
 export const d1Worker = new D1WorkerClient();
 
-// Add the compatibility methods for Supabase-like querying
+// Add the from method and extractData method to d1Worker
+d1Worker.from = function<T = any>(table: string, authToken?: string): EnhancedD1QueryBuilder<T> {
+  return new EnhancedD1QueryBuilder<T>(`SELECT * FROM ${table}`, {}, authToken);
+};
+
+d1Worker.extractData = function<T = any>(result: { data: T | null, error: Error | null }): T | null {
+  if ('error' in result && result.error) {
+    console.error('D1 query error:', result.error);
+    return null;
+  }
+  return result.data;
+};
+
+// Export the enhanced query builder class
 export class EnhancedD1QueryBuilder<T = any> {
   private sql: string;
   private options: D1QueryOptions;
@@ -344,6 +357,10 @@ export class EnhancedD1QueryBuilder<T = any> {
     return this;
   }
   
+  async get(): Promise<{ data: T[], error: null } | { data: null, error: Error }> {
+    return this.execute();
+  }
+  
   async execute(): Promise<{ data: T[], error: null } | { data: null, error: Error }> {
     try {
       // Add limit and offset to SQL if specified
@@ -360,7 +377,7 @@ export class EnhancedD1QueryBuilder<T = any> {
       const results = await d1Worker.query<T>(finalSql, { params: this.options.params }, this.authToken);
       return { data: results, error: null };
     } catch (error) {
-      return { data: null, error: error as Error };
+      return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
     }
   }
   
@@ -372,13 +389,13 @@ export class EnhancedD1QueryBuilder<T = any> {
         return { data: null, error };
       }
       
-      if (data.length === 0) {
+      if (!data || data.length === 0) {
         return { data: null, error: null };
       }
       
       return { data: data[0], error: null };
     } catch (error) {
-      return { data: null, error: error as Error };
+      return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
     }
   }
   
@@ -386,17 +403,3 @@ export class EnhancedD1QueryBuilder<T = any> {
     return this.single();
   }
 }
-
-// Enhance d1Worker with compatibility methods
-d1Worker.from = function<T = any>(table: string, authToken?: string): EnhancedD1QueryBuilder<T> {
-  return new EnhancedD1QueryBuilder<T>(`SELECT * FROM ${table}`, {}, authToken);
-};
-
-// Add helper methods
-d1Worker.extractData = function<T = any>(result: { data: T | null, error: null } | { data: null, error: Error }): T | null {
-  if ('error' in result && result.error) {
-    console.error('D1 query error:', result.error);
-    return null;
-  }
-  return result.data;
-};

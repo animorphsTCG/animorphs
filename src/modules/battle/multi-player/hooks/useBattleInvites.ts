@@ -1,178 +1,414 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth';
-import { createChannel } from '@/lib/channel';
-import { d1Worker } from '@/lib/cloudflare/d1Worker';
-import { useToast } from '@/hooks/use-toast';
+import { d1Database } from '@/lib/d1Database';
+import { createChannelWithCallback } from '@/lib/channel';
+import { toast } from '@/components/ui/use-toast';
 
-export interface BattleInvite {
+interface BattleInvite {
   id: string;
-  lobby_id: string;
-  user_id: string;
-  invited_by: string;
-  battle_type: string;
-  lobby_name: string;
-  is_accepted: boolean;
-  is_rejected: boolean;
-  created_at: string;
-  responded_at: string | null;
+  from_user_id: string;
   from_username?: string;
+  to_user_id: string;
+  created_at: string;
+  expires_at: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  lobby_id?: string;
 }
 
-export function useBattleInvites() {
+export const useBattleInvites = () => {
   const { user, token } = useAuth();
-  const [invites, setInvites] = useState<BattleInvite[]>([]);
+  const [sentInvites, setSentInvites] = useState<BattleInvite[]>([]);
+  const [receivedInvites, setReceivedInvites] = useState<BattleInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
   
-  useEffect(() => {
+  // Load invites
+  const loadInvites = useCallback(async () => {
     if (!user?.id || !token?.access_token) {
+      setSentInvites([]);
+      setReceivedInvites([]);
       setLoading(false);
       return;
     }
     
-    let channel: any;
-    let subscription: any;
-    
-    const loadInvites = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch invites from D1
-        const pendingInvites = await d1Worker.query<BattleInvite>(
-          `SELECT bi.*, p.username as from_username
-           FROM battle_invites bi
-           JOIN profiles p ON bi.invited_by = p.id
-           WHERE bi.user_id = ? AND bi.is_accepted = 0 AND bi.is_rejected = 0`,
-          { params: [user.id] },
-          token.access_token
-        );
-        
-        setInvites(pendingInvites);
-        
-        // Set up channel for real-time invites
-        channel = createChannel(`invites:${user.id}`, user.id);
-        subscription = channel.subscribe();
-        
-      } catch (err: any) {
-        console.error("Error loading battle invites:", err);
-        setError(err.message || "Failed to load battle invites");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadInvites();
-    
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe();
-      }
+    try {
+      setLoading(true);
+      setError(null);
       
-      if (channel) {
-        channel.unsubscribe();
-      }
-    };
+      // Get sent invites
+      const sentResult = await d1Database.query(`
+        SELECT i.*, p.username as from_username
+        FROM battle_invites i
+        JOIN profiles p ON i.from_user_id = p.id
+        WHERE i.from_user_id = ? AND i.status = 'pending'
+      `, { params: [user.id] });
+      
+      setSentInvites(sentResult || []);
+      
+      // Get received invites
+      const receivedResult = await d1Database.query(`
+        SELECT i.*, p.username as from_username
+        FROM battle_invites i
+        JOIN profiles p ON i.from_user_id = p.id
+        WHERE i.to_user_id = ? AND i.status = 'pending'
+      `, { params: [user.id] });
+      
+      setReceivedInvites(receivedResult || []);
+      
+    } catch (err) {
+      console.error('Error loading battle invites:', err);
+      setError('Failed to load invites');
+    } finally {
+      setLoading(false);
+    }
   }, [user, token]);
   
-  const acceptInvite = async (inviteId: string) => {
-    if (!user?.id || !token?.access_token) {
+  // Load invites on mount and when user changes
+  useEffect(() => {
+    loadInvites();
+  }, [loadInvites]);
+  
+  // Setup subscription for invite changes
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const { subscription: sentSubscription } = createChannelWithCallback(
+      `battle_invites:${user.id}:sent`,
+      'update',
+      () => loadInvites()
+    );
+    
+    const { subscription: receivedSubscription } = createChannelWithCallback(
+      `battle_invites:${user.id}:received`,
+      'update',
+      () => loadInvites()
+    );
+    
+    return () => {
+      if (sentSubscription) sentSubscription.unsubscribe();
+      if (receivedSubscription) receivedSubscription.unsubscribe();
+    };
+  }, [user, loadInvites]);
+  
+  // Send invite function
+  const sendInvite = useCallback(async (toUserId: string): Promise<string | null> => {
+    if (!user?.id || !token?.access_token) return null;
+    
+    if (user.id === toUserId) {
       toast({
         title: "Error",
-        description: "You must be logged in to accept an invite",
+        description: "You cannot invite yourself",
         variant: "destructive"
       });
       return null;
     }
     
     try {
-      // Update invite status in D1
-      await d1Worker.execute(
-        `UPDATE battle_invites 
-         SET is_accepted = 1, responded_at = datetime('now') 
-         WHERE id = ? AND user_id = ?`,
-        { params: [inviteId, user.id] },
-        token.access_token
+      // Check if we already have a pending invite to this user
+      const existingInvite = sentInvites.find(invite => 
+        invite.to_user_id === toUserId && invite.status === 'pending'
       );
       
-      // Get the updated invite
-      const updatedInvite = await d1Worker.getOne<BattleInvite>(
-        `SELECT * FROM battle_invites WHERE id = ?`,
-        { params: [inviteId] },
-        token.access_token
-      );
-      
-      if (!updatedInvite) {
-        throw new Error("Invite not found");
+      if (existingInvite) {
+        toast({
+          title: "Invite Exists",
+          description: "You already sent an invite to this user",
+          variant: "destructive"
+        });
+        return null;
       }
       
-      // Remove from local state
-      setInvites(prev => prev.filter(invite => invite.id !== inviteId));
+      // Generate a unique ID for the invite
+      const inviteId = crypto.randomUUID();
+      
+      // Set expiry time (30 minutes from now)
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+      
+      // Insert the invite
+      await d1Database.query(`
+        INSERT INTO battle_invites (
+          id,
+          from_user_id,
+          to_user_id,
+          status,
+          created_at,
+          expires_at
+        )
+        VALUES (?, ?, ?, 'pending', CURRENT_TIMESTAMP, ?)
+      `, {
+        params: [
+          inviteId,
+          user.id,
+          toUserId,
+          expiresAt
+        ]
+      });
+      
+      // Refresh invites
+      await loadInvites();
+      
+      toast({
+        title: "Invite Sent",
+        description: "Battle invite has been sent",
+      });
+      
+      return inviteId;
+    } catch (err) {
+      console.error('Error sending battle invite:', err);
+      
+      toast({
+        title: "Error",
+        description: "Failed to send invite",
+        variant: "destructive"
+      });
+      
+      return null;
+    }
+  }, [user, token, sentInvites, loadInvites]);
+  
+  // Accept invite function
+  const acceptInvite = useCallback(async (inviteId: string): Promise<string | null> => {
+    if (!user?.id || !token?.access_token) return null;
+    
+    try {
+      // Find the invite
+      const invite = receivedInvites.find(i => i.id === inviteId);
+      
+      if (!invite) {
+        toast({
+          title: "Invalid Invite",
+          description: "The invite could not be found",
+          variant: "destructive"
+        });
+        return null;
+      }
+      
+      // Create a battle lobby
+      const lobbyId = crypto.randomUUID();
+      
+      await d1Database.query(`
+        INSERT INTO battle_lobbies (
+          id,
+          name,
+          created_by,
+          battle_type,
+          max_players,
+          is_public,
+          status,
+          created_at
+        )
+        VALUES (?, ?, ?, '1v1', 2, 0, 'waiting', CURRENT_TIMESTAMP)
+      `, {
+        params: [
+          lobbyId,
+          `${invite.from_username}'s Battle`,
+          invite.from_user_id,
+          
+        ]
+      });
+      
+      // Add the inviter to the lobby
+      await d1Database.query(`
+        INSERT INTO lobby_participants (
+          id,
+          lobby_id,
+          user_id,
+          player_number
+        )
+        VALUES (?, ?, ?, 1)
+      `, {
+        params: [
+          crypto.randomUUID(),
+          lobbyId,
+          invite.from_user_id
+        ]
+      });
+      
+      // Add the invitee (current user) to the lobby
+      await d1Database.query(`
+        INSERT INTO lobby_participants (
+          id,
+          lobby_id,
+          user_id,
+          player_number
+        )
+        VALUES (?, ?, ?, 2)
+      `, {
+        params: [
+          crypto.randomUUID(),
+          lobbyId,
+          user.id
+        ]
+      });
+      
+      // Update the invite status
+      await d1Database.query(`
+        UPDATE battle_invites
+        SET status = 'accepted', lobby_id = ?
+        WHERE id = ?
+      `, {
+        params: [lobbyId, inviteId]
+      });
+      
+      // Refresh invites
+      await loadInvites();
       
       toast({
         title: "Invite Accepted",
-        description: "You've joined the battle!"
+        description: "You've joined the battle lobby",
       });
       
-      return updatedInvite;
-      
-    } catch (err: any) {
-      console.error("Error accepting battle invite:", err);
+      return lobbyId;
+    } catch (err) {
+      console.error('Error accepting battle invite:', err);
       
       toast({
         title: "Error",
-        description: err.message || "Failed to accept battle invite",
+        description: "Failed to accept invite",
         variant: "destructive"
       });
       
       return null;
     }
-  };
+  }, [user, token, receivedInvites, loadInvites]);
   
-  const declineInvite = async (inviteId: string) => {
-    if (!user?.id || !token?.access_token) {
-      return false;
-    }
+  // Decline invite function
+  const declineInvite = useCallback(async (inviteId: string): Promise<boolean> => {
+    if (!user?.id || !token?.access_token) return false;
     
     try {
-      // Update invite status in D1
-      await d1Worker.execute(
-        `UPDATE battle_invites 
-         SET is_rejected = 1, responded_at = datetime('now') 
-         WHERE id = ? AND user_id = ?`,
-        { params: [inviteId, user.id] },
-        token.access_token
-      );
+      // Find the invite
+      const invite = receivedInvites.find(i => i.id === inviteId);
       
-      // Remove from local state
-      setInvites(prev => prev.filter(invite => invite.id !== inviteId));
+      if (!invite) {
+        toast({
+          title: "Invalid Invite",
+          description: "The invite could not be found",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      // Update the invite status
+      await d1Database.query(`
+        UPDATE battle_invites
+        SET status = 'declined'
+        WHERE id = ?
+      `, {
+        params: [inviteId]
+      });
+      
+      // Refresh invites
+      await loadInvites();
       
       toast({
         title: "Invite Declined",
-        description: "You've declined the battle invite"
+        description: "You've declined the battle invite",
       });
       
       return true;
-      
-    } catch (err: any) {
-      console.error("Error declining battle invite:", err);
+    } catch (err) {
+      console.error('Error declining battle invite:', err);
       
       toast({
         title: "Error",
-        description: err.message || "Failed to decline battle invite",
+        description: "Failed to decline invite",
         variant: "destructive"
       });
       
       return false;
     }
-  };
+  }, [user, token, receivedInvites, loadInvites]);
+  
+  // Cancel invite function
+  const cancelInvite = useCallback(async (inviteId: string): Promise<boolean> => {
+    if (!user?.id || !token?.access_token) return false;
+    
+    try {
+      // Find the invite
+      const invite = sentInvites.find(i => i.id === inviteId);
+      
+      if (!invite) {
+        toast({
+          title: "Invalid Invite",
+          description: "The invite could not be found",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      // Delete the invite
+      await d1Database.query(`
+        DELETE FROM battle_invites
+        WHERE id = ?
+      `, {
+        params: [inviteId]
+      });
+      
+      // Refresh invites
+      await loadInvites();
+      
+      toast({
+        title: "Invite Cancelled",
+        description: "You've cancelled the battle invite",
+      });
+      
+      return true;
+    } catch (err) {
+      console.error('Error cancelling battle invite:', err);
+      
+      toast({
+        title: "Error",
+        description: "Failed to cancel invite",
+        variant: "destructive"
+      });
+      
+      return false;
+    }
+  }, [user, token, sentInvites, loadInvites]);
+  
+  // Clean up expired invites
+  useEffect(() => {
+    const cleanupExpiredInvites = async () => {
+      if (!user?.id || !token?.access_token) return;
+      
+      try {
+        await d1Database.query(`
+          UPDATE battle_invites
+          SET status = 'expired'
+          WHERE status = 'pending' AND expires_at < CURRENT_TIMESTAMP
+        `);
+        
+        // We don't need to refresh invites here as we're just cleaning up
+      } catch (err) {
+        console.error('Error cleaning up expired invites:', err);
+      }
+    };
+    
+    // Run cleanup on mount
+    cleanupExpiredInvites();
+    
+    // Set up interval to clean up expired invites
+    const interval = setInterval(cleanupExpiredInvites, 60000); // Every minute
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [user, token]);
   
   return {
-    invites,
+    sentInvites,
+    receivedInvites,
     loading,
     error,
+    sendInvite,
     acceptInvite,
-    declineInvite
+    declineInvite,
+    cancelInvite,
+    refreshInvites: loadInvites
   };
-}
+};
+
+export default useBattleInvites;

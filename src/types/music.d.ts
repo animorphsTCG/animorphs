@@ -3,21 +3,21 @@
 export interface Song {
   id: string;
   title: string;
-  youtube_url?: string;  // Optional for R2 songs
-  r2_key?: string;       // For R2 songs
-  r2_url?: string;       // For R2 songs
-  preview_start_seconds?: number;
-  preview_duration_seconds?: number;
+  youtube_url?: string;     // Optional for R2 songs
+  r2_key?: string;          // For R2 songs
+  r2_url?: string;          // For R2 songs
+  preview_start_seconds?: number;  // Make it optional
+  preview_duration_seconds?: number;  // Make it optional
   created_at?: string;
   artist?: string;
   genre?: string;
-  name?: string;         // For R2 compatibility
-  size?: number;         // For R2 songs
-  lastModified?: string; // For R2 songs
-  url?: string;          // For R2 songs
-  contentType?: string;  // For R2 songs
-  etag?: string;         // For R2 songs
-  duration?: number;     // For R2 songs
+  name?: string;            // For R2 compatibility
+  size?: number;            // For R2 songs
+  lastModified?: string;    // For R2 songs
+  url?: string;             // For R2 songs
+  contentType?: string;     // For R2 songs
+  etag?: string;            // For R2 songs
+  duration?: number;        // For R2 songs
   metadata?: Record<string, string>; // For R2 songs
 }
 

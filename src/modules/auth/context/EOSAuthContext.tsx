@@ -1,341 +1,235 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { toast } from '@/hooks/use-toast';
-import { Session, User } from '../types';
-import { d1Worker } from '@/lib/cloudflare/d1Worker';
-import { signUpApi, resetPasswordApi, updatePasswordApi } from '@/lib/auth/authApi';
-import { UserProfile as AuthUserProfile } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { Session } from '../types';
+import { UserProfile } from '../types';
+import { toast } from '@/components/ui/use-toast';
+import { d1Database } from '@/lib/d1Database';
 
-// Define the AuthState interface
-interface AuthState {
-  user: User | null;
-  token: {access_token: string} | null;
-  userProfile: AuthUserProfile | null;
-  isLoading: boolean;
+interface AuthContextProps {
+  session: Session | null;
+  user: UserProfile | null;
+  loading: boolean;
   error: string | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  refreshToken: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-  signUp: (email: string, password: string, metadata?: any) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
+  login: (credentials: Credentials) => Promise<void>;
+  logout: () => Promise<void>;
+  authenticateAdmin: (totpCode: string) => Promise<boolean>;
 }
 
-const AuthContext = createContext<AuthState>({
-  user: null,
-  token: null,
-  userProfile: null,
-  isLoading: true,
-  error: null,
-  signIn: async () => {},
-  signOut: async () => {},
-  refreshToken: async () => {},
-  refreshProfile: async () => {},
-  signUp: async () => {},
-  resetPassword: async () => {},
-  updatePassword: async () => {},
-});
+interface Credentials {
+  email: string;
+  password?: string;
+  username?: string;
+  totp?: string;
+}
+
+const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<{access_token: string} | null>(null);
-  const [userProfile, setUserProfile] = useState<AuthUserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+interface EOSAuthProviderProps {
+  children: React.ReactNode;
+}
+
+const mapUserResponse = (data: any): UserProfile => {
+  return {
+    id: data.id,
+    username: data.username,
+    email: data.email,
+    name: data.name,
+    surname: data.surname,
+    country: data.country,
+    created_at: data.created_at,
+    has_paid: Boolean(data.has_paid),
+    is_admin: Boolean(data.is_admin),
+    music_unlocked: Boolean(data.music_unlocked || false),
+    // Add any other required fields with reasonable defaults
+    age: data.age || 0,
+    gender: data.gender || '',
+    mp: data.mp || 0,
+    ai_points: data.ai_points || 0,
+    lbp: data.lbp || 0,
+    digi: data.digi || 0,
+    gold: data.gold || 0,
+    favorite_animorph: data.favorite_animorph || '',
+    favorite_battle_mode: data.favorite_battle_mode || '',
+    online_times_gmt2: data.online_times_gmt2 || '',
+    playing_times: data.playing_times || '',
+    profile_image_url: data.profile_image_url || ''
+  };
+};
+
+export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Fetch user profile
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      if (!token?.access_token) return null;
-      
-      // Get basic profile
-      const profile = await d1Worker.getOne(
-        'SELECT * FROM profiles WHERE id = ?',
-        { params: [userId] },
-        token.access_token
-      );
-      
-      if (!profile) return null;
-      
-      // Get payment status
-      const paymentStatus = await d1Worker.getOne(
-        'SELECT * FROM payment_status WHERE user_id = ?',
-        { params: [userId] },
-        token.access_token
-      );
-      
-      // Create a valid profile object
-      const profileData: AuthUserProfile = {
-        id: profile.id,
-        username: profile.username || `User-${profile.id.substring(0, 5)}`,
-        email: profile.email || user?.email || '',
-        name: profile.name || '',
-        surname: profile.surname || '',
-        country: profile.country || '',
-        created_at: profile.created_at || new Date().toISOString(),
-        has_paid: paymentStatus ? !!paymentStatus.has_paid : false,
-        is_admin: !!profile.is_admin
-      };
-      
-      setUserProfile(profileData);
-      return profileData;
-    } catch (err) {
-      console.error("Error fetching user profile:", err);
-      return null;
-    }
-  };
-
-  const refreshProfile = async (): Promise<void> => {
-    if (user?.id && token?.access_token) {
-      await fetchUserProfile(user.id);
-    }
-  };
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for existing session
-    const checkSession = async () => {
-      try {
-        // For development/migration purposes, we're using localStorage
-        // In production, this would integrate with EOS SDK
-        const storedUser = localStorage.getItem('eos_user');
-        const storedToken = localStorage.getItem('eos_token');
-        
-        if (storedUser && storedToken) {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-          setToken({ access_token: storedToken });
-          
-          if (parsedUser.id) {
-            await fetchUserProfile(parsedUser.id);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to check session:', err);
-        setError('Failed to check authentication status');
-      } finally {
-        setIsLoading(false);
+    const storedSession = localStorage.getItem('session');
+    if (storedSession) {
+      const parsedSession: Session = JSON.parse(storedSession);
+      setSession(parsedSession);
+
+      if (parsedSession.user) {
+        setUser(mapUserResponse(parsedSession.user));
       }
-    };
-    
-    checkSession();
+    }
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // In production, this would be an actual EOS authentication call
-      // For migration purposes, we're just simulating a successful login
-      
-      // Check if a user exists with that email in D1 (mock auth)
-      const mockToken = `eos_mock_token_${Date.now()}`;
-      
-      const mockUser = {
-        id: `user_${Date.now()}`,
-        email,
-        displayName: email.split('@')[0]
-      };
-      
-      // Store in localStorage (temporary for development)
-      localStorage.setItem('eos_user', JSON.stringify(mockUser));
-      localStorage.setItem('eos_token', mockToken);
-      
-      setUser(mockUser);
-      setToken({ access_token: mockToken });
-      
-      // Create basic profile if necessary
-      await fetchUserProfile(mockUser.id);
-      
-      toast({
-        title: "Success",
-        description: "You are now signed in",
-      });
-      
-    } catch (err: any) {
-      console.error('Login failed:', err);
-      setError(err.message || 'Authentication failed');
-      
-      toast({
-        title: "Authentication failed",
-        description: err.message || 'Failed to sign in',
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+  const updateSession = (newSession: Session | null) => {
+    if (newSession) {
+      localStorage.setItem('session', JSON.stringify(newSession));
+    } else {
+      localStorage.removeItem('session');
     }
+    setSession(newSession);
   };
-  
-  const signOut = async () => {
+
+  // Fix the login flow to properly set token
+  const handleLogin = async (credentials: Credentials) => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      
-      // Clear local storage
-      localStorage.removeItem('eos_user');
-      localStorage.removeItem('eos_token');
-      
-      // Reset state
-      setUser(null);
-      setToken(null);
-      setUserProfile(null);
-      
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      const data = await response.json();
+      const newSession: Session = {
+        access_token: data.access_token,
+        token_type: data.token_type,
+        expires_in: data.expires_in,
+        expires_at: Date.now() + (data.expires_in * 1000),
+        user: data.user,
+      };
+
+      updateSession(newSession);
+      setUser(mapUserResponse(data.user));
+      navigate('/');
       toast({
-        title: "Signed out",
-        description: "You have been successfully signed out",
+        title: "Login Successful",
+        description: `Welcome, ${data.user.username}!`,
       });
     } catch (err: any) {
-      console.error('Sign out failed:', err);
-      setError(err.message || 'Failed to sign out');
-      
+      setError(err.message);
       toast({
-        title: "Error",
-        description: err.message || 'Failed to sign out',
         variant: "destructive",
+        title: "Login Failed",
+        description: err.message,
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const refreshToken = async () => {
+  const handleLogout = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      
-      // In production, this would be an actual EOS token refresh
-      // For migration purposes, we're just simulating a successful refresh
-      if (token) {
-        const newToken = `eos_refreshed_token_${Date.now()}`;
-        
-        // Update localStorage
-        localStorage.setItem('eos_token', newToken);
-        
-        // Update state
-        setToken({ access_token: newToken });
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      updateSession(null);
+      setUser(null);
+      navigate('/login');
+      toast({
+        title: "Logout Successful",
+        description: "You have been successfully logged out.",
+      });
+    } catch (err: any) {
+      setError(err.message);
+      toast({
+        variant: "destructive",
+        title: "Logout Failed",
+        description: err.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const authenticateAdmin = async (totpCode: string): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ totp: totpCode }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Admin authentication failed');
       }
+
+      const data = await response.json();
+      const adminSession: Session = {
+        access_token: data.access_token,
+        token_type: data.token_type,
+        expires_in: data.expires_in,
+        expires_at: Date.now() + (data.expires_in * 1000),
+        user: data.user,
+      };
+
+      updateSession(adminSession);
+      setUser(mapUserResponse(data.user));
+      navigate('/admin');
+      toast({
+        title: "Admin Authentication Successful",
+        description: "You have been successfully authenticated as an administrator.",
+      });
+      return true;
     } catch (err: any) {
-      console.error('Token refresh failed:', err);
-      setError(err.message || 'Failed to refresh authentication');
-      
-      // If token refresh fails, sign the user out
-      await signOut();
+      setError(err.message);
+      toast({
+        variant: "destructive",
+        title: "Admin Authentication Failed",
+        description: err.message,
+      });
+      return false;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
-  const signUp = async (email: string, password: string, metadata?: any) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // In production this would call the EOS signup API
-      // For now, we'll simulate it
-      const displayName = metadata?.name || email.split('@')[0];
-      
-      // Call the API stub
-      await signUpApi(email, password, displayName, metadata);
-      
-      toast({
-        title: "Registration successful",
-        description: "Please check your email to verify your account.",
-      });
-      
-    } catch (err: any) {
-      console.error('Registration failed:', err);
-      setError(err.message || 'Registration failed');
-      
-      toast({
-        title: "Registration failed",
-        description: err.message || 'Failed to register',
-        variant: "destructive",
-      });
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const resetPassword = async (email: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // In production this would call the EOS password reset API
-      await resetPasswordApi(email);
-      
-      toast({
-        title: "Password reset email sent",
-        description: "Please check your email to reset your password.",
-      });
-      
-    } catch (err: any) {
-      console.error('Password reset failed:', err);
-      setError(err.message || 'Password reset failed');
-      
-      toast({
-        title: "Password reset failed",
-        description: err.message || 'Failed to send password reset email',
-        variant: "destructive",
-      });
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const updatePassword = async (password: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // In production this would call the EOS password update API
-      if (user?.id) {
-        await updatePasswordApi(user.id, password);
-      } else {
-        throw new Error('User not authenticated');
-      }
-      
-      toast({
-        title: "Password updated",
-        description: "Your password has been updated successfully.",
-      });
-      
-    } catch (err: any) {
-      console.error('Password update failed:', err);
-      setError(err.message || 'Password update failed');
-      
-      toast({
-        title: "Password update failed",
-        description: err.message || 'Failed to update password',
-        variant: "destructive",
-      });
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+
+  const value: AuthContextProps = {
+    session,
+    user,
+    loading,
+    error,
+    login: handleLogin,
+    logout: handleLogout,
+    authenticateAdmin,
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        userProfile,
-        isLoading,
-        error,
-        signIn,
-        signOut,
-        refreshToken,
-        refreshProfile,
-        signUp,
-        resetPassword,
-        updatePassword
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

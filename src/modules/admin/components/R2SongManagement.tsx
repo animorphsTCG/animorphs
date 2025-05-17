@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -84,7 +83,7 @@ const R2SongManagement: React.FC = () => {
         title: "Sync Complete",
         description: `${songs.length} songs synced with the database.`
       });
-      calculateStats();
+      calculateStats(songs as unknown as R2Song[]);
     } catch (error) {
       console.error('Error syncing songs:', error);
       toast({

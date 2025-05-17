@@ -6,8 +6,8 @@ export interface Song {
   youtube_url?: string;     // Optional for R2 songs
   r2_key?: string;          // For R2 songs
   r2_url?: string;          // For R2 songs
-  preview_start_seconds?: number;  // Make it optional
-  preview_duration_seconds?: number;  // Make it optional
+  preview_start_seconds?: number;
+  preview_duration_seconds?: number;
   created_at?: string;
   artist?: string;
   genre?: string;
@@ -26,7 +26,7 @@ export interface R2Song extends Song {
   name: string;
   size: number;
   lastModified: string;
-  url: string;
+  url?: string;
   contentType: string;
   etag: string;
 }

@@ -1,3 +1,4 @@
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -20,6 +21,7 @@ export interface UserProfile {
   ai_points?: number;
   lbp_points?: number;
   digi_balance?: number;
+  displayName?: string;  // Added for compatibility with EOSVoice
 }
 
 export interface PaymentInfo {
@@ -71,4 +73,20 @@ export interface Session {
   expires_at?: number;
   refresh_token?: string;
   user?: any;
+}
+
+// AuthContext Props interface to ensure all required properties are defined
+export interface AuthContextProps {
+  session: Session | null;
+  user: UserProfile | null;
+  loading: boolean;
+  error: string | null;
+  token: AuthToken | null;
+  userProfile: UserProfile | null;
+  login: (credentials: any) => Promise<void>;
+  logout: () => Promise<void>;
+  signOut: () => Promise<void>;
+  authenticateAdmin: (totpCode: string) => Promise<boolean>;
+  refreshProfile: () => Promise<void>;
+  isLoading: boolean;
 }

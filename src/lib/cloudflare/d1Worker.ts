@@ -3,6 +3,7 @@
  * D1Worker module
  * Simple wrapper for Cloudflare D1 database calls via Worker API
  */
+import { EnhancedD1QueryBuilder, EnhancedD1QueryResult } from './d1Types';
 
 export interface D1Response<T = any> {
   results: T[];
@@ -176,7 +177,7 @@ class D1WorkerClient {
    * Create a query builder for a table
    */
   from<T = any>(table: string, authToken?: string): EnhancedD1QueryBuilder<T> {
-    return new EnhancedD1QueryBuilder<T>(`SELECT * FROM ${table}`, {}, authToken);
+    return new EnhancedD1QueryBuilderImpl<T>(`SELECT * FROM ${table}`, {}, authToken, this);
   }
   
   /**
@@ -195,15 +196,21 @@ class D1WorkerClient {
 export const d1Worker = new D1WorkerClient();
 
 // Export the enhanced query builder class
-export class EnhancedD1QueryBuilder<T = any> {
+export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuilder<T> {
   private sql: string;
   private options: D1QueryOptions;
   private authToken?: string;
+  private client: D1WorkerClient;
   
-  constructor(sql: string, options: D1QueryOptions = {}, authToken?: string) {
+  // Required properties to satisfy the interface
+  data: T[] | null = null;
+  error: Error | null = null;
+  
+  constructor(sql: string, options: D1QueryOptions = {}, authToken?: string, client: D1WorkerClient = d1Worker) {
     this.sql = sql;
     this.options = { ...options };
     this.authToken = authToken;
+    this.client = client;
   }
   
   select(columns: string | string[]): EnhancedD1QueryBuilder<T> {
@@ -213,7 +220,28 @@ export class EnhancedD1QueryBuilder<T = any> {
     return this;
   }
   
-  eq(column: string, value: any): EnhancedD1QueryBuilder<T> {
+  from(table: string): EnhancedD1QueryBuilder<T> {
+    // For chain method support
+    this.sql = this.sql.replace(/FROM\s+.+?(\s+WHERE|\s+ORDER|\s+LIMIT|\s*$)/i, `FROM ${table}$1`);
+    return this;
+  }
+  
+  where(condition: string, ...params: any[]): EnhancedD1QueryBuilder<T> {
+    // Add WHERE clause to SQL
+    if (this.sql.toLowerCase().includes('where')) {
+      this.sql += ` AND ${condition}`;
+    } else {
+      this.sql += ` WHERE ${condition}`;
+    }
+    
+    // Add params
+    this.options.params = this.options.params || [];
+    this.options.params.push(...params);
+    
+    return this;
+  }
+  
+  async eq(column: string, value: any): Promise<EnhancedD1QueryResult<T>> {
     // Modify SQL to add WHERE clause
     if (this.sql.toLowerCase().includes('where')) {
       this.sql += ` AND ${column} = ?`;
@@ -225,10 +253,21 @@ export class EnhancedD1QueryBuilder<T = any> {
     this.options.params = this.options.params || [];
     this.options.params.push(value);
     
-    return this;
+    try {
+      const result = await this.execute();
+      return {
+        data: result.data,
+        error: result.error
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error : new Error(String(error))
+      };
+    }
   }
   
-  neq(column: string, value: any): EnhancedD1QueryBuilder<T> {
+  not(column: string, value: any): EnhancedD1QueryBuilder<T> {
     // Modify SQL to add WHERE clause
     if (this.sql.toLowerCase().includes('where')) {
       this.sql += ` AND ${column} <> ?`;
@@ -369,11 +408,11 @@ export class EnhancedD1QueryBuilder<T = any> {
     return this;
   }
   
-  async get(): Promise<{ data: T[], error: null } | { data: null, error: Error }> {
+  async get(): Promise<EnhancedD1QueryResult<T>> {
     return this.execute();
   }
   
-  async execute(): Promise<{ data: T[], error: null } | { data: null, error: Error }> {
+  async execute(): Promise<EnhancedD1QueryResult<T>> {
     try {
       // Add limit and offset to SQL if specified
       let finalSql = this.sql;
@@ -386,56 +425,75 @@ export class EnhancedD1QueryBuilder<T = any> {
         finalSql += ` OFFSET ${this.options.offset}`;
       }
       
-      const results = await d1Worker.query<T>(finalSql, { params: this.options.params }, this.authToken);
+      const results = await this.client.query<T>(finalSql, { params: this.options.params }, this.authToken);
+      this.data = results;
+      this.error = null;
       return { data: results, error: null };
     } catch (error) {
-      return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
+      this.data = null;
+      this.error = error instanceof Error ? error : new Error('Unknown error');
+      return { data: null, error: this.error };
     }
   }
   
-  async single(): Promise<{ data: T | null, error: null } | { data: null, error: Error }> {
+  async single(): Promise<{ data: T | null, error: Error | null }> {
     try {
-      const { data, error } = await this.limit(1).execute();
+      const result = await this.limit(1).execute();
       
-      if (error) {
-        return { data: null, error };
+      if (result.error) {
+        return { data: null, error: result.error };
       }
       
-      if (!data || data.length === 0) {
+      if (!result.data || result.data.length === 0) {
         return { data: null, error: null };
       }
       
-      return { data: data[0], error: null };
+      return { data: result.data[0], error: null };
     } catch (error) {
       return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
     }
   }
   
-  async maybeSingle(): Promise<{ data: T | null, error: null } | { data: null, error: Error }> {
+  async maybeSingle(): Promise<{ data: T | null, error: Error | null }> {
     return this.single();
   }
   
-  async insert(data: Record<string, any>): Promise<{ data: T | null, error: null } | { data: null, error: Error }> {
+  async insert(values: Partial<T>): Promise<EnhancedD1QueryResult<T>> {
     try {
-      const result = await d1Worker.insert<T>(
-        this.sql.replace(/SELECT \* FROM ([^\s]+).*$/i, '$1'),
-        data,
+      const tableName = this.extractTableName();
+      if (!tableName) {
+        throw new Error('Cannot determine table name from SQL');
+      }
+      
+      const result = await this.client.insert<T>(
+        tableName,
+        values as Record<string, any>,
         this.authToken
       );
-      return { data: result, error: null };
+      
+      if (result) {
+        this.data = [result];
+        this.error = null;
+        return { data: [result], error: null };
+      } else {
+        this.data = null;
+        this.error = new Error('Insert operation returned no data');
+        return { data: null, error: this.error };
+      }
     } catch (error) {
-      return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
+      this.data = null;
+      this.error = error instanceof Error ? error : new Error('Unknown error');
+      return { data: null, error: this.error };
     }
   }
   
-  async update(data: Record<string, any>): Promise<{ count: number, error: null } | { count: 0, error: Error }> {
+  async update(values: Partial<T>): Promise<{ count: number, error: null } | { count: 0, error: Error }> {
     try {
       // Extract the table name from the SQL
-      const tableMatch = this.sql.match(/FROM\s+([^\s]+)/i);
-      if (!tableMatch) {
+      const tableName = this.extractTableName();
+      if (!tableName) {
         throw new Error('Cannot determine table name from SQL');
       }
-      const tableName = tableMatch[1];
       
       // Extract where clause from the SQL
       let whereClause = '';
@@ -453,12 +511,12 @@ export class EnhancedD1QueryBuilder<T = any> {
         throw new Error('Cannot update without WHERE clause');
       }
       
-      const count = await d1Worker.execute(
+      const count = await this.client.execute(
         `UPDATE ${tableName} SET ${
-          Object.keys(data).map(key => `${key} = ?`).join(', ')
+          Object.keys(values).map(key => `${key} = ?`).join(', ')
         } WHERE ${whereClause}`,
         { 
-          params: [...Object.values(data), ...whereParams]
+          params: [...Object.values(values as Record<string, any>), ...whereParams]
         },
         this.authToken
       );
@@ -467,5 +525,46 @@ export class EnhancedD1QueryBuilder<T = any> {
     } catch (error) {
       return { count: 0, error: error instanceof Error ? error : new Error('Unknown error') };
     }
+  }
+  
+  async delete(): Promise<{ count: number, error: null } | { count: 0, error: Error }> {
+    try {
+      // Extract the table name from the SQL
+      const tableName = this.extractTableName();
+      if (!tableName) {
+        throw new Error('Cannot determine table name from SQL');
+      }
+      
+      // Extract where clause from the SQL
+      let whereClause = '';
+      let whereParams: any[] = [];
+      
+      if (this.sql.toLowerCase().includes('where')) {
+        const whereMatch = this.sql.match(/WHERE\s+(.+?)(\s+ORDER\s+BY|\s+LIMIT|\s*$)/i);
+        if (whereMatch) {
+          whereClause = whereMatch[1];
+          whereParams = this.options.params || [];
+        }
+      }
+      
+      if (!whereClause) {
+        throw new Error('Cannot delete without WHERE clause');
+      }
+      
+      const count = await this.client.execute(
+        `DELETE FROM ${tableName} WHERE ${whereClause}`,
+        { params: whereParams },
+        this.authToken
+      );
+      
+      return { count, error: null };
+    } catch (error) {
+      return { count: 0, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+  }
+  
+  private extractTableName(): string | null {
+    const tableMatch = this.sql.match(/FROM\s+([^\s]+)/i);
+    return tableMatch ? tableMatch[1] : null;
   }
 }

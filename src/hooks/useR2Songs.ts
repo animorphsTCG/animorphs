@@ -1,15 +1,14 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 import { Song, R2Song } from '@/types/music.d';
 
 // Use 'export type' to fix the isolatedModules issue
-export type { R2Song };
+export type { Song, R2Song };
 
 export const useR2Songs = () => {
   const [songs, setSongs] = useState<Song[]>([]);
-  const [r2Songs, setR2Songs] = useState<R2Song[]>([]);
+  const [r2Songs, setR2Songs] = useState<Song[]>([]);
   const [userSongs, setUserSongs] = useState<Song[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);

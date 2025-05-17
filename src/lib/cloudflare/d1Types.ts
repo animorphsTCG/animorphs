@@ -64,4 +64,3 @@ export interface D1ExecuteResponse {
   count: number;
   error: Error | null;
 }
-

@@ -1,26 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Session } from '../types';
-import { UserProfile } from '../types';
+import { Session, UserProfile, AuthToken, AuthContextProps } from '../types';
 import { toast } from '@/components/ui/use-toast';
 import { d1Database } from '@/lib/d1Database';
-
-interface AuthContextProps {
-  session: Session | null;
-  user: UserProfile | null;
-  loading: boolean;
-  error: string | null;
-  login: (credentials: Credentials) => Promise<void>;
-  logout: () => Promise<void>;
-  authenticateAdmin: (totpCode: string) => Promise<boolean>;
-}
-
-interface Credentials {
-  email: string;
-  password?: string;
-  username?: string;
-  totp?: string;
-}
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
@@ -49,18 +32,16 @@ const mapUserResponse = (data: any): UserProfile => {
     is_admin: Boolean(data.is_admin),
     music_unlocked: Boolean(data.music_unlocked || false),
     // Add any other required fields with reasonable defaults
-    age: data.age || 0,
-    gender: data.gender || '',
-    mp: data.mp || 0,
-    ai_points: data.ai_points || 0,
-    lbp: data.lbp || 0,
-    digi: data.digi || 0,
-    gold: data.gold || 0,
+    displayName: data.displayName || data.username,
+    profile_image_url: data.profile_image_url || '',
     favorite_animorph: data.favorite_animorph || '',
     favorite_battle_mode: data.favorite_battle_mode || '',
     online_times_gmt2: data.online_times_gmt2 || '',
     playing_times: data.playing_times || '',
-    profile_image_url: data.profile_image_url || ''
+    mp_points: data.mp_points || 0,
+    ai_points: data.ai_points || 0,
+    lbp_points: data.lbp_points || 0,
+    digi_balance: data.digi_balance || 0
   };
 };
 
@@ -69,16 +50,28 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<AuthToken | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const storedSession = localStorage.getItem('session');
     if (storedSession) {
-      const parsedSession: Session = JSON.parse(storedSession);
-      setSession(parsedSession);
-
-      if (parsedSession.user) {
-        setUser(mapUserResponse(parsedSession.user));
+      try {
+        const parsedSession: Session = JSON.parse(storedSession);
+        setSession(parsedSession);
+        
+        if (parsedSession.user) {
+          const mappedUser = mapUserResponse(parsedSession.user);
+          setUser(mappedUser);
+        }
+        
+        setToken({
+          access_token: parsedSession.access_token,
+          refresh_token: parsedSession.refresh_token,
+          expires_at: parsedSession.expires_at
+        });
+      } catch (err) {
+        console.error("Error parsing stored session", err);
       }
     }
   }, []);
@@ -86,14 +79,22 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
   const updateSession = (newSession: Session | null) => {
     if (newSession) {
       localStorage.setItem('session', JSON.stringify(newSession));
+      
+      if (newSession.access_token) {
+        setToken({
+          access_token: newSession.access_token,
+          refresh_token: newSession.refresh_token,
+          expires_at: newSession.expires_at
+        });
+      }
     } else {
       localStorage.removeItem('session');
+      setToken(null);
     }
     setSession(newSession);
   };
 
-  // Fix the login flow to properly set token
-  const handleLogin = async (credentials: Credentials) => {
+  const handleLogin = async (credentials: any) => {
     setLoading(true);
     setError(null);
 
@@ -121,7 +122,12 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
       };
 
       updateSession(newSession);
-      setUser(mapUserResponse(data.user));
+      
+      if (data.user) {
+        const mappedUser = mapUserResponse(data.user);
+        setUser(mappedUser);
+      }
+      
       navigate('/');
       toast({
         title: "Login Successful",
@@ -198,7 +204,12 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
       };
 
       updateSession(adminSession);
-      setUser(mapUserResponse(data.user));
+      
+      if (data.user) {
+        const mappedUser = mapUserResponse(data.user);
+        setUser(mappedUser);
+      }
+      
       navigate('/admin');
       toast({
         title: "Admin Authentication Successful",
@@ -218,14 +229,37 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
     }
   };
 
+  const refreshProfile = async () => {
+    if (!user?.id || !token?.access_token) return;
+    
+    try {
+      setLoading(true);
+      // Fetch updated profile from D1
+      const updatedProfile = await d1Database.getProfile(user.id);
+      if (updatedProfile) {
+        const mappedUser = mapUserResponse({...user, ...updatedProfile});
+        setUser(mappedUser);
+      }
+    } catch (err) {
+      console.error("Failed to refresh profile", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value: AuthContextProps = {
     session,
     user,
     loading,
     error,
+    token,
+    userProfile: user,
     login: handleLogin,
     logout: handleLogout,
+    signOut: handleLogout, // Alias for compatibility
     authenticateAdmin,
+    refreshProfile,
+    isLoading: loading
   };
 
   return (
@@ -234,3 +268,6 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
     </AuthContext.Provider>
   );
 };
+
+// Export for backwards compatibility
+export const AuthProvider = EOSAuthProvider;

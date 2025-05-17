@@ -1,6 +1,7 @@
 
 export interface UserProfile {
   id: string;
+  user_id?: string;
   username: string;
   email?: string;
   name?: string;
@@ -20,6 +21,11 @@ export interface UserProfile {
   ai_points?: number;
   lbp_points?: number;
   digi_balance?: number;
+  bio?: string;
+  // Compatibility fields
+  mp?: number;
+  lbp?: number;
+  digi?: number;
 }
 
 export interface Session {
@@ -50,4 +56,7 @@ export interface AuthContextProps {
   authenticateAdmin: (totpCode: string) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
   isLoading: boolean;
+  // Add placeholder methods for backward compatibility
+  resetPassword: (email: string) => Promise<any>;
+  updatePassword: (password: string) => Promise<any>;
 }

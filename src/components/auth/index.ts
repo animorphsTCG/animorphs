@@ -6,8 +6,5 @@ export {
   AuthProvider,
   ProtectedRoute,
   LoginForm,
-  RegistrationForm,
-  PasswordReset,
-  UpdatePassword
+  RegistrationForm
 } from '@/modules/auth';
-

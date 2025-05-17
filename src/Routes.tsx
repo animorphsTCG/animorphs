@@ -20,41 +20,43 @@ import { ProtectedRoute } from './modules/auth';
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <Layout />,
-    children: [
-      {
-        index: true,
-        element: <Home />
-      },
-      {
-        path: 'login',
-        element: <Login />
-      },
-      {
-        path: 'register',
-        element: <Register />
-      },
-      {
-        path: 'profile',
-        element: <ProtectedRoute><Profile /></ProtectedRoute>
-      },
-      {
-        path: 'dashboard',
-        element: <ProtectedRoute><Dashboard /></ProtectedRoute>
-      },
-      {
-        path: 'visitor-demo-battle',
-        element: <VisitorDemoBattle />
-      },
-      {
-        path: 'admin',
-        element: <ProtectedRoute adminOnly={true}><Admin /></ProtectedRoute>
-      },
-      {
-        path: 'auth/callback',
-        element: <AuthCallback />
-      }
-    ]
+    element: <Layout>
+      {/* Pass children explicitly to Layout component */}
+      <RouterProvider router={createBrowserRouter([
+        {
+          path: '/',
+          element: <Home />
+        },
+        {
+          path: '/login',
+          element: <Login />
+        },
+        {
+          path: '/register',
+          element: <Register />
+        },
+        {
+          path: '/profile',
+          element: <ProtectedRoute><Profile /></ProtectedRoute>
+        },
+        {
+          path: '/dashboard',
+          element: <ProtectedRoute><Dashboard /></ProtectedRoute>
+        },
+        {
+          path: '/visitor-demo-battle',
+          element: <VisitorDemoBattle />
+        },
+        {
+          path: '/admin',
+          element: <ProtectedRoute adminOnly={true}><Admin /></ProtectedRoute>
+        },
+        {
+          path: '/auth/callback',
+          element: <AuthCallback />
+        }
+      ])} />
+    </Layout>
   }
 ]);
 

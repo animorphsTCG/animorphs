@@ -28,6 +28,7 @@ interface EOSAuthProviderProps {
 const mapUserResponse = (data: any): UserProfile => {
   return {
     id: data.id,
+    user_id: data.id, // Ensuring user_id is set
     username: data.username || data.displayName,
     email: data.email,
     name: data.name,
@@ -47,7 +48,12 @@ const mapUserResponse = (data: any): UserProfile => {
     mp_points: data.mp_points || 0,
     ai_points: data.ai_points || 0,
     lbp_points: data.lbp_points || 0,
-    digi_balance: data.digi_balance || 0
+    digi_balance: data.digi_balance || 0,
+    // Compatibility fields
+    bio: data.bio || '',
+    mp: data.mp_points || data.mp || 0,
+    lbp: data.lbp_points || data.lbp || 0,
+    digi: data.digi_balance || data.digi || 0
   };
 };
 
@@ -179,6 +185,26 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
     }
   };
 
+  // Placeholder method for backward compatibility - no-op since we don't support it anymore
+  const resetPassword = async () => {
+    toast({
+      title: "Feature Not Available",
+      description: "Password reset is not supported with Epic Games authentication.",
+      variant: "destructive"
+    });
+    return false;
+  };
+  
+  // Placeholder method for backward compatibility - no-op since we don't support it anymore
+  const updatePassword = async () => {
+    toast({
+      title: "Feature Not Available",
+      description: "Password update is not supported with Epic Games authentication.",
+      variant: "destructive"
+    });
+    return false;
+  };
+
   const authenticateAdmin = async (totpCode: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
@@ -263,7 +289,10 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
     signOut: handleLogout, // Alias for compatibility
     authenticateAdmin,
     refreshProfile,
-    isLoading: loading
+    isLoading: loading,
+    // Add placeholder methods for backward compatibility
+    resetPassword,
+    updatePassword
   };
 
   return (

@@ -8,7 +8,6 @@ import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '../context/EOSAuthContext';
@@ -40,8 +39,9 @@ const PasswordReset: React.FC = () => {
     setSuccess(false);
     
     try {
+      // This is now a stub function that shows a toast
       await resetPassword(values.email);
-      setSuccess(true);
+      setError("Password reset is not available with Epic Games authentication.");
       form.reset();
     } catch (error: any) {
       setError(error.message || 'Failed to send reset email');

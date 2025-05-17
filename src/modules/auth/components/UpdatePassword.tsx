@@ -43,10 +43,12 @@ const UpdatePassword: React.FC = () => {
     setError(null);
     
     try {
+      // This is now a stub function that shows a toast
       await updatePassword(values.password);
-      // Navigation is handled in the auth context
+      setError("Password update is not available with Epic Games authentication.");
     } catch (error: any) {
       setError(error.message || 'Failed to update password');
+    } finally {
       setIsLoading(false);
     }
   };

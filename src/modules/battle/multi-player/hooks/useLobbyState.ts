@@ -81,17 +81,20 @@ export const useLobbyState = (lobbyId: string | null) => {
     fetchLobbyState();
 
     // Subscribe to realtime updates
-    const lobbyChannel = supabase
-      .channel('lobby_changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'battle_lobbies', filter: `id=eq.${lobbyId}` },
-        fetchLobbyState
-      )
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'lobby_participants', filter: `lobby_id=eq.${lobbyId}` },
-        fetchLobbyState
-      )
-      .subscribe();
+    const lobbyChannel = supabase.channel('lobby_changes');
+    
+    lobbyChannel.subscribe(payload => {
+      if ((payload.schema === 'public' && 
+           payload.table === 'battle_lobbies' && 
+           payload.record && 
+           payload.record.id === lobbyId) ||
+          (payload.schema === 'public' && 
+           payload.table === 'lobby_participants' && 
+           payload.record && 
+           payload.record.lobby_id === lobbyId)) {
+        fetchLobbyState();
+      }
+    });
 
     return () => {
       supabase.removeChannel(lobbyChannel);

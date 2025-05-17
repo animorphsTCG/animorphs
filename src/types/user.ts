@@ -27,6 +27,11 @@ export interface UserProfile {
   paid_status?: boolean;
   subscription_status?: string;
   subscription_expires_at?: string;
+  
+  // Compatibility fields for old code references
+  mp?: number;
+  lbp?: number;
+  digi?: number;
 }
 
 export interface AdminProfile extends UserProfile {

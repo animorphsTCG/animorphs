@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -175,13 +176,18 @@ export const useBattleQueue = () => {
     if (!user) return;
     
     // Listen for matches
-    const channel = supabase
-      .channel('battle_queue')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'battle_sessions', filter: `player_ids @> array["${user.id}"]` }, 
-        handleMatchFound
-      )
-      .subscribe();
+    const channel = supabase.channel('battle_queue');
+    
+    channel.subscribe(payload => {
+      if (payload.event === 'INSERT' && 
+          payload.schema === 'public' && 
+          payload.table === 'battle_sessions' && 
+          payload.record && 
+          payload.record.player_ids && 
+          payload.record.player_ids.includes(user.id)) {
+        handleMatchFound(payload);
+      }
+    });
       
     // Clean up subscription
     return () => {

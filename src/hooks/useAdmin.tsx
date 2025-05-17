@@ -2,8 +2,9 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/modules/auth';
 
+// This is the hook that provides admin functionality
 export const useAdmin = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, token } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [adminToken, setAdminToken] = useState<string | null>(null);
@@ -20,7 +21,12 @@ export const useAdmin = () => {
     }
   }, [userProfile]);
   
-  return { isAdmin, isLoading, adminToken };
+  return { 
+    isAdmin, 
+    isLoading, 
+    adminToken,
+    token // Include token from useAuth for MigrationPanel
+  };
 };
 
 // Also export as default for backward compatibility

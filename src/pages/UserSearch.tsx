@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
@@ -28,7 +27,7 @@ const UserSearch: React.FC = () => {
     setError(null);
 
     try {
-      // Search for users with similar usernames
+      // Search for users with similar usernames using the method we added
       const users = await d1Database.searchUsers(searchTerm);
       setResults(users);
       

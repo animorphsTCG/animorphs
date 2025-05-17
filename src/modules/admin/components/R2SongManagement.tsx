@@ -3,11 +3,20 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useR2Songs, R2Song } from '@/hooks/useR2Songs';
+import { useR2Songs } from '@/hooks/useR2Songs';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, RefreshCcw, Database, Play, Disc, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { d1 } from '@/lib/d1Database';
+
+// Define a type that matches the R2Song type from useR2Songs hook
+interface R2Song {
+  name: string;
+  title: string;
+  artist?: string;
+  size: number;
+  lastModified: number;
+}
 
 const R2SongManagement: React.FC = () => {
   const { songs, isLoading, refreshSongs, syncSongsWithDatabase } = useR2Songs();
@@ -22,19 +31,23 @@ const R2SongManagement: React.FC = () => {
   
   useEffect(() => {
     if (songs && songs.length > 0) {
-      filterSongs();
-      calculateStats();
+      // Cast the songs to the R2Song type
+      const typedSongs = songs as unknown as R2Song[];
+      setFilteredSongs(typedSongs);
+      calculateStats(typedSongs);
     }
   }, [songs, searchQuery]);
   
   const filterSongs = () => {
-    if (!searchQuery.trim()) {
-      setFilteredSongs(songs);
+    if (!searchQuery.trim() || !songs || songs.length === 0) {
+      // Cast the songs to the R2Song type
+      setFilteredSongs(songs as unknown as R2Song[]);
       return;
     }
     
     const query = searchQuery.toLowerCase().trim();
-    const results = songs.filter(song => 
+    const typedSongs = songs as unknown as R2Song[];
+    const results = typedSongs.filter(song => 
       song.name.toLowerCase().includes(query) || 
       song.title.toLowerCase().includes(query) ||
       (song.artist && song.artist.toLowerCase().includes(query))
@@ -43,7 +56,7 @@ const R2SongManagement: React.FC = () => {
     setFilteredSongs(results);
   };
   
-  const calculateStats = async () => {
+  const calculateStats = async (songList: R2Song[]) => {
     try {
       // Check how many songs are already synced
       const results = await d1.from('songs')
@@ -51,12 +64,12 @@ const R2SongManagement: React.FC = () => {
         .select('r2_key')
         .get();
         
-      const syncedSongs = new Set((results as any[]).map(row => row.r2_key));
+      const syncedSongs = new Set((results.data as any[]).map(row => row.r2_key));
       
       setSongStats({
-        total: songs.length,
+        total: songList.length,
         synced: syncedSongs.size,
-        notSynced: songs.length - syncedSongs.size
+        notSynced: songList.length - syncedSongs.size
       });
     } catch (err) {
       console.error('Error calculating stats:', err);

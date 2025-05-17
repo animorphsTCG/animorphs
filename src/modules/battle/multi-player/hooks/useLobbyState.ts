@@ -7,9 +7,10 @@ export interface LobbyParticipant {
   id: string;
   user_id: string;
   player_number: number;
-  is_ready: boolean;
+  isReady: boolean;  // Renamed from is_ready to match LobbyUI component
   username?: string;
   profile_image_url?: string;
+  isHost?: boolean;   // Renamed from is_host to match LobbyUI component
 }
 
 export interface LobbyState {
@@ -19,8 +20,8 @@ export interface LobbyState {
   status: 'waiting' | 'in_progress' | 'completed' | 'cancelled';
   battle_type: '1v1' | '3player' | '4player';
   max_players: number;
-  use_timer: boolean;
-  use_music: boolean;
+  useTimer: boolean;  // Renamed from use_timer to match LobbyUI component
+  useMusic: boolean;  // Renamed from use_music to match LobbyUI component
   participants: LobbyParticipant[];
 }
 
@@ -59,13 +60,17 @@ export const useLobbyState = (lobbyId: string | null) => {
 
         if (participantsError) throw participantsError;
 
+        // Map from snake_case to camelCase for component consumption
         setLobbyState({
           ...lobby,
+          useTimer: lobby.use_timer,
+          useMusic: lobby.use_music,
           participants: participants.map(p => ({
             id: p.id,
             user_id: p.user_id,
             player_number: p.player_number,
-            is_ready: p.is_ready,
+            isReady: p.is_ready,
+            isHost: p.user_id === lobby.host_id,
             username: p.profiles?.username,
             profile_image_url: p.profiles?.profile_image_url
           }))
@@ -80,18 +85,25 @@ export const useLobbyState = (lobbyId: string | null) => {
     // Initial fetch
     fetchLobbyState();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates with fixed method
     const lobbyChannel = supabase.channel('lobby_changes');
     
-    lobbyChannel.subscribe(payload => {
-      if ((payload.schema === 'public' && 
-           payload.table === 'battle_lobbies' && 
-           payload.record && 
-           payload.record.id === lobbyId) ||
-          (payload.schema === 'public' && 
-           payload.table === 'lobby_participants' && 
-           payload.record && 
-           payload.record.lobby_id === lobbyId)) {
+    lobbyChannel.on('*', { 
+      event: '*',
+      schema: 'public',
+      table: 'battle_lobbies' 
+    }).subscribe(payload => {
+      if (payload.record && payload.record.id === lobbyId) {
+        fetchLobbyState();
+      }
+    });
+
+    lobbyChannel.on('*', { 
+      event: '*',
+      schema: 'public',
+      table: 'lobby_participants' 
+    }).subscribe(payload => {
+      if (payload.record && payload.record.lobby_id === lobbyId) {
         fetchLobbyState();
       }
     });

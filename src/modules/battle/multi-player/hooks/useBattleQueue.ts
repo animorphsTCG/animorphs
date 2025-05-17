@@ -178,11 +178,13 @@ export const useBattleQueue = () => {
     // Listen for matches
     const channel = supabase.channel('battle_queue');
     
-    channel.subscribe(payload => {
-      if (payload.event === 'INSERT' && 
-          payload.schema === 'public' && 
-          payload.table === 'battle_sessions' && 
-          payload.record && 
+    // Fix the subscription method
+    channel.on('INSERT', {
+      event: 'INSERT', 
+      schema: 'public', 
+      table: 'battle_sessions'
+    }).subscribe((payload) => {
+      if (payload.record && 
           payload.record.player_ids && 
           payload.record.player_ids.includes(user.id)) {
         handleMatchFound(payload);

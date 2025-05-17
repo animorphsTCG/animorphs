@@ -24,7 +24,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
     isLeavingLobby,
     battleStarted,
     leaveLobby,
-    setReadyStatus,
+    setReady, // Renamed from setReadyStatus to match hook implementation
     startBattle
   } = useBattleLobby(lobbyId);
   
@@ -72,7 +72,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
             </span>
           </div>
           
-          {lobbyData.use_timer && (
+          {lobbyData.useTimer && (
             <div className="flex items-center text-sm text-gray-400">
               <Clock className="mr-1 h-4 w-4" />
               <span>10-min timer enabled</span>
@@ -87,10 +87,10 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
             {lobbyMembers.map((member) => (
               <div key={member.id} 
                 className={`flex items-center justify-between p-2 rounded ${
-                  member.is_ready ? 'bg-green-500/10 border border-green-500/30' : 'bg-gray-800/50'
+                  member.isReady ? 'bg-green-500/10 border border-green-500/30' : 'bg-gray-800/50'
                 }`}>
                 <div className="flex items-center">
-                  {member.is_host && <Crown className="h-4 w-4 text-yellow-500 mr-2" />}
+                  {member.isHost && <Crown className="h-4 w-4 text-yellow-500 mr-2" />}
                   <Avatar className="h-8 w-8 mr-3">
                     {member.profile_image_url ? (
                       <AvatarImage src={member.profile_image_url} />
@@ -105,7 +105,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
                 </div>
                 
                 <div>
-                  {member.is_ready ? (
+                  {member.isReady ? (
                     <div className="flex items-center text-green-500">
                       <Check className="h-4 w-4 mr-1" />
                       <span className="text-xs">Ready</span>
@@ -133,7 +133,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
               <Switch
                 id="ready-status"
                 checked={isReady}
-                onCheckedChange={setReadyStatus}
+                onCheckedChange={setReady}
               />
               <Label htmlFor="ready-status">Ready</Label>
             </div>
@@ -141,7 +141,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
             {isHost && (
               <Button
                 className="fantasy-button"
-                disabled={lobbyMembers.length < 2 || !lobbyMembers.every(m => m.is_ready)}
+                disabled={lobbyMembers.length < 2 || !lobbyMembers.every(m => m.isReady)}
                 onClick={startBattle}
               >
                 <Users className="mr-2 h-4 w-4" />

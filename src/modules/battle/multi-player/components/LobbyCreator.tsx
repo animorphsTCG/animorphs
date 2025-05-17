@@ -7,8 +7,16 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
-import { useBattleLobby, BattleLobbyConfig } from '../hooks/useBattleLobby';
+import { useBattleLobby } from '../hooks/useBattleLobby';
 import { useNavigate } from 'react-router-dom';
+
+// Define the BattleLobbyConfig interface locally if it's not exported from the hook
+interface BattleLobbyConfig {
+  name: string;
+  battleType: '1v1' | '3player' | '4player';
+  useTimer: boolean;
+  useMusic: boolean;
+}
 
 export const LobbyCreator = () => {
   const navigate = useNavigate();

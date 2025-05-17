@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { useAdmin } from '@/modules/admin/hooks/useAdmin';
+import useAdmin from '@/hooks/useAdmin';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/modules/auth';
 
@@ -20,10 +19,10 @@ import R2SongManagement from '@/modules/admin/components/R2SongManagement';
 
 const Admin: React.FC = () => {
   const { isAdmin, isLoading: adminLoading, adminToken } = useAdmin();
-  const { loading } = useAuth();
+  const { isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('users');
   
-  if (loading || adminLoading) {
+  if (isLoading || adminLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

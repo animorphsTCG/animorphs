@@ -1,6 +1,6 @@
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 import type { UserProfile } from '@/modules/auth/types';
-import { EnhancedD1QueryBuilder } from '@/lib/cloudflare/d1Worker';
+import { EnhancedD1QueryBuilderImpl as EnhancedD1QueryBuilder } from '@/lib/cloudflare/d1Types';
 
 /**
  * Cloudflare D1 database adapter for the Animorphs app
@@ -24,6 +24,22 @@ export class D1Database {
       throw new Error("d1Worker.from is not defined");
     }
     return d1Worker.from<T>(table, this.token || undefined);
+  }
+
+  // Add search users method
+  async searchUsers(searchTerm: string) {
+    try {
+      const results = await d1Worker.query(
+        `SELECT id, username, profile_image_url FROM profiles 
+         WHERE username LIKE ? LIMIT 20`,
+        { params: [`%${searchTerm}%`] },
+        this.token || undefined
+      );
+      return results || [];
+    } catch (err) {
+      console.error('Error searching users:', err);
+      return [];
+    }
   }
 
   async executeQuery(sql: string, params: any[] = []) {

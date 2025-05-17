@@ -56,7 +56,7 @@ export interface AuthContextProps {
   authenticateAdmin: (totpCode: string) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
   isLoading: boolean;
-  // Add placeholder methods for backward compatibility
+  // Add stub methods for backward compatibility
   resetPassword: (email: string) => Promise<any>;
   updatePassword: (password: string) => Promise<any>;
 }

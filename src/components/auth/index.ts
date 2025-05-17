@@ -8,3 +8,6 @@ export {
   LoginForm,
   RegistrationForm
 } from '@/modules/auth';
+
+// Export type definitions
+export type { UserProfile, Session } from '@/modules/auth/types';

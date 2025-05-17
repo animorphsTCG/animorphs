@@ -2,32 +2,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
+import { Song, R2Song } from '@/types/music.d';
 
-export interface Song {
-  id: string;
-  title: string;
-  youtube_url: string;
-  preview_start_seconds?: number;
-  preview_duration_seconds?: number;
-  created_at?: string;
-  artist?: string;
-  genre?: string;
-}
-
-export interface R2Song {
-  id: string;
-  name: string;
-  size: number;
-  lastModified: string;
-  url: string;
-  contentType: string;
-  etag: string;
-  title: string;
-  artist?: string;
-  genre?: string;
-  duration?: number;
-  metadata?: Record<string, string>;
-}
+export { R2Song };
 
 export const useR2Songs = () => {
   const [songs, setSongs] = useState<Song[]>([]);
@@ -110,6 +87,42 @@ export const useR2Songs = () => {
       throw err;
     }
   }, [token]);
+
+  const syncSongsWithDatabase = useCallback(async () => {
+    if (!token?.access_token || !user?.id) {
+      return { success: false, message: 'Not authenticated' };
+    }
+    
+    try {
+      setIsUpdating(true);
+      const response = await fetch('/api/r2/songs/sync', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ userId: user.id })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to sync songs with database');
+      }
+      
+      const result = await response.json();
+      await fetchR2Songs();
+      await fetchSongs();
+      
+      return { success: true, message: result.message || 'Successfully synced songs' };
+    } catch (err) {
+      console.error('Failed to sync songs:', err);
+      return { 
+        success: false, 
+        message: err instanceof Error ? err.message : 'Unknown error occurred'
+      };
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [token, user, fetchR2Songs, fetchSongs]);
 
   const fetchUserSongs = useCallback(async () => {
     if (!user?.id || !token?.access_token) {
@@ -207,6 +220,7 @@ export const useR2Songs = () => {
     refreshSongs: fetchSongs,
     refreshUserSongs: fetchUserSongs,
     getSongStreamUrl,
+    syncSongsWithDatabase,
   };
 };
 

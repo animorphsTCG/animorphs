@@ -7,6 +7,7 @@ import SongInfo from "./SongInfo";
 import PlaybackControls from "./PlaybackControls";
 import VolumeControl from "./VolumeControl";
 import YouTubeEmbed from "./YouTubeEmbed";
+import R2MusicPlayer from "@/components/music/R2MusicPlayer";
 import { Loader2 } from "lucide-react";
 
 const MusicPlayer: React.FC = () => {
@@ -29,6 +30,7 @@ const MusicPlayer: React.FC = () => {
     handleVolumeChange,
     handleRetry,
     extractVideoId,
+    getSongStreamUrl
   } = useMusicPlayer();
 
   if (isLoading) {
@@ -64,6 +66,9 @@ const MusicPlayer: React.FC = () => {
     );
   }
 
+  // Determine if this is an R2 song (has name property) or YouTube song (has youtube_url)
+  const isR2Song = currentSong && ('name' in currentSong || 'r2_key' in currentSong);
+
   return (
     <div className="bg-black/60 border border-fantasy-primary/30 rounded-md p-3">
       <div className="flex items-center justify-between">
@@ -90,15 +95,26 @@ const MusicPlayer: React.FC = () => {
         </div>
       </div>
 
-      <YouTubeEmbed
-        currentSong={currentSong}
-        isPlaying={isPlaying}
-        isMuted={isMuted}
-        isPreviewMode={isPreviewMode}
-        ytApiReady={ytApiReady}
-        playerRef={playerRef}
-        extractVideoId={extractVideoId}
-      />
+      {/* Conditionally render either R2 or YouTube player based on song type */}
+      {isR2Song ? (
+        <R2MusicPlayer
+          currentSong={currentSong}
+          isPlaying={isPlaying}
+          isMuted={isMuted}
+          volume={volume}
+          getSongStreamUrl={getSongStreamUrl}
+        />
+      ) : (
+        <YouTubeEmbed
+          currentSong={currentSong}
+          isPlaying={isPlaying}
+          isMuted={isMuted}
+          isPreviewMode={isPreviewMode}
+          ytApiReady={ytApiReady}
+          playerRef={playerRef}
+          extractVideoId={extractVideoId}
+        />
+      )}
     </div>
   );
 };

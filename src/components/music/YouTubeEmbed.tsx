@@ -1,7 +1,8 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useD1Songs } from '@/hooks/useD1Songs';
 import { Song } from '@/types/music';
-import { R2Song } from '@/hooks/useR2Songs';
+import { R2Song } from '@/types/music.d';
 
 interface YouTubeEmbedProps {
   currentSong: Song | R2Song | null;
@@ -45,7 +46,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
     if (!currentSong) return;
     
     // Skip if this is an R2 song (indicated by r2_key or r2_url property)
-    if ('r2_key' in currentSong || 'r2_url' in currentSong) {
+    if ('r2_key' in currentSong || 'name' in currentSong || 'url' in currentSong) {
       setVideoId("");
       return;
     }

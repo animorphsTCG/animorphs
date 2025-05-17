@@ -25,6 +25,8 @@ export interface R2Song {
   genre?: string;
   duration?: number;
   metadata?: Record<string, string>;
+  preview_start_seconds?: number;
+  preview_duration_seconds?: number;
 }
 
 export interface SongSelection {

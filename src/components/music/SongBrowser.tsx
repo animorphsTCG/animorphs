@@ -12,19 +12,10 @@ import { useAuth } from '@/modules/auth';
 import { Check, Music, Search, Loader2, Disc, Play } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { useD1Songs } from '@/hooks/useD1Songs';
-import { useR2Songs, R2Song } from '@/hooks/useR2Songs';
+import { useR2Songs } from '@/hooks/useR2Songs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import R2AudioPlayer from './R2AudioPlayer';
-
-interface Song {
-  id: string;
-  title: string;
-  youtube_url: string;
-  r2_key?: string;
-  r2_url?: string;
-  artist?: string;
-  genre?: string;
-}
+import { Song, R2Song } from '@/types/music.d';
 
 interface SongBrowserProps {
   open: boolean;
@@ -43,7 +34,7 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
 }) => {
   const { user } = useAuth();
   const { songs: dbSongs, isLoading: dbLoading } = useD1Songs();
-  const { songs: r2Songs, isLoading: r2Loading, getSongStreamUrl } = useR2Songs();
+  const { r2Songs, isLoading: r2Loading, getSongStreamUrl } = useR2Songs();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredDbSongs, setFilteredDbSongs] = useState<Song[]>([]);

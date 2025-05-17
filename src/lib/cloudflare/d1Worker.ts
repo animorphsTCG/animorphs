@@ -25,7 +25,7 @@ export const d1Worker = {
   /**
    * Execute a query against D1 database
    */
-  async query<T = any>(sql: string, options: QueryOptions = {}, token?: string): Promise<T[]> {
+  async query<T>(sql: string, options: QueryOptions = {}, token?: string): Promise<T[]> {
     try {
       const response = await fetch(`${API_URL}/query`, {
         method: 'POST',
@@ -62,9 +62,9 @@ export const d1Worker = {
   /**
    * Get a single record
    */
-  async getOne<T = any>(sql: string, options: QueryOptions = {}, token?: string): Promise<T | null> {
+  async getOne<T>(sql: string, options: QueryOptions = {}, token?: string): Promise<T | null> {
     try {
-      const results = await this.query<T>(sql, options, token);
+      const results = await this.query(sql, options, token);
       return results.length > 0 ? results[0] : null;
     } catch (error) {
       console.error('GetOne error:', error);
@@ -75,7 +75,7 @@ export const d1Worker = {
   /**
    * Insert data into a table
    */
-  async insert<T = any>(
+  async insert<T>(
     table: string, 
     data: Record<string, any>,
     returning?: string | null,
@@ -93,7 +93,7 @@ export const d1Worker = {
     `;
     
     try {
-      const result = await this.query<T>(sql, { params: values }, token);
+      const result = await this.query(sql, { params: values }, token);
       return result.length > 0 ? result[0] : null;
     } catch (error) {
       console.error('Insert error:', error);
@@ -104,7 +104,7 @@ export const d1Worker = {
   /**
    * Update data in a table
    */
-  async update<T = any>(
+  async update<T>(
     table: string,
     data: Record<string, any>,
     whereClause: string,
@@ -125,7 +125,7 @@ export const d1Worker = {
     `;
     
     try {
-      const result = await this.query<T>(sql, { params: values }, token);
+      const result = await this.query(sql, { params: values }, token);
       return result.length > 0 ? result[0] : null;
     } catch (error) {
       console.error('Update error:', error);
@@ -136,7 +136,7 @@ export const d1Worker = {
   /**
    * Delete data from a table
    */
-  async delete<T = any>(
+  async delete<T>(
     table: string,
     whereClause: string,
     whereParams: any[] = [],
@@ -152,7 +152,7 @@ export const d1Worker = {
     `;
     
     try {
-      return await this.query<T>(sql, { params: whereParams }, token);
+      return await this.query(sql, { params: whereParams }, token);
     } catch (error) {
       console.error('Delete error:', error);
       return [];

@@ -1,5 +1,5 @@
 
-import MultiplayerBattle from './MultiplayerBattle';
+import { MultiplayerBattle } from './MultiplayerBattle';
 import { OneVOneMultiplayer } from './OneVOneMultiplayer';
 import { FourPlayerPublicBattle } from './FourPlayerPublicBattle';
 import { FourPlayerUserBattle } from './FourPlayerUserBattle';

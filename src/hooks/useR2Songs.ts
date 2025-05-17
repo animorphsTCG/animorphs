@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth';
 import { r2Client, R2BucketObject } from '@/lib/cloudflare/r2Client';
 import { toast } from '@/hooks/use-toast';
-import { d1 } from '@/lib/d1Database';
+import { d1Database } from '@/lib/d1Database';
 
 export interface R2Song extends R2BucketObject {
   id: string;
@@ -117,13 +117,15 @@ export function useR2Songs() {
     try {
       for (const song of songs) {
         // Check if song exists in the database
-        const existingSong = await d1.from('songs')
-          .where('r2_key', '=', song.name)
-          .first();
+        const existingQuery = d1Database.from('songs')
+          .select('*')
+          .eq('r2_key', song.name);
           
-        if (!existingSong) {
+        const existingResult = await existingQuery.get();
+        
+        if (!existingResult.data || existingResult.data.length === 0) {
           // Add new song to database
-          await d1.from('songs').insert({
+          await d1Database.from('songs').insert({
             title: song.title,
             r2_key: song.name,
             r2_url: song.url,

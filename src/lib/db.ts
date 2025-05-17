@@ -1,4 +1,3 @@
-
 import { supabase } from "@/lib/supabase";
 import { AnimorphCard, VipCode } from "@/types";
 
@@ -153,34 +152,43 @@ export async function fetchAnimorphCards(limit: number = 1000, offset: number = 
   }
   
   try {
-    const { data, error } = await dbConnection.retry(async () => {
-      return supabase
+    const result = await dbConnection.retry(async () => {
+      const query = supabase
         .from("animorph_cards")
         .select("*")
-        .order('card_number', { ascending: true })
-        .range(offset, offset + limit - 1);
+        .order('card_number', 'asc');
+      
+      if (offset > 0) {
+        query.offset(offset);
+      }
+      
+      if (limit > 0) {
+        query.limit(limit);
+      }
+      
+      return await query.get();
     });
       
-    if (error) {
-      console.error("Error fetching animorph cards:", error);
-      throw error;
+    if (!result || result.error) {
+      console.error("Error fetching animorph cards:", result?.error);
+      throw result?.error || new Error("Unknown error fetching cards");
     }
     
-    if (!data) {
+    if (!result.data || result.data.length === 0) {
       console.warn("No cards found or null data returned");
       return [];
     }
     
-    const result = data as AnimorphCard[];
+    const cards = result.data as AnimorphCard[];
     
     cache.addToCache(
       cache.animorphCards, 
       cacheKey, 
-      result, 
+      cards, 
       cache.MAX_ENTRIES.animorphCards
     );
     
-    return result;
+    return cards;
   } catch (error) {
     console.error("Error fetching animorph cards:", error);
     throw error;
@@ -200,26 +208,30 @@ export async function getRandomDeck(size: number = 10, excludeCardIds: number[] 
       .select("*");
       
     if (excludeCardIds.length > 0) {
-      query = query.not('id', 'in', `(${excludeCardIds.join(',')})`);
+      // This will handle "not in" for us
+      query.not('id', 'in', excludeCardIds);
     }
     
-    const { data, error } = await dbConnection.retry(async () => {
-      return query;
+    const result = await dbConnection.retry(async () => {
+      return await query.get();
     });
     
-    if (error) {
-      console.error("Error getting random deck:", error);
-      throw error;
+    if (!result || result.error) {
+      console.error("Error getting random deck:", result?.error);
+      throw result?.error || new Error("Unknown error getting random deck");
     }
     
-    if (!data || data.length === 0) {
+    if (!result.data || result.data.length === 0) {
       console.warn("No cards found for random deck");
       return [];
     }
     
-    return (data as AnimorphCard[])
+    const allCards = result.data as AnimorphCard[];
+    
+    // Randomly shuffle the cards and take the first 'size' cards
+    return allCards
       .sort(() => Math.random() - 0.5)
-      .slice(0, Math.min(size, data.length));
+      .slice(0, Math.min(size, allCards.length));
   } catch (error) {
     console.error("Error getting random deck:", error);
     throw error;
@@ -242,29 +254,30 @@ export async function fetchCardsByType(type: string, limit: number = 5): Promise
   }
   
   try {
-    const { data, error } = await dbConnection.retry(async () => {
-      return supabase
+    const result = await dbConnection.retry(async () => {
+      return await supabase
         .from("animorph_cards")
         .select("*")
         .eq("animorph_type", type)
-        .limit(limit);
+        .limit(limit)
+        .get();
     });
       
-    if (error) {
-      console.error(`Error fetching ${type} cards:`, error);
-      throw error;
+    if (!result || result.error) {
+      console.error(`Error fetching ${type} cards:`, result?.error);
+      throw result?.error || new Error(`Unknown error fetching ${type} cards`);
     }
     
-    const result = data as AnimorphCard[] || [];
+    const cards = (result.data || []) as AnimorphCard[];
     
     cache.addToCache(
       cache.animorphCards, 
       cacheKey, 
-      result, 
+      cards, 
       cache.MAX_ENTRIES.animorphCards
     );
     
-    return result;
+    return cards;
   } catch (error) {
     console.error(`Error fetching ${type} cards:`, error);
     throw error;
@@ -284,29 +297,31 @@ export async function fetchCardById(id: number): Promise<AnimorphCard | null> {
   }
   
   try {
-    const { data, error } = await dbConnection.retry(async () => {
-      return supabase
+    const result = await dbConnection.retry(async () => {
+      return await supabase
         .from("animorph_cards")
         .select("*")
         .eq("id", id)
-        .maybeSingle();
+        .maybeSingle()
+        .get();
     });
     
-    if (error) {
-      console.error(`Error fetching card with id ${id}:`, error);
-      throw error;
+    if (!result || result.error) {
+      console.error(`Error fetching card with id ${id}:`, result?.error);
+      throw result?.error || new Error(`Unknown error fetching card with id ${id}`);
     }
     
-    const result = data as AnimorphCard || null;
+    // Check if we got a card back
+    const card = (result.data.length > 0 ? result.data[0] : null) as AnimorphCard | null;
     
     cache.addToCache(
       cache.cardById, 
       id, 
-      result, 
+      card, 
       cache.MAX_ENTRIES.cardById
     );
     
-    return result;
+    return card;
   } catch (error) {
     console.error(`Error fetching card with id ${id}:`, error);
     throw error;
@@ -325,25 +340,37 @@ export async function ensureVipCodesExist(): Promise<boolean> {
     ];
     
     for (const codeData of vipCodes) {
-      const { data } = await dbConnection.retry(async () => {
-        return supabase
+      const result = await dbConnection.retry(async () => {
+        return await supabase
           .from("vip_codes")
           .select("*")
-          .ilike("code", codeData.code);
+          .like("code", codeData.code) // Using like instead of ilike
+          .get();
       });
       
-      if (!data || data.length === 0) {
-        await dbConnection.retry(async () => {
-          return supabase
+      if (!result || result.error) {
+        console.error("Error checking VIP codes:", result?.error);
+        continue;
+      }
+      
+      if (!result.data || result.data.length === 0) {
+        const insertResult = await dbConnection.retry(async () => {
+          return await supabase
             .from("vip_codes")
             .insert({
               code: codeData.code,
               max_uses: codeData.max_uses,
               current_uses: 0,
               description: codeData.description
-            });
+            })
+            .get();
         });
-        console.log(`Created VIP code: ${codeData.code}`);
+        
+        if (!insertResult || insertResult.error) {
+          console.error(`Failed to create VIP code ${codeData.code}:`, insertResult?.error);
+        } else {
+          console.log(`Created VIP code: ${codeData.code}`);
+        }
       }
     }
     
@@ -362,27 +389,29 @@ export async function ensureVipCodesExist(): Promise<boolean> {
  */
 export async function checkDatabaseHealth(): Promise<boolean> {
   try {
-    const { error: vipError } = await dbConnection.retry(async () => {
-      return supabase
+    const vipResult = await dbConnection.retry(async () => {
+      return await supabase
         .from('vip_codes')
         .select('count')
-        .limit(1);
+        .limit(1)
+        .get();
     });
     
-    if (vipError) {
-      console.error('VIP codes table check failed:', vipError);
+    if (!vipResult || vipResult.error) {
+      console.error('VIP codes table check failed:', vipResult?.error);
       return false;
     }
     
-    const { error: cardsError } = await dbConnection.retry(async () => {
-      return supabase
+    const cardsResult = await dbConnection.retry(async () => {
+      return await supabase
         .from('animorph_cards')
         .select('count')
-        .limit(1);
+        .limit(1)
+        .get();
     });
     
-    if (cardsError) {
-      console.error('Animorph cards table check failed:', cardsError);
+    if (!cardsResult || cardsResult.error) {
+      console.error('Animorph cards table check failed:', cardsResult?.error);
       return false;
     }
     
@@ -422,40 +451,42 @@ export async function validateVipCode(vipCode: string): Promise<boolean> {
       return isValid;
     }
     
-    // Modified query to handle case-insensitive comparison without ILIKE
-    const { data, error } = await dbConnection.retry(async () => {
-      return supabase
+    // Try exact match first
+    const result = await dbConnection.retry(async () => {
+      return await supabase
         .from("vip_codes")
         .select("*")
-        .eq("code", trimmedCode); // Try exact match first
+        .eq("code", trimmedCode)
+        .get();
     });
       
-    if (error) {
-      console.error("VIP code validation error:", error);
+    if (!result || result.error) {
+      console.error("VIP code validation error:", result?.error);
       return false;
     }
 
-    console.log(`VIP code database query for "${trimmedCode}" returned:`, data);
+    console.log(`VIP code database query for "${trimmedCode}" returned:`, result.data);
     
     let vipCodeData;
     
-    if (!data || data.length === 0) {
-      // If no exact match, try case-insensitive comparison manually
-      const { data: allCodes, error: allCodesError } = await dbConnection.retry(async () => {
-        return supabase
+    if (!result.data || result.data.length === 0) {
+      // If no exact match, try case-insensitive comparison
+      const allCodesResult = await dbConnection.retry(async () => {
+        return await supabase
           .from("vip_codes")
-          .select("*");
+          .select("*")
+          .get();
       });
       
-      if (allCodesError) {
-        console.error("Error fetching all VIP codes:", allCodesError);
+      if (!allCodesResult || allCodesResult.error) {
+        console.error("Error fetching all VIP codes:", allCodesResult?.error);
         return false;
       }
       
-      console.log("All VIP codes for manual case-insensitive search:", allCodes);
+      console.log("All VIP codes for manual case-insensitive search:", allCodesResult.data);
       
       // Manual case-insensitive comparison
-      const matchedCode = allCodes?.find(code => 
+      const matchedCode = allCodesResult.data?.find((code: any) => 
         code.code.toLowerCase() === trimmedCode.toLowerCase()
       );
       
@@ -467,7 +498,7 @@ export async function validateVipCode(vipCode: string): Promise<boolean> {
       vipCodeData = matchedCode;
       console.log("Found VIP code using manual case-insensitive search:", vipCodeData);
     } else {
-      vipCodeData = data[0];
+      vipCodeData = result.data[0];
       console.log(`Found VIP code in database: ${vipCodeData.code} (uses: ${vipCodeData.current_uses}/${vipCodeData.max_uses})`);
     }
     
@@ -509,7 +540,7 @@ export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
     
     // Try exact match first
     let { data, error } = await dbConnection.retry(async () => {
-      return supabase
+      return await supabase
         .from("vip_codes")
         .select("*")
         .eq("code", trimmedCode);
@@ -523,7 +554,7 @@ export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
     // If no exact match, try case-insensitive manual search
     if (!data || data.length === 0) {
       const { data: allCodes, error: allCodesError } = await dbConnection.retry(async () => {
-        return supabase
+        return await supabase
           .from("vip_codes")
           .select("*");
       });
@@ -555,7 +586,7 @@ export async function updateVipCodeUsage(vipCode: string): Promise<boolean> {
     }
     
     const { error: updateError } = await dbConnection.retry(async () => {
-      return supabase
+      return await supabase
         .from("vip_codes")
         .update({
           current_uses: vipCodeData.current_uses + 1
@@ -623,19 +654,20 @@ export async function fetchCardsByIds(ids: number[]): Promise<AnimorphCard[]> {
       return cachedCards.filter(Boolean) as AnimorphCard[];
     }
     
-    const { data, error } = await dbConnection.retry(async () => {
-      return supabase
+    const result = await dbConnection.retry(async () => {
+      return await supabase
         .from("animorph_cards")
         .select("*")
-        .in("id", ids);
+        .in("id", ids)
+        .get();
     });
     
-    if (error) {
-      console.error("Error batch fetching cards:", error);
-      throw error;
+    if (!result || result.error) {
+      console.error("Error batch fetching cards:", result?.error);
+      throw result?.error || new Error("Unknown error batch fetching cards");
     }
     
-    const fetchedCards = data as AnimorphCard[] || [];
+    const fetchedCards = result.data as AnimorphCard[] || [];
     
     fetchedCards.forEach(card => {
       cache.addToCache(

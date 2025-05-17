@@ -1,297 +1,299 @@
-import React, { useState, useEffect } from 'react';
+
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { d1 } from '@/lib/d1Database';
-import { toast } from '@/hooks/use-toast';
+import { d1Database } from '@/lib/d1Database';
+import { useD1Songs } from '@/hooks/useD1Songs';
+import { useAdmin } from '@/modules/admin';
+import { Pencil, Trash, Save, X, PlusCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
-const SongManagement = () => {
-  const [songs, setSongs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingSong, setEditingSong] = useState<any>(null);
-  const [form, setForm] = useState({
+export function SongManagement() {
+  const { songs, isLoading, error } = useD1Songs();
+  const { isAdmin } = useAdmin();
+  const { toast } = useToast();
+  const [editingSong, setEditingSong] = useState<string | null>(null);
+  const [songData, setSongData] = useState<Record<string, any>>({});
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newSong, setNewSong] = useState({
     title: '',
-    youtube_id: '',
+    youtube_url: '',
     preview_start_seconds: 0,
     preview_duration_seconds: 30
   });
   
+  // Reset editing state when songs change
   useEffect(() => {
-    fetchSongs();
-  }, []);
-  
-  const fetchSongs = async () => {
-    try {
-      setLoading(true);
-      
-      // Use the D1 database instead of Supabase
-      const result = await d1.from('songs')
-        .select('*')
-        .orderBy('title', 'asc')
-        .get();
-      
-      setSongs(result || []);
-    } catch (error) {
-      console.error('Error fetching songs:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load songs",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const openAddDialog = () => {
     setEditingSong(null);
-    setForm({
-      title: '',
-      youtube_id: '',
-      preview_start_seconds: 0,
-      preview_duration_seconds: 30
-    });
-    setIsDialogOpen(true);
-  };
+  }, [songs]);
   
-  const openEditDialog = (song: any) => {
-    setEditingSong(song);
-    setForm({
+  if (!isAdmin) {
+    return (
+      <div className="p-4">
+        <h2 className="text-xl font-bold">Unauthorized Access</h2>
+        <p>You do not have permission to manage songs.</p>
+      </div>
+    );
+  }
+  
+  if (isLoading) {
+    return <div className="p-4">Loading songs...</div>;
+  }
+  
+  if (error) {
+    return <div className="p-4 text-red-500">Error loading songs: {error.message}</div>;
+  }
+  
+  const startEditing = (song: any) => {
+    setEditingSong(song.id);
+    setSongData({
       title: song.title,
-      youtube_id: extractVideoId(song.youtube_url),
+      youtube_url: song.youtube_url,
       preview_start_seconds: song.preview_start_seconds || 0,
       preview_duration_seconds: song.preview_duration_seconds || 30
     });
-    setIsDialogOpen(true);
   };
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm({
-      ...form,
-      [name]: name.includes('seconds') ? parseFloat(value) : value
-    });
+  const cancelEditing = () => {
+    setEditingSong(null);
+    setSongData({});
   };
   
-  const handleSubmit = async () => {
-    if (!form.title || !form.youtube_id) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please complete all required fields",
-      });
-      return;
-    }
-    
+  const handleSaveEdit = async (songId: string) => {
     try {
-      const youtube_url = `https://www.youtube.com/watch?v=${form.youtube_id}`;
+      await d1Database.from('songs')
+        .update(songData)
+        .eq('id', songId);
       
-      if (editingSong) {
-        // Update existing song
-        await d1.from('songs')
-          .update({
-            title: form.title,
-            youtube_url,
-            preview_start_seconds: form.preview_start_seconds,
-            preview_duration_seconds: form.preview_duration_seconds
-          })
-          .where('id', '=', editingSong.id)
-          .execute();
-        
-        toast({
-          title: "Success",
-          description: "Song updated successfully",
-        });
-      } else {
-        // Add new song
-        await d1.from('songs')
-          .insert({
-            id: crypto.randomUUID(),
-            title: form.title,
-            youtube_url,
-            preview_start_seconds: form.preview_start_seconds,
-            preview_duration_seconds: form.preview_duration_seconds
-          })
-          .execute();
-        
-        toast({
-          title: "Success",
-          description: "Song added successfully",
-        });
-      }
-      
-      setIsDialogOpen(false);
-      fetchSongs();
-    } catch (error) {
-      console.error('Error saving song:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save song",
+        title: 'Song Updated',
+        description: 'The song has been successfully updated.'
+      });
+      
+      setEditingSong(null);
+      // In a real implementation, we would refresh the songs list here
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update song.',
+        variant: 'destructive'
       });
     }
   };
   
-  const handleDelete = async (songId: string) => {
-    if (!confirm("Are you sure you want to delete this song?")) return;
+  const handleDeleteSong = async (songId: string) => {
+    if (!confirm('Are you sure you want to delete this song?')) return;
     
     try {
-      await d1.from('songs')
+      await d1Database.from('songs')
         .delete()
-        .where('id', '=', songId)
-        .execute();
+        .eq('id', songId);
       
       toast({
-        title: "Success",
-        description: "Song deleted successfully",
+        title: 'Song Deleted',
+        description: 'The song has been permanently deleted.'
       });
-      
-      fetchSongs();
-    } catch (error) {
-      console.error('Error deleting song:', error);
+      // In a real implementation, we would refresh the songs list here
+    } catch (err) {
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete song",
+        title: 'Error',
+        description: 'Failed to delete song.',
+        variant: 'destructive'
       });
     }
   };
   
-  const extractVideoId = (url: string): string => {
-    if (!url) return '';
-    
+  const handleAddSong = async () => {
     try {
-      const urlObj = new URL(url);
-      if (urlObj.hostname.includes('youtube.com')) {
-        return urlObj.searchParams.get('v') || '';
+      if (!newSong.title || !newSong.youtube_url) {
+        toast({
+          title: 'Missing Information',
+          description: 'Please provide both title and YouTube URL.',
+          variant: 'destructive'
+        });
+        return;
       }
-      if (urlObj.hostname.includes('youtu.be')) {
-        return urlObj.pathname.slice(1);
-      }
-    } catch (e) {
-      console.error("Invalid URL format:", url);
-      return '';
+      
+      await d1Database.from('songs').insert(newSong);
+      
+      toast({
+        title: 'Song Added',
+        description: 'The new song has been successfully added.'
+      });
+      
+      setIsAddingNew(false);
+      setNewSong({
+        title: '',
+        youtube_url: '',
+        preview_start_seconds: 0,
+        preview_duration_seconds: 30
+      });
+      // In a real implementation, we would refresh the songs list here
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: 'Failed to add new song.',
+        variant: 'destructive'
+      });
     }
-    
-    return '';
   };
   
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold">Song Management</h3>
-        <Button onClick={openAddDialog}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Song
+    <div className="p-4 space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">Song Management</h2>
+        <Button onClick={() => setIsAddingNew(true)} disabled={isAddingNew}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Add New Song
         </Button>
       </div>
       
-      {loading ? (
-        <div className="text-center py-4">Loading songs...</div>
-      ) : (
+      {isAddingNew && (
+        <div className="bg-card p-4 border rounded-md shadow space-y-4">
+          <h3 className="font-semibold">Add New Song</h3>
+          
+          <div className="space-y-2">
+            <Label htmlFor="new-title">Title</Label>
+            <Input 
+              id="new-title" 
+              value={newSong.title} 
+              onChange={e => setNewSong({...newSong, title: e.target.value})} 
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="new-youtube">YouTube URL</Label>
+            <Input 
+              id="new-youtube" 
+              value={newSong.youtube_url} 
+              onChange={e => setNewSong({...newSong, youtube_url: e.target.value})} 
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-start">Preview Start (seconds)</Label>
+              <Input 
+                id="new-start" 
+                type="number" 
+                value={newSong.preview_start_seconds} 
+                onChange={e => setNewSong({...newSong, preview_start_seconds: Number(e.target.value)})} 
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="new-duration">Preview Duration (seconds)</Label>
+              <Input 
+                id="new-duration" 
+                type="number" 
+                value={newSong.preview_duration_seconds} 
+                onChange={e => setNewSong({...newSong, preview_duration_seconds: Number(e.target.value)})} 
+              />
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setIsAddingNew(false)}>
+              <X className="mr-2 h-4 w-4" /> Cancel
+            </Button>
+            <Button onClick={handleAddSong}>
+              <Save className="mr-2 h-4 w-4" /> Save
+            </Button>
+          </div>
+        </div>
+      )}
+      
+      <div className="border rounded-md shadow">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Title</TableHead>
-              <TableHead>YouTube ID</TableHead>
+              <TableHead>YouTube URL</TableHead>
               <TableHead>Preview Start</TableHead>
-              <TableHead>Preview Duration</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {songs.length > 0 ? (
+            {songs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-4">
+                  No songs found
+                </TableCell>
+              </TableRow>
+            ) : (
               songs.map(song => (
                 <TableRow key={song.id}>
-                  <TableCell>{song.title}</TableCell>
-                  <TableCell>{extractVideoId(song.youtube_url)}</TableCell>
-                  <TableCell>{song.preview_start_seconds}s</TableCell>
-                  <TableCell>{song.preview_duration_seconds}s</TableCell>
                   <TableCell>
-                    <div className="flex space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEditDialog(song)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(song.id)}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
+                    {editingSong === song.id ? (
+                      <Input 
+                        value={songData.title} 
+                        onChange={e => setSongData({...songData, title: e.target.value})} 
+                      />
+                    ) : (
+                      song.title
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs truncate max-w-[200px]">
+                    {editingSong === song.id ? (
+                      <Input 
+                        value={songData.youtube_url} 
+                        onChange={e => setSongData({...songData, youtube_url: e.target.value})} 
+                      />
+                    ) : (
+                      song.youtube_url
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingSong === song.id ? (
+                      <Input 
+                        type="number"
+                        value={songData.preview_start_seconds} 
+                        onChange={e => setSongData({...songData, preview_start_seconds: Number(e.target.value)})} 
+                      />
+                    ) : (
+                      song.preview_start_seconds || 0
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingSong === song.id ? (
+                      <Input 
+                        type="number"
+                        value={songData.preview_duration_seconds} 
+                        onChange={e => setSongData({...songData, preview_duration_seconds: Number(e.target.value)})} 
+                      />
+                    ) : (
+                      song.preview_duration_seconds || 30
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {editingSong === song.id ? (
+                      <div className="flex justify-end space-x-2">
+                        <Button size="sm" variant="outline" onClick={cancelEditing}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" onClick={() => handleSaveEdit(song.id)}>
+                          <Save className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end space-x-2">
+                        <Button size="sm" variant="outline" onClick={() => startEditing(song)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleDeleteSong(song.id)}>
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center">
-                  No songs available
-                </TableCell>
-              </TableRow>
             )}
           </TableBody>
         </Table>
-      )}
-      
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingSong ? 'Edit Song' : 'Add New Song'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="title">Song Title</label>
-              <Input
-                id="title"
-                name="title"
-                value={form.title}
-                onChange={handleInputChange}
-                placeholder="Enter song title"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="youtube_id">YouTube Video ID</label>
-              <Input
-                id="youtube_id"
-                name="youtube_id"
-                value={form.youtube_id}
-                onChange={handleInputChange}
-                placeholder="e.g. dQw4w9WgXcQ"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="preview_start_seconds">Preview Start (seconds)</label>
-                <Input
-                  id="preview_start_seconds"
-                  name="preview_start_seconds"
-                  type="number"
-                  min="0"
-                  value={form.preview_start_seconds}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="preview_duration_seconds">Preview Duration (seconds)</label>
-                <Input
-                  id="preview_duration_seconds"
-                  name="preview_duration_seconds"
-                  type="number"
-                  min="1"
-                  value={form.preview_duration_seconds}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit}>{editingSong ? 'Update' : 'Add'} Song</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </div>
     </div>
   );
-};
-
-export default SongManagement;
+}

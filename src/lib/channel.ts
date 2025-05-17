@@ -11,7 +11,7 @@ export interface Channel {
   name: string;
   userId: string;
   subscribed: boolean;
-  subscribe: () => Promise<Subscription>;
+  subscribe: () => Subscription;
   unsubscribe: () => Promise<boolean>;
   publish: (event: string, payload: any) => Promise<boolean>;
 }
@@ -26,7 +26,7 @@ export function createChannel(name: string, userId?: string): Channel {
     userId: userId || 'anonymous',
     get subscribed() { return isSubscribed; },
     
-    subscribe: async () => {
+    subscribe: () => {
       console.log(`Subscribing to channel ${name} for user ${userId || 'anonymous'}`);
       isSubscribed = true;
       
@@ -34,6 +34,10 @@ export function createChannel(name: string, userId?: string): Channel {
       const subscription = {
         unsubscribe: () => {
           console.log(`Unsubscribing from specific handler in channel ${name}`);
+          const index = activeSubscriptions.indexOf(subscription);
+          if (index !== -1) {
+            activeSubscriptions.splice(index, 1);
+          }
           isSubscribed = activeSubscriptions.length > 0;
         }
       };
@@ -78,13 +82,10 @@ export function createChannelWithCallback(
 ): { channel: Channel, subscription: Subscription } {
   const channel = createChannel(name, userId);
   
-  // Mock subscription that would normally listen for events
-  const subscription = {
-    unsubscribe: () => {
-      console.log(`Unsubscribing from event ${eventType} in channel ${name}`);
-    }
-  };
+  // Create a real subscription
+  const subscription = channel.subscribe();
   
+  // In a real implementation, we would set up an event listener here
   console.log(`Created channel ${name} with listener for event ${eventType}`);
   
   return { channel, subscription };

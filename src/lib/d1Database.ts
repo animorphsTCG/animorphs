@@ -5,6 +5,7 @@
  */
 
 import { d1Worker } from './cloudflare/d1Worker';
+import { UserProfile, AnimorphCard, PaymentStatus, VipCode } from '@/types';
 
 // Type definitions for Supabase compatibility
 export interface D1Result<T> {
@@ -55,6 +56,8 @@ export class EnhancedD1QueryBuilder<T = any> {
   private offsetClause: number | null = null;
   private selectColumns: string[] = ['*'];
   private token?: string;
+  private rangeStart: number | null = null;
+  private rangeEnd: number | null = null;
 
   constructor(table: string, token?: string) {
     this.table = table;
@@ -150,6 +153,58 @@ export class EnhancedD1QueryBuilder<T = any> {
     } else {
       this.conditions.push(`${column} IS NOT NULL`);
     }
+    return this;
+  }
+  
+  /**
+   * Filter by NOT condition with a subquery in format 'column', 'in', '(1,2,3)'
+   */
+  not(column: string, predicate: string, values: string | string[] | number[]): EnhancedD1QueryBuilder<T> {
+    if (predicate === 'in' && Array.isArray(values)) {
+      if (values.length === 0) {
+        // Empty NOT IN is always true (return all rows)
+        return this;
+      }
+      
+      const placeholders = values.map(() => '?').join(',');
+      this.conditions.push(`${column} NOT IN (${placeholders})`);
+      this.params.push(...values);
+      return this;
+    } else if (predicate === 'in' && typeof values === 'string') {
+      this.conditions.push(`${column} NOT IN ${values}`);
+      return this;
+    } else {
+      console.error('Unsupported NOT operation:', predicate);
+      return this;
+    }
+  }
+  
+  /**
+   * LIKE query for string pattern matching
+   */
+  like(column: string, pattern: string): EnhancedD1QueryBuilder<T> {
+    this.conditions.push(`${column} LIKE ?`);
+    this.params.push(pattern);
+    return this;
+  }
+  
+  /**
+   * Case insensitive LIKE
+   */
+  ilike(column: string, pattern: string): EnhancedD1QueryBuilder<T> {
+    this.conditions.push(`LOWER(${column}) LIKE LOWER(?)`);
+    this.params.push(pattern);
+    return this;
+  }
+
+  /**
+   * Range-based pagination (inclusive)
+   */
+  range(start: number, end: number): EnhancedD1QueryBuilder<T> {
+    this.rangeStart = start;
+    this.rangeEnd = end;
+    this.limitClause = (end - start) + 1;
+    this.offsetClause = start;
     return this;
   }
 
@@ -264,7 +319,27 @@ export class EnhancedD1QueryBuilder<T = any> {
   }
 
   /**
+   * Get first record (or null if not found)
+   * Same as first() in Supabase
+   */
+  async first(): Promise<T | null> {
+    try {
+      const prevLimit = this.limitClause;
+      this.limitClause = 1;
+      
+      const result = await this.get();
+      this.limitClause = prevLimit;
+      
+      return result.data.length > 0 ? result.data[0] : null;
+    } catch (error) {
+      console.error('Error in first():', error);
+      return null;
+    }
+  }
+
+  /**
    * Get a single record (or null if not found)
+   * This is equivalent to Supabase's maybeSingle()
    */
   async maybeSingle(): Promise<D1Response<T>> {
     try {
@@ -412,6 +487,67 @@ export class EnhancedD1QueryBuilder<T = any> {
         data: [],
         error: error as Error
       };
+    }
+  }
+  
+  /**
+   * Execute SQL query directly
+   * Returns { data, error } format for compatibility
+   */
+  async execute(sql: string, params?: any[]): Promise<D1Response<any>> {
+    try {
+      const result = await d1Worker.query(
+        sql,
+        { params: params || this.params },
+        this.token
+      );
+      
+      return {
+        data: result || [],
+        error: null
+      };
+    } catch (error) {
+      console.error('Error executing SQL:', error);
+      return {
+        data: [],
+        error: error as Error
+      };
+    }
+  }
+  
+  /**
+   * Count rows
+   */
+  async count(): Promise<{ count: number, error: Error | null }> {
+    try {
+      // Save current select columns and order by
+      const savedSelect = [...this.selectColumns];
+      const savedOrderBy = this.orderByClause;
+      
+      // Set select to COUNT(*) and remove order by
+      this.selectColumns = ['COUNT(*) as count'];
+      this.orderByClause = '';
+      
+      const sql = this.buildQuery();
+      const options: QueryOptions = { params: this.params };
+      
+      const results = await d1Worker.query(sql, options, this.token);
+      
+      // Restore original values
+      this.selectColumns = savedSelect;
+      this.orderByClause = savedOrderBy;
+      
+      if (!results || !results.length) {
+        return { count: 0, error: null };
+      }
+      
+      return { 
+        count: parseInt(results[0].count || '0'), 
+        error: null 
+      };
+    } catch (error) {
+      console.error('Error in count operation:', error);
+      return { count: 0, error: error as Error };
     }
   }
 }
@@ -579,6 +715,9 @@ export class D1Database {
   removeChannel(channel: any): void {
     console.log('Removing channel', channel);
     // In a real implementation, this would disconnect from Durable Objects
+    if (channel && typeof channel.unsubscribe === 'function') {
+      channel.unsubscribe();
+    }
   }
   
   /**
@@ -599,3 +738,11 @@ export class D1Database {
 
 // Create a singleton instance
 export const d1Database = new D1Database();
+
+// Export the d1Database as d1 for backward compatibility
+export const d1 = d1Database;
+
+// Helper function to initialize the database with a token
+export const initializeD1Database = (token: string): void => {
+  d1Database.setToken(token);
+};

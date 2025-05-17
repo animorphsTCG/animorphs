@@ -1,148 +1,32 @@
 
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { d1 } from "@/lib/d1Database";
-import { useAuth } from "@/modules/auth/context/EOSAuthContext";
-import { toast } from "@/hooks/use-toast";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Shield } from 'lucide-react';
+import { AdminAccessModal } from './AdminAccessModal';
+import { useAdmin } from '@/modules/admin';
+import { d1Database } from '@/lib/d1Database';
 
-const ADMIN_PASSWORD = "Adanacia23.";
-const ADMIN_EMAIL = "adanacia23d@gmail.com";
-
-interface AdminAccessTriggerProps {
-  onAuthenticated?: () => void;
-}
-
-const AdminAccessTrigger: React.FC<AdminAccessTriggerProps> = ({ onAuthenticated }) => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [password, setPassword] = useState("");
-  const [isKeyCombination, setIsKeyCombination] = useState(false);
-  const [typedKeys, setTypedKeys] = useState("");
-  const { user } = useAuth();
-
-  // Track key states for Ctrl+Alt
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.altKey) {
-        setIsKeyCombination(true);
-      }
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || !event.altKey) {
-        setIsKeyCombination(false);
-        if (typedKeys.length > 0) {
-          setTypedKeys("");
-        }
-      }
-    };
-
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (isKeyCombination) {
-        setTypedKeys(prevKeys => prevKeys + event.key);
-        
-        // Check if "admin" has been typed
-        if ((typedKeys + event.key).toLowerCase().includes("admin")) {
-          setIsDialogOpen(true);
-          setTypedKeys("");
-          setIsKeyCombination(false);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("keypress", handleKeyPress);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("keypress", handleKeyPress);
-    };
-  }, [isKeyCombination, typedKeys]);
-
-  const handleAdminLogin = async () => {
-    if (password !== ADMIN_PASSWORD) {
-      toast({
-        title: "Authentication Failed",
-        description: "Invalid admin password",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!user) {
-      toast({
-        title: "Error",
-        description: "You must be logged in to access admin functions",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Verify user is the admin email
-    if (user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-      toast({
-        title: "Authentication Failed",
-        description: "You do not have admin privileges",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      // Set the user as an admin using the d1 wrapper
-      await d1.from('profiles')
-        .update({ is_admin: true })
-        .eq('id', user.id);
-
-      toast({
-        title: "Admin Access Granted",
-        description: "Welcome to the admin dashboard"
-      });
-      
-      setIsDialogOpen(false);
-      if (onAuthenticated) {
-        onAuthenticated();
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to authenticate admin",
-        variant: "destructive"
-      });
-    }
-  };
-
+// Component to trigger admin access authentication
+export function AdminAccessTrigger() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { isAdmin } = useAdmin();
+  
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Strictly for Admin only use</DialogTitle>
-        </DialogHeader>
-        <div className="py-4">
-          <Input
-            type="password"
-            placeholder="Enter admin password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleAdminLogin();
-              }
-            }}
-          />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleAdminLogin}>Login</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Button 
+        variant="ghost" 
+        size="icon"
+        className="fixed top-4 right-4 z-50 bg-black/20 backdrop-blur-sm hover:bg-black/40"
+        onClick={() => setIsModalOpen(true)}
+        aria-label="Admin Access"
+      >
+        <Shield className={`h-5 w-5 ${isAdmin ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+      </Button>
+      
+      <AdminAccessModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+      />
+    </>
   );
-};
-
-export default AdminAccessTrigger;
+}

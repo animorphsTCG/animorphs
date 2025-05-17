@@ -1,273 +1,152 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/modules/auth";
-import { useNavigate } from "react-router-dom";
-import { Mail, Loader2, Check, X } from "lucide-react";
-import { d1Worker } from '@/lib/cloudflare/d1Worker';
-import { toast } from '@/components/ui/use-toast';
-import { createChannelWithCallback } from '@/lib/channel';
 
-interface BattleInvite {
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/modules/auth';
+import { createChannel } from '@/lib/channel';
+import { Check, X } from 'lucide-react';
+
+interface Invite {
   id: string;
-  lobby_id: string;
-  lobby_name: string;
-  battle_type: string;
-  invited_by: string;
-  created_at: string;
-  inviter_username?: string;
+  from: {
+    id: string;
+    username: string;
+  };
+  battleType: '1v1' | '4player';
+  timestamp: number;
 }
 
-export const BattleInvites = () => {
-  const { user, token } = useAuth();
+export function BattleInvites() {
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [invites, setInvites] = useState<BattleInvite[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [responding, setResponding] = useState<Record<string, boolean>>({});
+  const { user } = useAuth();
+  const [channel, setChannel] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
   
+  // Set up invite channel on mount
   useEffect(() => {
-    if (!user || !token?.access_token) return;
+    if (!user) return;
     
-    const fetchInvites = async () => {
-      try {
-        setLoading(true);
-
-        const invitesQuery = `
-          SELECT bi.*, p.username as inviter_username 
-          FROM battle_invites bi
-          JOIN profiles p ON bi.invited_by = p.id
-          WHERE bi.user_id = ? AND bi.is_accepted = 0 AND bi.is_rejected = 0
-        `;
-        
-        const data = await d1Worker.query(
-          invitesQuery,
-          { params: [user.id] },
-          token.access_token
-        );
-          
-        setInvites(data || []);
-      } catch (err) {
-        console.error("Error fetching invites:", err);
-        toast({
-          title: "Error",
-          description: "Failed to load battle invites",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Create channel for the user's invites
+    const inviteChannel = createChannel(`invites:${user.id}`, user.id);
+    setChannel(inviteChannel);
     
-    fetchInvites();
+    // Subscribe to the channel
+    const sub = inviteChannel.subscribe();
+    setSubscription(sub);
     
-    // Set up event listener for new invites
-    const { subscription } = createChannelWithCallback(
-      'battle-invites',
-      'INSERT',
-      () => fetchInvites()
-    );
-    
+    // Cleanup on unmount
     return () => {
-      if (subscription) {
-        subscription.unsubscribe();
+      if (sub) {
+        sub.unsubscribe();
+      }
+      
+      if (inviteChannel) {
+        inviteChannel.unsubscribe();
       }
     };
-  }, [user, token]);
+  }, [user]);
   
-  const handleInviteResponse = async (inviteId: string, lobbyId: string, accept: boolean) => {
-    if (!user || !token?.access_token) return;
+  // Handle receiving a battle invite
+  const handleInviteReceived = (invite: Invite) => {
+    setInvites(prev => [...prev, invite]);
     
+    toast({
+      title: 'Battle Invite',
+      description: `${invite.from.username} has invited you to a ${invite.battleType} battle!`,
+      duration: 10000,
+    });
+  };
+  
+  // Accept an invite
+  const acceptInvite = async (invite: Invite) => {
     try {
-      setResponding(prev => ({ ...prev, [inviteId]: true }));
+      // Remove the invite from the list
+      setInvites(prev => prev.filter(i => i.id !== invite.id));
       
-      // Update invite status
-      await d1Worker.update(
-        'battle_invites',
-        {
-          is_accepted: accept ? 1 : 0,
-          is_rejected: accept ? 0 : 1,
-          responded_at: new Date().toISOString()
-        },
-        'id = ?',
-        [inviteId],
-        null,
-        token.access_token
-      );
+      // Navigate to the battle room
+      navigate(`/battle/multiplayer/${invite.id}`);
       
-      if (accept) {
-        // Check if lobby still exists and has space
-        const lobby = await d1Worker.getOne(
-          'SELECT * FROM battle_lobbies WHERE id = ?',
-          { params: [lobbyId] },
-          token.access_token
-        );
-          
-        if (!lobby) {
-          toast({
-            title: "Lobby Not Available",
-            description: "The battle lobby is no longer available",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        // Check participant count
-        const participantsQuery = 'SELECT COUNT(*) as count FROM lobby_participants WHERE lobby_id = ?';
-        const participantCount = await d1Worker.getOne(
-          participantsQuery,
-          { params: [lobbyId] },
-          token.access_token
-        );
-          
-        const currentCount = participantCount ? participantCount.count : 0;
-        
-        if (currentCount >= lobby.max_players) {
-          toast({
-            title: "Lobby Full",
-            description: "The battle lobby is already full",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        // Join the lobby
-        await d1Worker.insert(
-          'lobby_participants',
-          {
-            lobby_id: lobbyId,
-            user_id: user.id,
-            player_number: currentCount + 1
-          },
-          null,
-          token.access_token
-        );
-        
-        // Close the popover
-        setOpen(false);
-        
-        // Redirect to the right battle page
-        let route = "";
-        switch (lobby.battle_type) {
-          case "1v1":
-            route = `/battle/multiplayer/${lobbyId}`;
-            break;
-          case "3player":
-            route = `/3-player-battle/${lobbyId}`;
-            break;
-          case "4player":
-            route = `/4-player-user-lobby/${lobbyId}`;
-            break;
-        }
-        
-        navigate(route);
-      } else {
-        // Remove from invites list
-        setInvites(prev => prev.filter(invite => invite.id !== inviteId));
-        
-        toast({
-          title: "Invite Declined",
-          description: "You've declined the battle invitation"
-        });
-      }
-    } catch (error) {
-      console.error("Error responding to invite:", error);
       toast({
-        title: "Error",
-        description: "Failed to respond to battle invitation",
-        variant: "destructive"
+        title: 'Battle Accepted',
+        description: `You've joined ${invite.from.username}'s battle!`,
       });
-    } finally {
-      setResponding(prev => ({ ...prev, [inviteId]: false }));
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to accept the invite.',
+        variant: 'destructive',
+      });
     }
   };
   
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Mail className="h-5 w-5" />
-          {invites.length > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center">
-              {invites.length}
-            </Badge>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80">
-        <div className="space-y-2">
-          <h3 className="font-medium">Battle Invitations</h3>
-          
-          {loading ? (
-            <div className="py-4 flex justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : invites.length > 0 ? (
-            <div className="divide-y">
-              {invites.map(invite => (
-                <div key={invite.id} className="py-3 space-y-2">
-                  <div>
-                    <p className="font-medium">{invite.lobby_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      From: {invite.inviter_username || "Unknown"} • {formatBattleType(invite.battle_type)}
-                    </p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button 
-                      size="sm" 
-                      className="w-full"
-                      onClick={() => handleInviteResponse(invite.id, invite.lobby_id, true)}
-                      disabled={!!responding[invite.id]}
-                    >
-                      {responding[invite.id] ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Check className="h-4 w-4 mr-1" />
-                      )}
-                      Accept
-                    </Button>
-                    <Button 
-                      size="sm"
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => handleInviteResponse(invite.id, invite.lobby_id, false)}
-                      disabled={!!responding[invite.id]}
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Decline
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              No pending battle invitations
-            </p>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-};
-
-// Helper function to format battle type
-function formatBattleType(type: string): string {
-  switch (type) {
-    case "1v1":
-      return "1v1 Battle";
-    case "3player":
-      return "3-Player Tournament";
-    case "4player":
-      return "4-Player Battle";
-    default:
-      return type;
+  // Decline an invite
+  const declineInvite = (invite: Invite) => {
+    setInvites(prev => prev.filter(i => i.id !== invite.id));
+    
+    toast({
+      title: 'Battle Declined',
+      description: `You've declined ${invite.from.username}'s battle invite.`,
+    });
+  };
+  
+  // Format timestamp
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  if (invites.length === 0) {
+    return null;
   }
+  
+  return (
+    <Card className="fixed bottom-4 right-4 w-80 z-50 bg-slate-900/90 backdrop-blur-sm border-fantasy-accent shadow-lg">
+      <CardHeader className="py-3">
+        <CardTitle className="text-lg flex items-center">
+          Battle Invites
+          <Badge variant="secondary" className="ml-2">
+            {invites.length}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 max-h-[200px] overflow-y-auto">
+        {invites.map(invite => (
+          <div 
+            key={invite.id} 
+            className="bg-slate-800/60 p-3 rounded-md flex flex-col"
+          >
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-semibold">{invite.from.username}</span>
+              <span className="text-xs opacity-70">{formatTime(invite.timestamp)}</span>
+            </div>
+            <div className="text-sm mb-2">
+              Invites you to a {invite.battleType} battle
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button 
+                size="sm" 
+                variant="ghost"
+                onClick={() => declineInvite(invite)}
+                className="h-8 px-2 text-red-400 hover:text-red-500"
+              >
+                <X className="h-4 w-4 mr-1" /> Decline
+              </Button>
+              <Button 
+                size="sm"
+                onClick={() => acceptInvite(invite)}
+                className="h-8 px-2 bg-green-700 hover:bg-green-600"
+              >
+                <Check className="h-4 w-4 mr-1" /> Accept
+              </Button>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 }
-
-export default BattleInvites;

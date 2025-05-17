@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { RotateCcw, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
-import { useAdmin } from '@/hooks/useAdmin';
+import { useAdmin } from '@/modules/admin/hooks/useAdmin';
 import { runMigration } from '@/lib/cloudflare/migrations/migrator';
 
 // Migration status interface
@@ -18,13 +18,13 @@ interface MigrationStatus {
 }
 
 const MigrationPanel: React.FC = () => {
-  const { token } = useAdmin();
+  const { adminToken } = useAdmin();
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   
   const runDataMigration = async () => {
-    if (!token || !token.access_token) {
+    if (!adminToken) {
       toast({
         title: "Authentication Required",
         description: "You must be authenticated as an admin to run migrations",
@@ -37,7 +37,7 @@ const MigrationPanel: React.FC = () => {
     setIsCompleted(false);
     
     try {
-      const status = await runMigration(token.access_token);
+      const status = await runMigration(adminToken);
       setMigrationStatus(status);
       setIsCompleted(true);
       
@@ -98,7 +98,7 @@ const MigrationPanel: React.FC = () => {
           
           <Button
             onClick={runDataMigration}
-            disabled={isRunning || !token}
+            disabled={isRunning || !adminToken}
             className="mb-4"
           >
             {isRunning ? (

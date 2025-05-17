@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useBattleLobby } from '../hooks/useBattleLobby';
 import { useNavigate } from 'react-router-dom';
+import { Lobby, Participant } from '../hooks/types';
 
 interface LobbyUIProps {
   lobbyId: string;
@@ -17,14 +17,14 @@ interface LobbyUIProps {
 export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
   const navigate = useNavigate();
   const {
-    lobbyData,
-    lobbyMembers,
-    isHost,
+    lobby,
+    participants,
+    isOwner,
     isReady,
     isLeavingLobby,
     battleStarted,
     leaveLobby,
-    setReady, // Renamed from setReadyStatus to match hook implementation
+    setReady,
     startBattle
   } = useBattleLobby(lobbyId);
   
@@ -39,7 +39,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
     }
   };
   
-  if (!lobbyData) {
+  if (!lobby) {
     return (
       <Card className="border-2 border-fantasy-primary bg-black/70">
         <CardContent className="py-6 flex justify-center">
@@ -53,12 +53,12 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
     <Card className="border-2 border-fantasy-primary bg-black/70">
       <CardHeader>
         <CardTitle className="text-2xl font-fantasy text-fantasy-accent">
-          {lobbyData.name}
+          {lobby.name}
         </CardTitle>
         <CardDescription>
-          {lobbyData.battle_type === '1v1' ? '1v1 Battle' : 
-           lobbyData.battle_type === '3player' ? '3-Player Tournament' : 
-           '4-Player Battle'} • {lobbyMembers.length}/{lobbyData.max_players} Players
+          {lobby.battle_type === '1v1' ? '1v1 Battle' : 
+           lobby.battle_type === '3player' ? '3-Player Tournament' : 
+           '4-Player Battle'} • {participants.length}/{lobby.max_players} Players
         </CardDescription>
       </CardHeader>
       
@@ -72,7 +72,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
             </span>
           </div>
           
-          {lobbyData.useTimer && (
+          {lobby.useTimer && (
             <div className="flex items-center text-sm text-gray-400">
               <Clock className="mr-1 h-4 w-4" />
               <span>10-min timer enabled</span>
@@ -84,7 +84,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
         <div className="space-y-3">
           <h3 className="font-medium">Players</h3>
           <div className="space-y-2">
-            {lobbyMembers.map((member) => (
+            {participants.map((member) => (
               <div key={member.id} 
                 className={`flex items-center justify-between p-2 rounded ${
                   member.isReady ? 'bg-green-500/10 border border-green-500/30' : 'bg-gray-800/50'
@@ -95,7 +95,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
                     {member.profile_image_url ? (
                       <AvatarImage src={member.profile_image_url} />
                     ) : (
-                      <AvatarFallback>{member.username.charAt(0).toUpperCase()}</AvatarFallback>
+                      <AvatarFallback>{member.username?.charAt(0).toUpperCase()}</AvatarFallback>
                     )}
                   </Avatar>
                   <div>
@@ -118,7 +118,7 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
             ))}
             
             {/* Empty Slots */}
-            {Array.from({ length: lobbyData.max_players - lobbyMembers.length }).map((_, i) => (
+            {Array.from({ length: lobby.max_players - participants.length }).map((_, i) => (
               <div key={`empty-${i}`} className="flex items-center justify-center p-4 rounded border border-dashed border-gray-700 bg-gray-900/30">
                 <span className="text-gray-500">Empty Slot</span>
               </div>
@@ -138,10 +138,10 @@ export const LobbyUI: React.FC<LobbyUIProps> = ({ lobbyId, onLeave }) => {
               <Label htmlFor="ready-status">Ready</Label>
             </div>
             
-            {isHost && (
+            {isOwner && (
               <Button
                 className="fantasy-button"
-                disabled={lobbyMembers.length < 2 || !lobbyMembers.every(m => m.isReady)}
+                disabled={participants.length < 2 || !participants.every(m => m.isReady)}
                 onClick={startBattle}
               >
                 <Users className="mr-2 h-4 w-4" />

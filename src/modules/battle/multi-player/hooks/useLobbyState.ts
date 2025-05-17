@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/modules/auth';
@@ -88,25 +87,27 @@ export const useLobbyState = (lobbyId: string | null) => {
     // Subscribe to realtime updates with fixed method
     const lobbyChannel = supabase.channel('lobby_changes');
     
-    lobbyChannel.on('*', { 
+    lobbyChannel.on('postgres_changes', { 
       event: '*',
       schema: 'public',
       table: 'battle_lobbies' 
-    }).subscribe(payload => {
-      if (payload.record && payload.record.id === lobbyId) {
+    }, (payload) => {
+      if (payload.new && payload.new.id === lobbyId) {
         fetchLobbyState();
       }
     });
 
-    lobbyChannel.on('*', { 
+    lobbyChannel.on('postgres_changes', { 
       event: '*',
       schema: 'public',
       table: 'lobby_participants' 
-    }).subscribe(payload => {
-      if (payload.record && payload.record.lobby_id === lobbyId) {
+    }, (payload) => {
+      if (payload.new && payload.new.lobby_id === lobbyId) {
         fetchLobbyState();
       }
     });
+
+    lobbyChannel.subscribe();
 
     return () => {
       supabase.removeChannel(lobbyChannel);

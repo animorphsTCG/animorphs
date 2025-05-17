@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -178,19 +177,21 @@ export const useBattleQueue = () => {
     // Listen for matches
     const channel = supabase.channel('battle_queue');
     
-    // Fix the subscription method
-    channel.on('INSERT', {
+    // Fix the subscription method - updated to match current Supabase JS API
+    channel.on('postgres_changes', { 
       event: 'INSERT', 
       schema: 'public', 
       table: 'battle_sessions'
-    }).subscribe((payload) => {
-      if (payload.record && 
-          payload.record.player_ids && 
-          payload.record.player_ids.includes(user.id)) {
+    }, (payload) => {
+      if (payload.new && 
+          payload.new.player_ids && 
+          payload.new.player_ids.includes(user.id)) {
         handleMatchFound(payload);
       }
     });
       
+    channel.subscribe();
+    
     // Clean up subscription
     return () => {
       supabase.removeChannel(channel);

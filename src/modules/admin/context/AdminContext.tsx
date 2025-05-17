@@ -1,10 +1,12 @@
 
 import React, { createContext, useContext, useState } from 'react';
 import { useAuth } from '@/modules/auth/context/AuthContext';
+import { useAdminStatus } from '../hooks/useAdmin';
 
 interface AdminContextState {
   isAdminMode: boolean;
   setAdminMode: (value: boolean) => void;
+  isAdmin: boolean;
 }
 
 const AdminContext = createContext<AdminContextState>({} as AdminContextState);
@@ -20,6 +22,7 @@ export const useAdmin = () => {
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAdminMode, setAdminMode] = useState(false);
   const { user } = useAuth();
+  const { isAdmin } = useAdminStatus();
 
   // Reset admin mode when user changes
   React.useEffect(() => {
@@ -32,7 +35,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <AdminContext.Provider
       value={{
         isAdminMode,
-        setAdminMode
+        setAdminMode,
+        isAdmin
       }}
     >
       {children}

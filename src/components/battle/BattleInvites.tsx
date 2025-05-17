@@ -57,8 +57,7 @@ export function BattleInvites() {
     
     toast({
       title: 'Battle Invite',
-      description: `${invite.from.username} has invited you to a ${invite.battleType} battle!`,
-      duration: 10000,
+      description: `${invite.from.username} has invited you to a ${invite.battleType} battle!`
     });
   };
   

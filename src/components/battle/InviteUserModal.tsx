@@ -72,8 +72,17 @@ const InviteUserModal = ({ open, onOpenChange, lobbyId, lobbyName, battleType }:
         token.access_token
       );
 
+      // Process results and ensure they match the User interface
+      const typedResults: User[] = results.map((user: any) => ({
+        id: user.id || '',
+        username: user.username || '',
+        name: user.name,
+        surname: user.surname,
+        email: user.email
+      }));
+
       // Filter out current user
-      setUsers(results.filter(u => u.id !== currentUser?.id));
+      setUsers(typedResults.filter(u => u.id !== currentUser?.id));
     } catch (error) {
       console.error('Error searching users:', error);
       toast({

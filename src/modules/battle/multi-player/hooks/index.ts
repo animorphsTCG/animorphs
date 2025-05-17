@@ -6,3 +6,5 @@ export { useBattleQueue } from './useBattleQueue';
 export { useEOSPresence } from './useEOSPresence';
 export { useLobbyState } from './useLobbyState';
 export { useMatchmaking } from './useMatchmaking';
+export { useEOSLobby } from './useEOSLobby';
+export { useBattleInvites } from './useBattleInvites';

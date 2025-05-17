@@ -60,14 +60,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Create a valid UserProfile object
       const userProfileData: UserProfile = {
-        id: profile.id,
-        username: profile.username || 'User-' + profile.id.substring(0, 5),
-        name: profile.name || '',
-        surname: profile.surname || '',
-        email: profile.email || user?.email || '',
-        country: profile.country || '',
-        created_at: profile.created_at || new Date().toISOString(),
-        is_admin: !!profile.is_admin || false
+        id: profile.id as string,
+        username: (profile.username as string) || 'User-' + (profile.id as string).substring(0, 5),
+        name: profile.name as string || '',
+        surname: profile.surname as string || '',
+        email: (profile.email as string) || user?.email || '',
+        country: profile.country as string || '',
+        created_at: (profile.created_at as string) || new Date().toISOString(),
+        is_admin: !!profile.is_admin as boolean || false
       };
       
       // Check payment status

@@ -74,7 +74,10 @@ export const useUser = (userId?: string) => {
           country: profile.country,
           created_at: profile.created_at || new Date().toISOString(),
           has_paid: paymentStatus?.has_paid || false,
-          music_subscription: musicSub || null
+          music_subscription: musicSub ? {
+            subscription_type: musicSub.subscription_type,
+            end_date: musicSub.end_date
+          } : null
         };
         
         setUserData(userData);

@@ -3,13 +3,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Shield } from 'lucide-react';
 import { AdminAccessModal } from './AdminAccessModal';
-import { useAdmin } from '@/modules/admin';
-import { d1Database } from '@/lib/d1Database';
+import { useAdminStatus } from '@/modules/admin/hooks/useAdmin';
 
 // Component to trigger admin access authentication
 export function AdminAccessTrigger() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { isAdmin } = useAdmin();
+  const { isAdmin } = useAdminStatus();
   
   return (
     <>

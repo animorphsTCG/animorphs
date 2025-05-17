@@ -1,748 +1,165 @@
 
-/**
- * D1Database service
- * A service to interact with Cloudflare D1 database with Supabase-like query API
- */
-
-import { d1Worker } from './cloudflare/d1Worker';
-import { UserProfile, AnimorphCard, PaymentStatus, VipCode } from '@/types';
-
-// Type definitions for Supabase compatibility
-export interface D1Result<T> {
-  results?: T[];
-  success: boolean;
-  meta?: any;
-  error?: Error;
-}
-
-// Query options
-export interface QueryOptions {
-  params?: any[];
-  timeout?: number;
-  metaOnly?: boolean;
-}
-
-// D1 prepared statement compatibility
-export interface D1PreparedStatement {
-  bind(...values: any[]): D1PreparedStatement;
-  first<T = any>(): Promise<T | null>;
-  all<T = any>(): Promise<T[]>;
-  raw<T = any>(): Promise<T[]>;
-  run(): Promise<D1Result<any>>;
-  meta(): Promise<any>;
-  timeout(ms: number): D1PreparedStatement;
-}
-
-// Response interface for enhanced D1 responses
-export interface D1Response<T> {
-  data: T[];
-  count?: number;
-  error: Error | null;
-}
-
-// Supabase-compatible filter types
-export type MatchFilter = { [key: string]: any };
-export type FilterOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'is';
+import { d1Worker } from '@/lib/cloudflare/d1Worker';
+import type { UserProfile } from '@/modules/auth/types';
 
 /**
- * Enhanced D1 Query Builder - provides Supabase-like query API
- */
-export class EnhancedD1QueryBuilder<T = any> {
-  private table: string;
-  private conditions: string[] = [];
-  private params: any[] = [];
-  private orderByClause: string = '';
-  private limitClause: number | null = null;
-  private offsetClause: number | null = null;
-  private selectColumns: string[] = ['*'];
-  private token?: string;
-  private rangeStart: number | null = null;
-  private rangeEnd: number | null = null;
-
-  constructor(table: string, token?: string) {
-    this.table = table;
-    this.token = token;
-  }
-
-  /**
-   * Select specific columns
-   */
-  select(...columns: string[]): EnhancedD1QueryBuilder<T> {
-    if (columns.length > 0) {
-      this.selectColumns = columns;
-    }
-    return this;
-  }
-
-  /**
-   * Filter by equality
-   */
-  eq(column: string, value: any): EnhancedD1QueryBuilder<T> {
-    this.conditions.push(`${column} = ?`);
-    this.params.push(value);
-    return this;
-  }
-
-  /**
-   * Filter by inequality
-   */
-  neq(column: string, value: any): EnhancedD1QueryBuilder<T> {
-    this.conditions.push(`${column} != ?`);
-    this.params.push(value);
-    return this;
-  }
-
-  /**
-   * Filter by greater than
-   */
-  gt(column: string, value: any): EnhancedD1QueryBuilder<T> {
-    this.conditions.push(`${column} > ?`);
-    this.params.push(value);
-    return this;
-  }
-
-  /**
-   * Filter by greater than or equal
-   */
-  gte(column: string, value: any): EnhancedD1QueryBuilder<T> {
-    this.conditions.push(`${column} >= ?`);
-    this.params.push(value);
-    return this;
-  }
-
-  /**
-   * Filter by less than
-   */
-  lt(column: string, value: any): EnhancedD1QueryBuilder<T> {
-    this.conditions.push(`${column} < ?`);
-    this.params.push(value);
-    return this;
-  }
-
-  /**
-   * Filter by less than or equal
-   */
-  lte(column: string, value: any): EnhancedD1QueryBuilder<T> {
-    this.conditions.push(`${column} <= ?`);
-    this.params.push(value);
-    return this;
-  }
-
-  /**
-   * Filter by IN condition
-   */
-  in(column: string, values: any[]): EnhancedD1QueryBuilder<T> {
-    if (values.length === 0) {
-      // Empty IN clause would fail, so add an impossible condition
-      this.conditions.push('1 = 0');
-      return this;
-    }
-    
-    const placeholders = values.map(() => '?').join(',');
-    this.conditions.push(`${column} IN (${placeholders})`);
-    this.params.push(...values);
-    return this;
-  }
-
-  /**
-   * Filter by IS condition (null/not null)
-   */
-  is(column: string, value: any): EnhancedD1QueryBuilder<T> {
-    if (value === null) {
-      this.conditions.push(`${column} IS NULL`);
-    } else {
-      this.conditions.push(`${column} IS NOT NULL`);
-    }
-    return this;
-  }
-  
-  /**
-   * Filter by NOT condition with a subquery in format 'column', 'in', '(1,2,3)'
-   */
-  not(column: string, predicate: string, values: string | string[] | number[]): EnhancedD1QueryBuilder<T> {
-    if (predicate === 'in' && Array.isArray(values)) {
-      if (values.length === 0) {
-        // Empty NOT IN is always true (return all rows)
-        return this;
-      }
-      
-      const placeholders = values.map(() => '?').join(',');
-      this.conditions.push(`${column} NOT IN (${placeholders})`);
-      this.params.push(...values);
-      return this;
-    } else if (predicate === 'in' && typeof values === 'string') {
-      this.conditions.push(`${column} NOT IN ${values}`);
-      return this;
-    } else {
-      console.error('Unsupported NOT operation:', predicate);
-      return this;
-    }
-  }
-  
-  /**
-   * LIKE query for string pattern matching
-   */
-  like(column: string, pattern: string): EnhancedD1QueryBuilder<T> {
-    this.conditions.push(`${column} LIKE ?`);
-    this.params.push(pattern);
-    return this;
-  }
-  
-  /**
-   * Case insensitive LIKE
-   */
-  ilike(column: string, pattern: string): EnhancedD1QueryBuilder<T> {
-    this.conditions.push(`LOWER(${column}) LIKE LOWER(?)`);
-    this.params.push(pattern);
-    return this;
-  }
-
-  /**
-   * Range-based pagination (inclusive)
-   */
-  range(start: number, end: number): EnhancedD1QueryBuilder<T> {
-    this.rangeStart = start;
-    this.rangeEnd = end;
-    this.limitClause = (end - start) + 1;
-    this.offsetClause = start;
-    return this;
-  }
-
-  /**
-   * Order results by column
-   */
-  order(column: string, direction: 'asc' | 'desc' = 'asc'): EnhancedD1QueryBuilder<T> {
-    this.orderByClause = `ORDER BY ${column} ${direction.toUpperCase()}`;
-    return this;
-  }
-
-  /**
-   * Alias for order to match Supabase API
-   */
-  orderBy(column: string, direction: 'asc' | 'desc' = 'asc'): EnhancedD1QueryBuilder<T> {
-    return this.order(column, direction);
-  }
-
-  /**
-   * Limit number of results
-   */
-  limit(count: number): EnhancedD1QueryBuilder<T> {
-    this.limitClause = count;
-    return this;
-  }
-
-  /**
-   * Offset results
-   */
-  offset(count: number): EnhancedD1QueryBuilder<T> {
-    this.offsetClause = count;
-    return this;
-  }
-
-  /**
-   * Build SQL query with conditions
-   */
-  private buildQuery(): string {
-    const columns = this.selectColumns.join(', ');
-    let query = `SELECT ${columns} FROM ${this.table}`;
-    
-    if (this.conditions.length > 0) {
-      query += ` WHERE ${this.conditions.join(' AND ')}`;
-    }
-    
-    if (this.orderByClause) {
-      query += ` ${this.orderByClause}`;
-    }
-    
-    if (this.limitClause !== null) {
-      query += ` LIMIT ${this.limitClause}`;
-    }
-    
-    if (this.offsetClause !== null) {
-      query += ` OFFSET ${this.offsetClause}`;
-    }
-    
-    return query;
-  }
-
-  /**
-   * Execute query and get all results
-   */
-  async get(): Promise<D1Response<T>> {
-    try {
-      const sql = this.buildQuery();
-      const options: QueryOptions = { params: this.params };
-      
-      const results = await d1Worker.query<T>(sql, options, this.token);
-      return {
-        data: results || [],
-        error: null
-      };
-    } catch (error) {
-      console.error('Error executing query:', error);
-      return {
-        data: [],
-        error: error as Error
-      };
-    }
-  }
-
-  /**
-   * Get a single record
-   */
-  async single(): Promise<D1Response<T>> {
-    try {
-      const prevLimit = this.limitClause;
-      this.limitClause = 1;
-      
-      const result = await this.get();
-      this.limitClause = prevLimit;
-      
-      if (result.error) {
-        throw result.error;
-      }
-      
-      if (result.data.length === 0) {
-        throw new Error('No rows returned from the query');
-      }
-      
-      return {
-        data: [result.data[0]],
-        error: null
-      };
-    } catch (error) {
-      return {
-        data: [],
-        error: error as Error
-      };
-    }
-  }
-
-  /**
-   * Get first record (or null if not found)
-   * Same as first() in Supabase
-   */
-  async first(): Promise<T | null> {
-    try {
-      const prevLimit = this.limitClause;
-      this.limitClause = 1;
-      
-      const result = await this.get();
-      this.limitClause = prevLimit;
-      
-      return result.data.length > 0 ? result.data[0] : null;
-    } catch (error) {
-      console.error('Error in first():', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get a single record (or null if not found)
-   * This is equivalent to Supabase's maybeSingle()
-   */
-  async maybeSingle(): Promise<D1Response<T>> {
-    try {
-      const prevLimit = this.limitClause;
-      this.limitClause = 1;
-      
-      const result = await this.get();
-      this.limitClause = prevLimit;
-      
-      if (result.error) {
-        throw result.error;
-      }
-      
-      return {
-        data: result.data.length > 0 ? [result.data[0]] : [],
-        error: null
-      };
-    } catch (error) {
-      return {
-        data: [],
-        error: error as Error
-      };
-    }
-  }
-
-  /**
-   * Insert new records
-   */
-  async insert(data: Partial<T> | Partial<T>[], options?: { returning?: string }): Promise<D1Response<T>> {
-    try {
-      const returningClause = options?.returning || 'id';
-      const items = Array.isArray(data) ? data : [data];
-      
-      if (items.length === 0) {
-        return { data: [], error: new Error('No data provided for insert') };
-      }
-      
-      // We'll use the first item to determine column names
-      const firstItem = items[0];
-      const columns = Object.keys(firstItem);
-      
-      if (columns.length === 0) {
-        return { data: [], error: new Error('No columns provided for insert') };
-      }
-      
-      // Prepare SQL for multi-row insert
-      const placeholders = items.map(() => 
-        `(${columns.map(() => '?').join(',')})`
-      ).join(',');
-      
-      const sql = `
-        INSERT INTO ${this.table} (${columns.join(',')})
-        VALUES ${placeholders}
-        RETURNING ${returningClause}
-      `;
-      
-      // Flatten all values in order
-      const values = items.flatMap(item => 
-        columns.map(col => (item as any)[col])
-      );
-      
-      const result = await d1Worker.query<T>(sql, { params: values }, this.token);
-      
-      return {
-        data: result || [],
-        error: null
-      };
-    } catch (error) {
-      console.error('Error in insert operation:', error);
-      return {
-        data: [],
-        error: error as Error
-      };
-    }
-  }
-
-  /**
-   * Update records
-   */
-  async update(data: Partial<T>, options?: { returning?: string }): Promise<D1Response<T>> {
-    try {
-      const returningClause = options?.returning || 'id';
-      const columns = Object.keys(data);
-      
-      if (columns.length === 0) {
-        return { data: [], error: new Error('No data provided for update') };
-      }
-      
-      if (this.conditions.length === 0) {
-        return { data: [], error: new Error('Update requires conditions') };
-      }
-      
-      const setClause = columns.map(col => `${col} = ?`).join(', ');
-      const updateValues = columns.map(col => (data as any)[col]);
-      
-      const sql = `
-        UPDATE ${this.table} 
-        SET ${setClause} 
-        WHERE ${this.conditions.join(' AND ')}
-        RETURNING ${returningClause}
-      `;
-      
-      const values = [...updateValues, ...this.params];
-      const result = await d1Worker.query<T>(sql, { params: values }, this.token);
-      
-      return {
-        data: result || [],
-        error: null
-      };
-    } catch (error) {
-      console.error('Error in update operation:', error);
-      return {
-        data: [],
-        error: error as Error
-      };
-    }
-  }
-
-  /**
-   * Delete records
-   */
-  async delete(options?: { returning?: string }): Promise<D1Response<T>> {
-    try {
-      const returningClause = options?.returning || 'id';
-      
-      if (this.conditions.length === 0) {
-        return { data: [], error: new Error('Delete requires conditions') };
-      }
-      
-      const sql = `
-        DELETE FROM ${this.table}
-        WHERE ${this.conditions.join(' AND ')}
-        RETURNING ${returningClause}
-      `;
-      
-      const result = await d1Worker.query<T>(sql, { params: this.params }, this.token);
-      
-      return {
-        data: result || [],
-        error: null
-      };
-    } catch (error) {
-      console.error('Error in delete operation:', error);
-      return {
-        data: [],
-        error: error as Error
-      };
-    }
-  }
-  
-  /**
-   * Execute SQL query directly
-   * Returns { data, error } format for compatibility
-   */
-  async execute(sql: string, params?: any[]): Promise<D1Response<any>> {
-    try {
-      const result = await d1Worker.query(
-        sql,
-        { params: params || this.params },
-        this.token
-      );
-      
-      return {
-        data: result || [],
-        error: null
-      };
-    } catch (error) {
-      console.error('Error executing SQL:', error);
-      return {
-        data: [],
-        error: error as Error
-      };
-    }
-  }
-  
-  /**
-   * Count rows
-   */
-  async count(): Promise<{ count: number, error: Error | null }> {
-    try {
-      // Save current select columns and order by
-      const savedSelect = [...this.selectColumns];
-      const savedOrderBy = this.orderByClause;
-      
-      // Set select to COUNT(*) and remove order by
-      this.selectColumns = ['COUNT(*) as count'];
-      this.orderByClause = '';
-      
-      const sql = this.buildQuery();
-      const options: QueryOptions = { params: this.params };
-      
-      const results = await d1Worker.query(sql, options, this.token);
-      
-      // Restore original values
-      this.selectColumns = savedSelect;
-      this.orderByClause = savedOrderBy;
-      
-      if (!results || !results.length) {
-        return { count: 0, error: null };
-      }
-      
-      return { 
-        count: parseInt(results[0].count || '0'), 
-        error: null 
-      };
-    } catch (error) {
-      console.error('Error in count operation:', error);
-      return { count: 0, error: error as Error };
-    }
-  }
-}
-
-/**
- * Main D1Database class
+ * Cloudflare D1 database adapter for the Animorphs app
  */
 export class D1Database {
   private token: string | null = null;
-  
+
   constructor(token?: string) {
     if (token) {
       this.setToken(token);
     }
   }
-  
-  setToken(token: string): void {
+
+  setToken(token: string) {
     this.token = token;
   }
-  
-  /**
-   * Create a query builder for a table
-   */
-  from<T = any>(table: string): EnhancedD1QueryBuilder<T> {
-    return new EnhancedD1QueryBuilder<T>(table, this.token || undefined);
+
+  async executeQuery(sql: string, params: any[] = []) {
+    return await d1Worker.query(sql, { params }, this.token || undefined);
   }
-  
-  /**
-   * Direct SQL query execution
-   */
-  async query<T = any>(sql: string, options?: QueryOptions): Promise<T[]> {
+
+  async getProfile(userId: string) {
     try {
-      const result = await d1Worker.query<T>(
-        sql, 
-        options,
+      return await d1Worker.getOne(
+        'SELECT * FROM profiles WHERE id = ?',
+        { params: [userId] },
         this.token || undefined
       );
-      
-      return result || [];
-    } catch (error) {
-      console.error('Query error:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Get a single row by SQL
-   */
-  async getOne<T = any>(sql: string, options?: QueryOptions): Promise<T | null> {
-    try {
-      const results = await this.query<T>(sql, options);
-      return results.length > 0 ? results[0] : null;
-    } catch (error) {
-      console.error('GetOne error:', error);
+    } catch (err) {
+      console.error('Failed to get profile:', err);
       return null;
     }
   }
-  
-  /**
-   * Execute a SQL statement (for INSERT, UPDATE, DELETE)
-   */
-  async execute(sql: string, params?: any[]): Promise<void> {
+
+  async getUser(userId: string) {
     try {
-      await d1Worker.query(
-        sql, 
-        { params },
+      return await d1Worker.getOne(
+        'SELECT * FROM users WHERE id = ?',
+        { params: [userId] },
         this.token || undefined
       );
-    } catch (error) {
-      console.error('Execute error:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Insert data to a table
-   */
-  async insert<T = any>(
-    table: string, 
-    data: Record<string, any>, 
-    returning?: string,
-    token?: string
-  ): Promise<T | null> {
-    try {
-      const columns = Object.keys(data);
-      const placeholders = columns.map(() => '?').join(',');
-      const values = columns.map(c => data[c]);
-      
-      const returningClause = returning ? `RETURNING ${returning}` : 'RETURNING id';
-      
-      const sql = `
-        INSERT INTO ${table} (${columns.join(',')})
-        VALUES (${placeholders})
-        ${returningClause}
-      `;
-      
-      const effectiveToken = token || this.token || undefined;
-      const result = await d1Worker.query<T>(sql, { params: values }, effectiveToken);
-      
-      return result && result.length > 0 ? result[0] : null;
-    } catch (error) {
-      console.error('Insert error:', error);
+    } catch (err) {
+      console.error('Failed to get user:', err);
       return null;
     }
   }
-  
-  /**
-   * Update data in a table
-   */
-  async update<T = any>(
-    table: string, 
-    data: Record<string, any>, 
-    whereClause: string,
-    whereParams: any[],
-    token?: string
-  ): Promise<T | null> {
+
+  async updateProfile(userId: string, data: Partial<UserProfile>) {
     try {
-      const columns = Object.keys(data);
-      const setClause = columns.map(col => `${col} = ?`).join(', ');
-      const values = [...columns.map(c => data[c]), ...whereParams];
-      
-      const sql = `
-        UPDATE ${table} 
-        SET ${setClause} 
-        WHERE ${whereClause}
-        RETURNING id
-      `;
-      
-      const effectiveToken = token || this.token || undefined;
-      const result = await d1Worker.query<T>(sql, { params: values }, effectiveToken);
-      
-      return result && result.length > 0 ? result[0] : null;
-    } catch (error) {
-      console.error('Update error:', error);
+      const setValues = Object.entries(data)
+        .filter(([key]) => key !== 'id')
+        .map(([key]) => `${key} = ?`)
+        .join(', ');
+
+      const values = Object.entries(data)
+        .filter(([key]) => key !== 'id')
+        .map(([_, value]) => value);
+
+      values.push(userId);
+
+      return await d1Worker.execute(
+        `UPDATE profiles SET ${setValues} WHERE id = ?`,
+        { params: values },
+        this.token || undefined
+      );
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      throw err;
+    }
+  }
+
+  async getPaymentStatus(userId: string) {
+    try {
+      return await d1Worker.getOne(
+        'SELECT * FROM payment_status WHERE user_id = ?',
+        { params: [userId] },
+        this.token || undefined
+      );
+    } catch (err) {
+      console.error('Failed to get payment status:', err);
       return null;
     }
   }
-  
-  /**
-   * Create or update a channel for real-time functionality
-   * This is a compatibility layer for Supabase channels
-   */
-  channel(name: string) {
-    return {
-      on: (event: string) => {
-        console.log(`Channel ${name} subscribed to ${event}`);
-        return {
-          subscribe: (callback: Function) => {
-            console.log(`Subscribing to channel ${name} event ${event}`);
-            // In a real implementation, this would connect to Durable Objects
-            return {
-              unsubscribe: () => {
-                console.log(`Unsubscribing from channel ${name} event ${event}`);
-              }
-            };
-          }
-        };
-      }
-    };
-  }
-  
-  /**
-   * Remove a channel subscription
-   */
-  removeChannel(channel: any): void {
-    console.log('Removing channel', channel);
-    // In a real implementation, this would disconnect from Durable Objects
-    if (channel && typeof channel.unsubscribe === 'function') {
-      channel.unsubscribe();
+
+  async getCards(limit: number = 100, offset: number = 0) {
+    try {
+      return await d1Worker.query(
+        'SELECT * FROM cards LIMIT ? OFFSET ?',
+        { params: [limit, offset] },
+        this.token || undefined
+      );
+    } catch (err) {
+      console.error('Failed to get cards:', err);
+      return [];
     }
   }
-  
-  /**
-   * Execute RPC (Remote Procedure Call)
-   */
-  async rpc(functionName: string, params?: any): Promise<{ data: any, error: Error | null }> {
-    console.log(`RPC call to ${functionName}`, params);
-    return { data: [], error: null };
+
+  async getSongs() {
+    try {
+      return await d1Worker.query(
+        'SELECT * FROM songs',
+        {},
+        this.token || undefined
+      );
+    } catch (err) {
+      console.error('Failed to get songs:', err);
+      return [];
+    }
   }
-  
-  // Profiles
-  async getProfile(userId: string): Promise<any | null> {
-    return this.getOne('SELECT * FROM profiles WHERE id = ?', { params: [userId] });
+
+  async getUserSongs(userId: string) {
+    try {
+      return await d1Worker.query(
+        `SELECT s.* 
+         FROM songs s
+         JOIN user_song_selections uss ON s.id = uss.song_id
+         WHERE uss.user_id = ?`,
+        { params: [userId] },
+        this.token || undefined
+      );
+    } catch (err) {
+      console.error('Failed to get user songs:', err);
+      return [];
+    }
   }
-  
-  // Add other helpful methods based on your application needs
+
+  async addSongToUser(userId: string, songId: string) {
+    try {
+      const id = crypto.randomUUID();
+      return await d1Worker.execute(
+        `INSERT INTO user_song_selections (id, user_id, song_id) VALUES (?, ?, ?)`,
+        { params: [id, userId, songId] },
+        this.token || undefined
+      );
+    } catch (err) {
+      console.error('Failed to add song to user:', err);
+      throw err;
+    }
+  }
+
+  async removeSongFromUser(userId: string, songId: string) {
+    try {
+      return await d1Worker.execute(
+        `DELETE FROM user_song_selections WHERE user_id = ? AND song_id = ?`,
+        { params: [userId, songId] },
+        this.token || undefined
+      );
+    } catch (err) {
+      console.error('Failed to remove song from user:', err);
+      throw err;
+    }
+  }
 }
 
-// Create a singleton instance
+// Create and export a singleton instance
 export const d1Database = new D1Database();
+export const d1 = d1Database; // Alias for compatibility
 
-// Export the d1Database as d1 for backward compatibility
-export const d1 = d1Database;
-
-// Helper function to initialize the database with a token
-export const initializeD1Database = (token: string): void => {
+// Helper function to initialize D1 database with auth token
+export function initD1Database(token: string) {
   d1Database.setToken(token);
-};
+}

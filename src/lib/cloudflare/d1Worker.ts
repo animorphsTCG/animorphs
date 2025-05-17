@@ -177,7 +177,7 @@ class D1WorkerClient {
    * Create a query builder for a table
    */
   from<T = any>(table: string, authToken?: string): EnhancedD1QueryBuilder<T> {
-    return new EnhancedD1QueryBuilderImpl<T>(`SELECT * FROM ${table}`, {}, authToken, this);
+    return new EnhancedD1QueryBuilderImpl<T>(table, authToken, this);
   }
   
   /**
@@ -201,14 +201,16 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
   private options: D1QueryOptions;
   private authToken?: string;
   private client: D1WorkerClient;
+  private tableName: string;
   
   // Required properties to satisfy the interface
   data: T[] | null = null;
   error: Error | null = null;
   
-  constructor(sql: string, options: D1QueryOptions = {}, authToken?: string, client: D1WorkerClient = d1Worker) {
-    this.sql = sql;
-    this.options = { ...options };
+  constructor(tableName: string, authToken?: string, client: D1WorkerClient = d1Worker) {
+    this.tableName = tableName;
+    this.sql = `SELECT * FROM ${tableName}`;
+    this.options = {};
     this.authToken = authToken;
     this.client = client;
   }
@@ -222,6 +224,7 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
   
   from(table: string): EnhancedD1QueryBuilder<T> {
     // For chain method support
+    this.tableName = table;
     this.sql = this.sql.replace(/FROM\s+.+?(\s+WHERE|\s+ORDER|\s+LIMIT|\s*$)/i, `FROM ${table}$1`);
     return this;
   }
@@ -254,11 +257,7 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
     this.options.params.push(value);
     
     try {
-      const result = await this.execute();
-      return {
-        data: result.data,
-        error: result.error
-      };
+      return await this.execute();
     } catch (error) {
       return {
         data: null,
@@ -438,7 +437,8 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
   
   async single(): Promise<{ data: T | null, error: Error | null }> {
     try {
-      const result = await this.limit(1).execute();
+      const limitQuery = this.limit(1);
+      const result = await limitQuery.execute();
       
       if (result.error) {
         return { data: null, error: result.error };
@@ -460,13 +460,8 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
   
   async insert(values: Partial<T>): Promise<EnhancedD1QueryResult<T>> {
     try {
-      const tableName = this.extractTableName();
-      if (!tableName) {
-        throw new Error('Cannot determine table name from SQL');
-      }
-      
       const result = await this.client.insert<T>(
-        tableName,
+        this.tableName,
         values as Record<string, any>,
         this.authToken
       );
@@ -487,14 +482,8 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
     }
   }
   
-  async update(values: Partial<T>): Promise<{ count: number, error: null } | { count: 0, error: Error }> {
+  async update(values: Partial<T>): Promise<{ count: number; error: null } | { count: 0; error: Error }> {
     try {
-      // Extract the table name from the SQL
-      const tableName = this.extractTableName();
-      if (!tableName) {
-        throw new Error('Cannot determine table name from SQL');
-      }
-      
       // Extract where clause from the SQL
       let whereClause = '';
       let whereParams: any[] = [];
@@ -512,7 +501,7 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
       }
       
       const count = await this.client.execute(
-        `UPDATE ${tableName} SET ${
+        `UPDATE ${this.tableName} SET ${
           Object.keys(values).map(key => `${key} = ?`).join(', ')
         } WHERE ${whereClause}`,
         { 
@@ -527,14 +516,8 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
     }
   }
   
-  async delete(): Promise<{ count: number, error: null } | { count: 0, error: Error }> {
+  async delete(): Promise<{ count: number; error: null } | { count: 0; error: Error }> {
     try {
-      // Extract the table name from the SQL
-      const tableName = this.extractTableName();
-      if (!tableName) {
-        throw new Error('Cannot determine table name from SQL');
-      }
-      
       // Extract where clause from the SQL
       let whereClause = '';
       let whereParams: any[] = [];
@@ -552,7 +535,7 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
       }
       
       const count = await this.client.execute(
-        `DELETE FROM ${tableName} WHERE ${whereClause}`,
+        `DELETE FROM ${this.tableName} WHERE ${whereClause}`,
         { params: whereParams },
         this.authToken
       );
@@ -561,10 +544,5 @@ export class EnhancedD1QueryBuilderImpl<T = any> implements EnhancedD1QueryBuild
     } catch (error) {
       return { count: 0, error: error instanceof Error ? error : new Error('Unknown error') };
     }
-  }
-  
-  private extractTableName(): string | null {
-    const tableMatch = this.sql.match(/FROM\s+([^\s]+)/i);
-    return tableMatch ? tableMatch[1] : null;
   }
 }

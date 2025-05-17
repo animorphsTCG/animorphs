@@ -26,7 +26,6 @@ export interface R2Song extends Song {
   name: string;
   size: number;
   lastModified: string;
-  url?: string;
   contentType: string;
   etag: string;
 }

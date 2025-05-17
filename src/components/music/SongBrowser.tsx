@@ -38,9 +38,9 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
   const { r2Songs, isLoading: r2Loading, getSongStreamUrl } = useR2Songs();
   
   const [searchQuery, setSearchQuery] = useState('');
-  // Explicitly cast these state setters to use our unified Song type
+  // Fixed type declarations to match what we're actually using
   const [filteredDbSongs, setFilteredDbSongs] = useState<Song[]>([]);
-  const [filteredR2Songs, setFilteredR2Songs] = useState<R2Song[]>([]);
+  const [filteredR2Songs, setFilteredR2Songs] = useState<Song[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('database');
@@ -81,7 +81,7 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
       }
       
       // Filter R2 songs
-      let r2Results: R2Song[] = [];
+      let r2Results: Song[] = [];
       if (r2Songs && r2Songs.length > 0) {
         if (!query) {
           r2Results = r2Songs;
@@ -93,9 +93,8 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
         }
       }
       
-      // Use explicit type assertions to satisfy TypeScript
-      setFilteredDbSongs(dbResults as Song[]);
-      setFilteredR2Songs(r2Results as R2Song[]);
+      setFilteredDbSongs(dbResults);
+      setFilteredR2Songs(r2Results);
     } catch (error) {
       console.error('Error searching songs:', error);
     } finally {
@@ -124,11 +123,22 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
   };
   
   // Handle R2 song preview
-  const handlePreview = async (song: R2Song) => {
+  const handlePreview = async (song: Song) => {
     try {
-      setPreviewSong(song);
-      const url = await getSongStreamUrl(song.name);
-      setPreviewUrl(url);
+      // Ensure the song has all required R2Song properties before casting
+      if (song.name && song.size && song.lastModified && song.contentType && song.etag) {
+        const r2Song = song as R2Song;
+        setPreviewSong(r2Song);
+        const url = await getSongStreamUrl(r2Song.name);
+        setPreviewUrl(url);
+      } else {
+        console.error('Invalid R2Song format:', song);
+        toast({
+          title: "Preview Error",
+          description: "Invalid song format for preview",
+          variant: "destructive"
+        });
+      }
     } catch (err) {
       console.error('Error getting preview URL:', err);
       toast({
@@ -253,7 +263,7 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
                     
                     return (
                       <div
-                        key={song.name}
+                        key={song.name || song.id}
                         className={`flex items-center justify-between p-2 rounded-md ${
                           isSelected ? 'bg-primary/10' : isPreviewActive ? 'bg-fantasy-accent/10' : 'hover:bg-accent/50'
                         }`}
@@ -263,7 +273,7 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
                           <div>
                             <div className="font-medium">{song.title}</div>
                             <div className="text-xs text-muted-foreground">
-                              {song.artist} • {(song.size / 1024 / 1024).toFixed(1)} MB
+                              {song.artist} • {(song.size && (song.size / 1024 / 1024).toFixed(1)) || '?'} MB
                             </div>
                           </div>
                         </div>
@@ -271,7 +281,7 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handlePreview(song)}
+                            onClick={() => song.name && song.size && handlePreview(song)}
                           >
                             <Play className="h-4 w-4" />
                           </Button>

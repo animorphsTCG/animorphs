@@ -27,8 +27,8 @@ export interface EnhancedD1QueryBuilder<T> {
   
   // Data manipulation methods
   insert: (values: Partial<T>) => Promise<EnhancedD1QueryResult<T>>;
-  update: (values: Partial<T>) => EnhancedD1QueryBuilder<T>;
-  delete: () => EnhancedD1QueryBuilder<T>;
+  update: (values: Partial<T>) => Promise<{ count: number; error: null } | { count: 0; error: Error }>;
+  delete: () => Promise<{ count: number; error: null } | { count: 0; error: Error }>;
   
   // Execution methods
   get: () => Promise<EnhancedD1QueryResult<T>>;

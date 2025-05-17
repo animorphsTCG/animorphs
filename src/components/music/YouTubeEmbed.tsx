@@ -69,7 +69,9 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
     
     try {
       // Create a new player
-      playerRef.current = new window.YT.Player(iframeRef?.current || "youtube-player", {
+      const elementId = "youtube-player";
+      
+      playerRef.current = new window.YT.Player(iframeRef?.current || elementId, {
         height: "0",
         width: "0",
         videoId: videoId,

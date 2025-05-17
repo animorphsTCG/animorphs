@@ -8,7 +8,8 @@ export type EnhancedD1Database = {
   exec: (query: string, params?: any[]) => Promise<D1Result>;
   batch: (statements: string[]) => Promise<D1Result[]>;
   prepare: (query: string) => D1PreparedStatement;
-  rpc?: (procedure: string, params: any) => Promise<any>;
+  rpc: (procedure: string, params?: any) => Promise<any>;
+  channel?: (name: string, userId: string) => any;
 };
 
 export type D1PreparedStatement = {
@@ -66,10 +67,11 @@ export type EnhancedD1QueryBuilder = {
   range: (column: string, lower: any, upper: any) => EnhancedD1QueryBuilder;
   first: <T = any>() => Promise<T | null>;
   maybeSingle: <T = any>() => Promise<T | null>;
+  single: <T = any>() => Promise<T>;
   get: <T = any>() => Promise<T[]>;
   execute: () => Promise<D1Response<any>>;
-  data?: any[];
   error?: Error;
+  data?: any[];
 };
 
 // Create a mock implementation of the D1 database wrapper
@@ -404,6 +406,14 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
           ? (result.results[0] as T)
           : null;
       },
+      single: async <T>() => {
+        query.limitValue = 1;
+        const result = await execute();
+        if (!result.success || !result.results || result.results.length === 0) {
+          throw new Error("No record found");
+        }
+        return result.results[0] as T;
+      },
       maybeSingle: async <T>() => {
         query.limitValue = 1;
         const result = await execute();
@@ -442,10 +452,11 @@ export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
       return batch.run();
     },
     prepare: (query) => db.prepare(query),
-    rpc: async (procedure, params) => {
-      const stmt = db.prepare(`CALL ${procedure}($1)`);
+    rpc: async (procedure, params = {}) => {
+      const stmt = db.prepare(`CALL ${procedure}(?)`);
       return stmt.bind(JSON.stringify(params)).run();
-    }
+    },
+    channel: (name, userId) => createChannel(name, userId)
   };
 }
 

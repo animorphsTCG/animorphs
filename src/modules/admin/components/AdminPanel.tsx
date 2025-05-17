@@ -11,7 +11,7 @@ import MigrationPanel from './MigrationPanel';
 import CloudflareErrors from './CloudflareErrors';
 import SupabaseCleanup from './SupabaseCleanup';
 import WranglerTerminal from './WranglerTerminal';
-import { useAdmin } from '../hooks/useAdmin';
+import { useAdmin } from '@/hooks/useAdmin';
 import { Loader2 } from 'lucide-react';
 
 const AdminPanel: React.FC = () => {

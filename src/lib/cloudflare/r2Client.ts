@@ -40,7 +40,7 @@ export interface R2ClientConfig {
 export class R2Client {
   private accountId: string;
   private bucketName: string;
-  private accessToken: string;
+  public accessToken: string; // Changed to public
   private baseUrl: string;
   
   constructor(config: R2ClientConfig) {

@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/lib/supabase';
-import { toast } from '@/components/ui/use-toast';
+import { d1 } from '@/lib/d1Database';
+import { toast } from '@/hooks/use-toast';
 import { Loader2, Search, RefreshCw, UserCheck } from 'lucide-react';
 
 const UserManagement = () => {
@@ -22,56 +22,40 @@ const UserManagement = () => {
       setLoading(true);
       setError(null);
       
-      // Use a more reliable approach to join profiles and payment status
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
-        
-      if (profilesError) {
-        console.error("Error fetching profiles:", profilesError);
-        throw new Error("Failed to fetch user profiles");
-      }
-
-      // Get user emails using the admin function
-      const { data: usersData, error: usersError } = await supabase
-        .rpc('get_user_emails');
-        
-      if (usersError) {
-        console.error("Error fetching user emails:", usersError);
-        throw new Error("Failed to fetch user emails");
-      }
+      // Use D1 database instead of Supabase
+      const profiles = await d1.from('profiles')
+        .select('*')
+        .orderBy('username', 'asc')
+        .get();
       
-      // Get payment statuses
-      const { data: paymentStatuses, error: paymentError } = await supabase
-        .from('payment_status')
-        .select('*');
-        
-      if (paymentError) {
-        console.error("Error fetching payment statuses:", paymentError);
-        throw new Error("Failed to fetch payment statuses");
-      }
+      // Get user emails using a separate query - adapt from the previous Supabase RPC
+      const usersData = await d1.from('users')
+        .select('id, email')
+        .get();
       
-      // Get music subscriptions
-      const { data: musicSubs, error: musicError } = await supabase
-        .from('music_subscriptions')
-        .select('*');
-        
-      if (musicError) {
-        console.error("Error fetching music subscriptions:", musicError);
-        throw new Error("Failed to fetch music subscriptions");
-      }
-
-      // Create lookup maps for faster joining
-      const paymentMap = new Map();
-      paymentStatuses?.forEach(payment => {
-        paymentMap.set(payment.id, payment);
-      });
-      
+      // Create a lookup map for emails
       const emailMap = new Map();
       usersData?.forEach(user => {
         emailMap.set(user.id, user.email);
       });
       
+      // Get payment statuses
+      const paymentStatuses = await d1.from('payment_status')
+        .select('*')
+        .get();
+      
+      // Create lookup map for payment status
+      const paymentMap = new Map();
+      paymentStatuses?.forEach(payment => {
+        paymentMap.set(payment.user_id || payment.id, payment);
+      });
+      
+      // Get music subscriptions
+      const musicSubs = await d1.from('music_subscriptions')
+        .select('*')
+        .get();
+      
+      // Create lookup map for music subscriptions
       const musicSubMap = new Map();
       musicSubs?.forEach(sub => {
         musicSubMap.set(sub.user_id, sub);

@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { Mail, Loader2, Check, X } from "lucide-react";
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 import { toast } from '@/hooks/use-toast';
-import { createChannel } from '@/lib/d1Database';
+import { createChannel } from '@/lib/channel';
 
 interface BattleInvite {
   id: string;

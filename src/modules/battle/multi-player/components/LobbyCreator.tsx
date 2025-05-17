@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,14 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useBattleLobby } from '../hooks/useBattleLobby';
 import { useNavigate } from 'react-router-dom';
-
-// Define the BattleLobbyConfig interface locally if it's not exported from the hook
-interface BattleLobbyConfig {
-  name: string;
-  battleType: '1v1' | '3player' | '4player';
-  useTimer: boolean;
-  useMusic: boolean;
-}
+import { BattleLobbyConfig } from '../hooks/types';
 
 export const LobbyCreator = () => {
   const navigate = useNavigate();
@@ -31,6 +23,8 @@ export const LobbyCreator = () => {
     const config: BattleLobbyConfig = {
       name: lobbyName,
       battleType,
+      maxPlayers: battleType === '1v1' ? 2 : battleType === '3player' ? 3 : 4,
+      isPublic: true,
       useTimer,
       useMusic
     };

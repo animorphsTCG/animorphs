@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/modules/auth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
-import { Song } from "@/types/music";
+import { Song, R2Song } from "@/types/music.d";
 import { Loader2, AlertCircle } from "lucide-react";
 import SongInfo from "./music/SongInfo";
 import PlaybackControls from "./music/PlaybackControls";
@@ -71,11 +71,14 @@ const MusicPlayer: React.FC = () => {
     );
   }
 
+  // Make TypeScript happy by using a type assertion since we've unified the interfaces
+  const typedCurrentSong = currentSong as (Song | null);
+
   return (
     <div className="bg-black/60 border border-fantasy-primary/30 rounded-md p-3">
       <div className="flex items-center justify-between">
         <SongInfo
-          currentSong={currentSong}
+          currentSong={typedCurrentSong}
           isPreviewMode={isPreviewMode}
           hasSubscription={hasSubscription}
         />
@@ -98,7 +101,7 @@ const MusicPlayer: React.FC = () => {
       </div>
 
       <YouTubeEmbed
-        currentSong={currentSong}
+        currentSong={typedCurrentSong}
         isPlaying={isPlaying}
         isMuted={isMuted}
         isPreviewMode={isPreviewMode}

@@ -4,7 +4,8 @@ import { useAuth } from '@/modules/auth';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 import { Song, R2Song } from '@/types/music.d';
 
-export { R2Song };
+// Using export type for the re-export to fix the isolatedModules issue
+export type { R2Song };
 
 export const useR2Songs = () => {
   const [songs, setSongs] = useState<Song[]>([]);

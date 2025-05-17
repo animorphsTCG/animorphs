@@ -1,9 +1,9 @@
 
 import React, { useEffect, MutableRefObject } from "react";
-import { Song } from "@/types/music";
+import { Song, R2Song } from "@/types/music.d";
 
 interface YouTubeEmbedProps {
-  currentSong: Song | null;
+  currentSong: Song | R2Song | null;
   isPlaying: boolean;
   isMuted: boolean;
   isPreviewMode: boolean;
@@ -22,7 +22,8 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   extractVideoId,
 }) => {
   useEffect(() => {
-    if (ytApiReady && currentSong && window.YT) {
+    // Only process YouTube songs (those with youtube_url)
+    if (ytApiReady && currentSong && 'youtube_url' in currentSong && currentSong.youtube_url && window.YT) {
       try {
         const videoId = extractVideoId(currentSong.youtube_url);
         console.log("Extracted video ID:", videoId);
@@ -45,7 +46,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
               autoplay: isPlaying ? 1 : 0,
               mute: isMuted ? 1 : 0,
               controls: 0,
-              start: isPreviewMode ? currentSong.preview_start_seconds : 0,
+              start: isPreviewMode && currentSong.preview_start_seconds ? currentSong.preview_start_seconds : 0,
             },
             events: {
               onReady: (event) => {
@@ -63,12 +64,12 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
           if (isPlaying) {
             playerRef.current.loadVideoById({
               videoId: videoId,
-              startSeconds: isPreviewMode ? currentSong.preview_start_seconds : 0
+              startSeconds: isPreviewMode && currentSong.preview_start_seconds ? currentSong.preview_start_seconds : 0
             });
           } else {
             playerRef.current.cueVideoById({
               videoId: videoId,
-              startSeconds: isPreviewMode ? currentSong.preview_start_seconds : 0
+              startSeconds: isPreviewMode && currentSong.preview_start_seconds ? currentSong.preview_start_seconds : 0
             });
           }
         }
@@ -106,7 +107,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
     }
   }, [isMuted]);
 
-  if (!currentSong) return null;
+  if (!currentSong || ('name' in currentSong)) return null; // Skip rendering for R2 songs
 
   return (
     <div className="hidden">

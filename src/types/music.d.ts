@@ -2,7 +2,7 @@
 export interface Song {
   id: string;
   title: string;
-  youtube_url: string;
+  youtube_url?: string;  // Make this optional to accommodate R2 songs
   r2_key?: string;
   r2_url?: string;
   preview_start_seconds: number;
@@ -10,6 +10,7 @@ export interface Song {
   created_at?: string;
   artist?: string;
   genre?: string;
+  name?: string;  // Add this to make R2Song compatible
 }
 
 export interface R2Song {

@@ -33,10 +33,12 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
   hasSubscription
 }) => {
   const { user } = useAuth();
+  // We now use the correct types from our unified interfaces
   const { songs: dbSongs, isLoading: dbLoading } = useD1Songs();
   const { r2Songs, isLoading: r2Loading, getSongStreamUrl } = useR2Songs();
   
   const [searchQuery, setSearchQuery] = useState('');
+  // Explicitly cast these state setters to use our unified Song type
   const [filteredDbSongs, setFilteredDbSongs] = useState<Song[]>([]);
   const [filteredR2Songs, setFilteredR2Songs] = useState<R2Song[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -91,8 +93,9 @@ const SongBrowser: React.FC<SongBrowserProps> = ({
         }
       }
       
-      setFilteredDbSongs(dbResults);
-      setFilteredR2Songs(r2Results);
+      // Use explicit type assertions to satisfy TypeScript
+      setFilteredDbSongs(dbResults as Song[]);
+      setFilteredR2Songs(r2Results as R2Song[]);
     } catch (error) {
       console.error('Error searching songs:', error);
     } finally {

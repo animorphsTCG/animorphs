@@ -4,7 +4,11 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/EOSAuthContext';
 import { Loader2 } from 'lucide-react';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { user, token, isLoading } = useAuth();
 
   if (isLoading) {

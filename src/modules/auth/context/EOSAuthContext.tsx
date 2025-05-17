@@ -3,8 +3,19 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { Session, User } from '../types';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
-import { UserProfile } from '@/types';
-import { resetPassword as resetPasswordApi, signUp as signUpApi } from '@/lib/eos/eosAuth';
+
+// Define the UserProfile interface
+interface UserProfile {
+  id: string;
+  username: string;
+  email?: string;
+  name?: string;
+  surname?: string;
+  country?: string;
+  created_at: string;
+  has_paid?: boolean;
+  is_admin?: boolean;
+}
 
 interface AuthState {
   user: User | null;

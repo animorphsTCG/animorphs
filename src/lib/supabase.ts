@@ -17,39 +17,131 @@ class SupabaseStub implements SupabaseClient {
   };
 
   from(table: string) {
-    const resource = {
-      select: () => resource,
-      insert: (data: any) => Promise.resolve({ data: null, error: null }),
-      update: (data: any) => Promise.resolve({ data: null, error: null }),
-      delete: () => Promise.resolve({ data: null, error: null }),
-      eq: (column: string, value: any) => resource,
-      neq: (column: string, value: any) => resource,
-      gt: (column: string, value: any) => resource,
-      gte: (column: string, value: any) => resource,
-      lt: (column: string, value: any) => resource,
-      lte: (column: string, value: any) => resource,
-      in: (column: string, values: any[]) => resource,
-      contains: (column: string, value: any) => resource,
-      containedBy: (column: string, value: any) => resource,
-      range: (column: string, from: any, to: any) => resource,
-      textSearch: (column: string, value: any) => resource,
-      filter: (column: string, op: string, value: any) => resource,
-      not: (column: string, op: string, value: any) => resource,
-      or: (filters: string, op: string, value: any) => resource,
-      order: (column: string, options?: any) => resource,
-      limit: (count: number) => resource,
-      single: () => Promise.resolve({ data: null, error: null }),
-      maybeSingle: () => Promise.resolve({ data: null, error: null }),
-      then: (onfulfilled: any) => Promise.resolve(onfulfilled({ data: null, error: null }))
+    // Create a chainable API that mimics Supabase's query builder
+    // but ultimately resolves to a simple object
+    const createQueryBuilder = () => {
+      const operations: Record<string, any> = {};
+      const filters: Record<string, any> = {};
+      
+      const builder = {
+        // Selection methods
+        select: (columns?: string) => {
+          operations.select = columns || '*';
+          return builder;
+        },
+        
+        // Insertion/update/delete methods
+        insert: (data: any, options?: any) => {
+          return Promise.resolve({ data: null, error: null });
+        },
+        update: (data: any, options?: any) => {
+          return Promise.resolve({ data: null, error: null });
+        },
+        delete: (options?: any) => {
+          return Promise.resolve({ data: null, error: null });
+        },
+        
+        // Filter methods
+        eq: (column: string, value: any) => {
+          filters[column] = value;
+          return builder;
+        },
+        neq: (column: string, value: any) => {
+          filters[`${column}_neq`] = value;
+          return builder;
+        },
+        gt: (column: string, value: any) => {
+          filters[`${column}_gt`] = value;
+          return builder;
+        },
+        gte: (column: string, value: any) => {
+          filters[`${column}_gte`] = value;
+          return builder;
+        },
+        lt: (column: string, value: any) => {
+          filters[`${column}_lt`] = value;
+          return builder;
+        },
+        lte: (column: string, value: any) => {
+          filters[`${column}_lte`] = value;
+          return builder;
+        },
+        in: (column: string, values: any[]) => {
+          filters[`${column}_in`] = values;
+          return builder;
+        },
+        contains: (column: string, value: any) => {
+          filters[`${column}_contains`] = value;
+          return builder;
+        },
+        containedBy: (column: string, value: any) => {
+          filters[`${column}_containedBy`] = value;
+          return builder;
+        },
+        ilike: (column: string, value: any) => {
+          filters[`${column}_ilike`] = value;
+          return builder;
+        },
+        like: (column: string, value: any) => {
+          filters[`${column}_like`] = value;
+          return builder;
+        },
+        range: (column: string, from: any, to: any) => {
+          filters[`${column}_range`] = [from, to];
+          return builder;
+        },
+        textSearch: (column: string, value: any, options?: any) => {
+          filters[`${column}_textSearch`] = value;
+          return builder;
+        },
+        filter: (column: string, operator: string, value: any) => {
+          filters[`${column}_${operator}`] = value;
+          return builder;
+        },
+        not: (column: string, operator: string, value: any) => {
+          filters[`${column}_not_${operator}`] = value;
+          return builder;
+        },
+        or: (filterStr: string, options?: any) => {
+          filters.or = filterStr;
+          return builder;
+        },
+        
+        // Ordering & pagination
+        order: (column: string, options?: any) => {
+          operations.order = { column, options };
+          return builder;
+        },
+        limit: (count: number) => {
+          operations.limit = count;
+          return builder;
+        },
+        
+        // Execution methods
+        single: () => {
+          return Promise.resolve({ data: null, error: null });
+        },
+        maybeSingle: () => {
+          return Promise.resolve({ data: null, error: null });
+        },
+        
+        // Promise interface
+        then: (onfulfilled: any) => {
+          return Promise.resolve(onfulfilled({ data: null, error: null }));
+        }
+      };
+      
+      return builder;
     };
-    return resource;
+    
+    return createQueryBuilder();
   }
 
   storage = {
     from: (bucket: string) => ({
-      upload: () => Promise.resolve({ data: null, error: null }),
-      download: () => Promise.resolve({ data: null, error: null }),
-      getPublicUrl: () => ({ data: { publicUrl: '' }, error: null })
+      upload: (path: string, data: any, options?: any) => Promise.resolve({ data: null, error: null }),
+      download: (path: string, options?: any) => Promise.resolve({ data: null, error: null }),
+      getPublicUrl: (path: string, options?: any) => ({ data: { publicUrl: '' }, error: null })
     })
   };
 

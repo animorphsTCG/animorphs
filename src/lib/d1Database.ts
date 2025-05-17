@@ -1,360 +1,413 @@
 
-import { d1Worker } from './cloudflare/d1Worker';
+import { D1Database, D1Result } from '@cloudflare/workers-types';
 
-// Mock database response format
-export type D1Response<T> = {
-  data: T | null;
-  error: Error | null;
-}
+// Define a type that combines D1 response capabilities with chainable query methods
+export type EnhancedD1Database = {
+  from: (table: string) => EnhancedD1QueryBuilder;
+  raw: (query: string, params?: any[]) => Promise<D1Result>;
+  exec: (query: string, params?: any[]) => Promise<D1Result>;
+  batch: (statements: string[]) => Promise<D1Result[]>;
+  prepare: (query: string) => D1PreparedStatement;
+};
 
-// Interface for query options
-interface QueryOptions {
-  limit?: number;
-  offset?: number;
-  orderBy?: {
-    column: string;
-    ascending: boolean;
+export type D1PreparedStatement = {
+  bind: (...params: any[]) => D1PreparedStatement;
+  first: <T = any>(colName?: string) => Promise<T | null>;
+  run: () => Promise<D1Result>;
+  all: <T = any>() => Promise<T[]>;
+};
+
+export type EnhancedD1QueryBuilder = {
+  select: (...columns: string[]) => EnhancedD1QueryBuilder;
+  insert: (data: Record<string, any> | Record<string, any>[]) => EnhancedD1QueryBuilder;
+  update: (data: Record<string, any>) => EnhancedD1QueryBuilder;
+  delete: () => EnhancedD1QueryBuilder;
+  where: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
+  whereIn: (column: string, values: any[]) => EnhancedD1QueryBuilder;
+  andWhere: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
+  orWhere: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
+  eq: (column: string, value: any) => Promise<D1Response<any>>;
+  is: (column: string, value: any) => EnhancedD1QueryBuilder;
+  not: (column: string, value: any) => EnhancedD1QueryBuilder;
+  in: (column: string, values: any[]) => EnhancedD1QueryBuilder;
+  limit: (limit: number) => EnhancedD1QueryBuilder;
+  offset: (offset: number) => EnhancedD1QueryBuilder;
+  orderBy: (column: string, direction?: 'asc' | 'desc') => EnhancedD1QueryBuilder;
+  join: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
+  leftJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
+  rightJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
+  fullJoin: (table: string, column1: string, operator: string, column2: string) => EnhancedD1QueryBuilder;
+  groupBy: (...columns: string[]) => EnhancedD1QueryBuilder;
+  having: (column: string, operator: string, value: any) => EnhancedD1QueryBuilder;
+  count: (column?: string) => Promise<number>;
+  sum: (column: string) => Promise<number>;
+  avg: (column: string) => Promise<number>;
+  min: (column: string) => Promise<number>;
+  max: (column: string) => Promise<number>;
+  upsert: (data: Record<string, any>, conflictColumns: string[]) => EnhancedD1QueryBuilder;
+  range: (column: string, lower: any, upper: any) => EnhancedD1QueryBuilder;
+  first: <T = any>() => Promise<T | null>;
+  get: <T = any>() => Promise<T[]>;
+  execute: () => Promise<D1Response<any>>;
+};
+
+export interface D1Response<T> {
+  success: boolean;
+  error?: Error;
+  results?: T[];
+  meta?: {
+    duration: number;
+    last_row_id?: number;
+    changes?: number;
+    served_by?: string;
+    rows_read?: number;
+    rows_written?: number;
   };
-  params?: any[];
+  data?: T[];
 }
 
-/**
- * D1Database class - A wrapper around d1Worker to provide a Supabase-like interface
- * This makes the migration from Supabase easier by providing familiar methods
- */
-export class D1Database {
-  private table: string;
-  private token: string | null;
-  private whereConditions: Array<{field: string, op: string, value: any}> = [];
-  private _data: any = null;
-  private _error: Error | null = null;
-  
-  constructor(table: string, token?: string) {
-    this.table = table;
-    this.token = token || null;
-  }
-  
-  /**
-   * Set the token for authenticated requests
-   */
-  setToken(token: string): D1Database {
-    this.token = token;
-    return this;
-  }
-
-  /**
-   * Access data from the last operation
-   */
-  get data() {
-    return this._data;
-  }
-
-  /**
-   * Access error from the last operation
-   */
-  get error() {
-    return this._error;
-  }
-  
-  /**
-   * Select data from the table
-   */
-  select(columns: string = '*'): D1Database {
-    // This is just a fluent interface setup, the actual selection happens in execute()
-    return this;
-  }
-  
-  /**
-   * Filter by equality
-   */
-  eq(field: string, value: any): D1Database {
-    this.whereConditions.push({ field, op: '=', value });
-    return this;
-  }
-  
-  /**
-   * Filter by inequality
-   */
-  neq(field: string, value: any): D1Database {
-    this.whereConditions.push({ field, op: '!=', value });
-    return this;
-  }
-  
-  /**
-   * Filter by LIKE pattern
-   */
-  ilike(field: string, pattern: string): D1Database {
-    this.whereConditions.push({ field, op: 'LIKE', value: pattern });
-    return this;
-  }
-  
-  /**
-   * Limit results
-   */
-  limit(count: number): D1Database {
-    // Handled in execute()
-    return this;
-  }
-  
-  /**
-   * Order results
-   */
-  order(column: string, { ascending = true } = {}): D1Database {
-    // Handled in execute()
-    return this;
-  }
-  
-  /**
-   * Single result
-   */
-  async single(): Promise<D1Response<any>> {
-    return this.execute(true);
-  }
-  
-  /**
-   * Maybe single result (doesn't throw on no results)
-   */
-  async maybeSingle(): Promise<D1Response<any>> {
-    return this.execute(true, true);
-  }
-  
-  /**
-   * Return promise with data and error properties like Supabase
-   */
-  async then(resolve: (value: D1Response<any>) => any): Promise<any> {
-    const result = await this.execute();
-    return resolve(result);
-  }
-  
-  /**
-   * Insert data
-   */
-  async insert(data: any): Promise<D1Response<any>> {
-    try {
-      const result = await d1Worker.insert(
-        this.table,
-        data,
-        'id',
-        this.token || undefined
-      );
-      
-      this._data = result;
-      this._error = null;
-      
-      return {
-        data: result,
-        error: null
-      };
-    } catch (err) {
-      console.error(`Error inserting into ${this.table}:`, err);
-      
-      this._data = null;
-      this._error = err instanceof Error ? err : new Error(String(err));
-      
-      return {
-        data: null,
-        error: err instanceof Error ? err : new Error(String(err))
-      };
-    }
-  }
-  
-  /**
-   * Update data
-   */
-  async update(data: Record<string, any>): Promise<D1Response<any>> {
-    try {
-      if (this.whereConditions.length === 0) {
-        throw new Error('Update requires a where condition');
-      }
-      
-      const whereClause = this.buildWhereClause();
-      const whereParams = this.extractWhereParams();
-      
-      const result = await d1Worker.update(
-        this.table,
-        data,
-        whereClause,
-        whereParams,
-        'id',
-        this.token || undefined
-      );
-      
-      this._data = result;
-      this._error = null;
-      
-      return {
-        data: result,
-        error: null
-      };
-    } catch (err) {
-      console.error(`Error updating ${this.table}:`, err);
-      
-      this._data = null;
-      this._error = err instanceof Error ? err : new Error(String(err));
-      
-      return {
-        data: null,
-        error: err instanceof Error ? err : new Error(String(err))
-      };
-    }
-  }
-  
-  /**
-   * Delete data
-   */
-  async delete(): Promise<D1Response<any>> {
-    try {
-      if (this.whereConditions.length === 0) {
-        throw new Error('Delete requires a where condition');
-      }
-      
-      const whereClause = this.buildWhereClause();
-      const whereParams = this.extractWhereParams();
-      
-      const count = await d1Worker.delete(
-        this.table,
-        whereClause,
-        whereParams,
-        this.token || undefined
-      );
-      
-      this._data = { count };
-      this._error = null;
-      
-      return {
-        data: { count },
-        error: null
-      };
-    } catch (err) {
-      console.error(`Error deleting from ${this.table}:`, err);
-      
-      this._data = null;
-      this._error = err instanceof Error ? err : new Error(String(err));
-      
-      return {
-        data: null,
-        error: err instanceof Error ? err : new Error(String(err))
-      };
-    }
-  }
-  
-  /**
-   * Execute the query
-   */
-  private async execute(single: boolean = false, allowEmpty: boolean = false): Promise<D1Response<any>> {
-    try {
-      const whereClause = this.buildWhereClause();
-      const whereParams = this.extractWhereParams();
-      
-      const sql = `SELECT * FROM ${this.table}${whereClause ? ` WHERE ${whereClause}` : ''}`;
-      
-      if (single) {
-        const result = await d1Worker.getOne(sql, { params: whereParams }, this.token || undefined);
-        
-        if (!result && !allowEmpty) {
-          throw new Error('No rows returned');
-        }
-        
-        this._data = result;
-        this._error = null;
-        
-        return {
-          data: result,
-          error: null
-        };
-      } else {
-        const results = await d1Worker.query(sql, { params: whereParams }, this.token || undefined);
-        
-        this._data = results;
-        this._error = null;
-        
-        return {
-          data: results,
-          error: null
-        };
-      }
-    } catch (err) {
-      console.error(`Error executing query on ${this.table}:`, err);
-      
-      this._data = null;
-      this._error = err instanceof Error ? err : new Error(String(err));
-      
-      return {
-        data: null,
-        error: err instanceof Error ? err : new Error(String(err))
-      };
-    }
-  }
-  
-  /**
-   * Build the WHERE clause from conditions
-   */
-  private buildWhereClause(): string {
-    if (this.whereConditions.length === 0) {
-      return '';
-    }
-    
-    return this.whereConditions
-      .map(condition => `${condition.field} ${condition.op} ?`)
-      .join(' AND ');
-  }
-  
-  /**
-   * Extract parameters from WHERE conditions
-   */
-  private extractWhereParams(): any[] {
-    return this.whereConditions.map(condition => condition.value);
-  }
-}
-
-/**
- * D1 database client with Supabase-like interface for compatibility
- */
-export const d1 = {
-  from: (table: string) => new D1Database(table),
-  auth: {
-    // Auth methods are handled by EOSAuth, this is just for compatibility
-    getSession: async () => ({ data: { session: null }, error: null }),
-    getUser: async () => ({ data: { user: null }, error: null }),
-    signOut: async () => ({ error: null })
-  },
-  storage: {
-    from: (bucket: string) => ({
-      // Stub methods for storage, to be implemented later
-      upload: async () => ({ data: null, error: new Error('Not implemented') }),
-      download: async () => ({ data: null, error: new Error('Not implemented') })
-    })
-  },
-  rpc: async (functionName: string, params = {}) => {
-    console.warn(`RPC function "${functionName}" called with params:`, params);
-    return { data: null, error: new Error(`RPC not implemented: ${functionName}`) };
-  },
-  channel: (channelName: string) => {
-    console.warn(`Channel "${channelName}" requested, but channels are not supported`);
-    return {
-      on: () => ({}),
-      subscribe: () => ({})
+// Create a mock implementation of the D1 database wrapper
+export function createD1DatabaseWrapper(db: D1Database): EnhancedD1Database {
+  const createQueryBuilder = (tableName: string): EnhancedD1QueryBuilder => {
+    let query = {
+      type: 'select',
+      table: tableName,
+      columns: ['*'],
+      where: [] as { column: string; operator: string; value: any; logic?: 'AND' | 'OR' }[],
+      joins: [] as { type: string; table: string; column1: string; operator: string; column2: string }[],
+      orderByColumns: [] as { column: string; direction: 'asc' | 'desc' }[],
+      groupByColumns: [] as string[],
+      havingConditions: [] as { column: string; operator: string; value: any }[],
+      limitValue: null as number | null,
+      offsetValue: null as number | null,
+      data: null as Record<string, any> | Record<string, any>[] | null,
+      upsertConflictColumns: [] as string[],
     };
-  },
-  removeChannel: () => {}
-};
 
-// Helper function to create a channel-like object
-export const createChannel = (channelName: string) => {
-  return {
-    on: (event: string, filter: any, callback: (payload: any) => void) => {
-      // This would be replaced with actual event handling
-      console.log(`Channel ${channelName} subscribed to ${event}`);
-      return { unsubscribe: () => {} };
-    },
-    subscribe: (callback?: () => void) => {
-      if (callback) setTimeout(callback, 0);
-      return {
-        unsubscribe: () => {}
-      };
-    }
+    // Build SQL query string based on the current state
+    const buildQuery = (): { sql: string; params: any[] } => {
+      let sql = '';
+      const params: any[] = [];
+
+      if (query.type === 'select') {
+        sql = `SELECT ${query.columns.join(', ')} FROM ${query.table}`;
+      } else if (query.type === 'insert') {
+        if (!query.data) throw new Error('No data provided for insert');
+
+        const data = Array.isArray(query.data) ? query.data : [query.data];
+        if (data.length === 0) throw new Error('Empty data array');
+
+        const columns = Object.keys(data[0]);
+        sql = `INSERT INTO ${query.table} (${columns.join(', ')})`;
+
+        if (query.upsertConflictColumns.length > 0) {
+          // Handle upsert
+          const valuesSql = data.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+          sql += ` VALUES ${valuesSql}`;
+          data.forEach(row => {
+            columns.forEach(col => {
+              params.push(row[col]);
+            });
+          });
+          sql += ` ON CONFLICT(${query.upsertConflictColumns.join(', ')}) DO UPDATE SET `;
+          sql += columns
+            .filter(col => !query.upsertConflictColumns.includes(col))
+            .map(col => `${col} = excluded.${col}`)
+            .join(', ');
+        } else {
+          // Regular insert
+          const valuesSql = data.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+          sql += ` VALUES ${valuesSql}`;
+          data.forEach(row => {
+            columns.forEach(col => {
+              params.push(row[col]);
+            });
+          });
+        }
+      } else if (query.type === 'update') {
+        if (!query.data) throw new Error('No data provided for update');
+
+        sql = `UPDATE ${query.table} SET `;
+        const updates = Object.entries(query.data).map(([col, _]) => `${col} = ?`);
+        sql += updates.join(', ');
+        params.push(...Object.values(query.data));
+      } else if (query.type === 'delete') {
+        sql = `DELETE FROM ${query.table}`;
+      }
+
+      // Add joins
+      query.joins.forEach(join => {
+        sql += ` ${join.type} JOIN ${join.table} ON ${join.column1} ${join.operator} ${join.column2}`;
+      });
+
+      // Add where conditions
+      if (query.where.length > 0) {
+        sql += ' WHERE ';
+        const whereClauses = query.where.map((condition, index) => {
+          const logicOperator = index === 0 ? '' : `${condition.logic} `;
+          if (condition.value === null) {
+            if (condition.operator.toLowerCase() === '=' || condition.operator.toLowerCase() === 'is') {
+              return `${logicOperator}${condition.column} IS NULL`;
+            } else if (condition.operator.toLowerCase() === '!=' || condition.operator.toLowerCase() === 'is not') {
+              return `${logicOperator}${condition.column} IS NOT NULL`;
+            }
+          } else if (Array.isArray(condition.value) && condition.operator.toLowerCase() === 'in') {
+            const placeholders = condition.value.map(() => '?').join(', ');
+            params.push(...condition.value);
+            return `${logicOperator}${condition.column} IN (${placeholders})`;
+          } else if (condition.operator.toLowerCase() === 'between') {
+            params.push(condition.value[0], condition.value[1]);
+            return `${logicOperator}${condition.column} BETWEEN ? AND ?`;
+          }
+          params.push(condition.value);
+          return `${logicOperator}${condition.column} ${condition.operator} ?`;
+        });
+        sql += whereClauses.join(' ');
+      }
+
+      // Add GROUP BY
+      if (query.groupByColumns.length > 0) {
+        sql += ` GROUP BY ${query.groupByColumns.join(', ')}`;
+      }
+
+      // Add HAVING
+      if (query.havingConditions.length > 0) {
+        sql += ' HAVING ';
+        const havingClauses = query.havingConditions.map((condition, index) => {
+          const connector = index === 0 ? '' : 'AND ';
+          params.push(condition.value);
+          return `${connector}${condition.column} ${condition.operator} ?`;
+        });
+        sql += havingClauses.join(' ');
+      }
+
+      // Add ORDER BY
+      if (query.orderByColumns.length > 0) {
+        sql += ` ORDER BY ${query.orderByColumns.map(o => `${o.column} ${o.direction}`).join(', ')}`;
+      }
+
+      // Add LIMIT and OFFSET
+      if (query.limitValue !== null) {
+        sql += ` LIMIT ${query.limitValue}`;
+      }
+      if (query.offsetValue !== null) {
+        sql += ` OFFSET ${query.offsetValue}`;
+      }
+
+      return { sql, params };
+    };
+
+    const execute = async (): Promise<D1Response<any>> => {
+      try {
+        const { sql, params } = buildQuery();
+        const stmt = db.prepare(sql);
+        const boundStmt = stmt.bind(...params);
+
+        let result;
+        if (query.type === 'select') {
+          result = await boundStmt.all();
+        } else if (['insert', 'update', 'delete'].includes(query.type)) {
+          result = await boundStmt.run();
+        } else {
+          throw new Error(`Unsupported query type: ${query.type}`);
+        }
+
+        return {
+          success: true,
+          results: result.results || [],
+          data: result.results || [],
+          meta: {
+            duration: result.meta?.duration || 0,
+            last_row_id: result.meta?.last_row_id,
+            changes: result.meta?.changes,
+            served_by: result.meta?.served_by,
+            rows_read: result.meta?.rows_read,
+            rows_written: result.meta?.rows_written,
+          }
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error as Error
+        };
+      }
+    };
+
+    // Create the query builder object with chainable methods
+    const queryBuilder: EnhancedD1QueryBuilder = {
+      select: (...columns) => {
+        query.type = 'select';
+        query.columns = columns.length > 0 ? columns : ['*'];
+        return queryBuilder;
+      },
+      insert: (data) => {
+        query.type = 'insert';
+        query.data = data;
+        return queryBuilder;
+      },
+      update: (data) => {
+        query.type = 'update';
+        query.data = data;
+        return queryBuilder;
+      },
+      delete: () => {
+        query.type = 'delete';
+        return queryBuilder;
+      },
+      where: (column, operator, value) => {
+        query.where.push({ column, operator, value, logic: 'AND' });
+        return queryBuilder;
+      },
+      whereIn: (column, values) => {
+        query.where.push({ column, operator: 'IN', value: values, logic: 'AND' });
+        return queryBuilder;
+      },
+      andWhere: (column, operator, value) => {
+        query.where.push({ column, operator, value, logic: 'AND' });
+        return queryBuilder;
+      },
+      orWhere: (column, operator, value) => {
+        query.where.push({ column, operator, value, logic: 'OR' });
+        return queryBuilder;
+      },
+      eq: async (column, value) => {
+        query.where.push({ column, operator: '=', value, logic: 'AND' });
+        return execute();
+      },
+      is: (column, value) => {
+        query.where.push({ column, operator: 'IS', value, logic: 'AND' });
+        return queryBuilder;
+      },
+      not: (column, value) => {
+        query.where.push({ column, operator: 'IS NOT', value, logic: 'AND' });
+        return queryBuilder;
+      },
+      in: (column, values) => {
+        query.where.push({ column, operator: 'IN', value: values, logic: 'AND' });
+        return queryBuilder;
+      },
+      range: (column, lower, upper) => {
+        query.where.push({ column, operator: 'BETWEEN', value: [lower, upper], logic: 'AND' });
+        return queryBuilder;
+      },
+      limit: (limit) => {
+        query.limitValue = limit;
+        return queryBuilder;
+      },
+      offset: (offset) => {
+        query.offsetValue = offset;
+        return queryBuilder;
+      },
+      orderBy: (column, direction = 'asc') => {
+        query.orderByColumns.push({ column, direction });
+        return queryBuilder;
+      },
+      join: (table, column1, operator, column2) => {
+        query.joins.push({ type: 'INNER', table, column1, operator, column2 });
+        return queryBuilder;
+      },
+      leftJoin: (table, column1, operator, column2) => {
+        query.joins.push({ type: 'LEFT', table, column1, operator, column2 });
+        return queryBuilder;
+      },
+      rightJoin: (table, column1, operator, column2) => {
+        query.joins.push({ type: 'RIGHT', table, column1, operator, column2 });
+        return queryBuilder;
+      },
+      fullJoin: (table, column1, operator, column2) => {
+        query.joins.push({ type: 'FULL', table, column1, operator, column2 });
+        return queryBuilder;
+      },
+      groupBy: (...columns) => {
+        query.groupByColumns.push(...columns);
+        return queryBuilder;
+      },
+      having: (column, operator, value) => {
+        query.havingConditions.push({ column, operator, value });
+        return queryBuilder;
+      },
+      count: async (column = '*') => {
+        query.columns = [`COUNT(${column}) as count`];
+        const result = await execute();
+        return result.success && result.results && result.results.length > 0
+          ? Number((result.results[0] as any).count)
+          : 0;
+      },
+      sum: async (column) => {
+        query.columns = [`SUM(${column}) as sum`];
+        const result = await execute();
+        return result.success && result.results && result.results.length > 0
+          ? Number((result.results[0] as any).sum)
+          : 0;
+      },
+      avg: async (column) => {
+        query.columns = [`AVG(${column}) as avg`];
+        const result = await execute();
+        return result.success && result.results && result.results.length > 0
+          ? Number((result.results[0] as any).avg)
+          : 0;
+      },
+      min: async (column) => {
+        query.columns = [`MIN(${column}) as min`];
+        const result = await execute();
+        return result.success && result.results && result.results.length > 0
+          ? Number((result.results[0] as any).min)
+          : 0;
+      },
+      max: async (column) => {
+        query.columns = [`MAX(${column}) as max`];
+        const result = await execute();
+        return result.success && result.results && result.results.length > 0
+          ? Number((result.results[0] as any).max)
+          : 0;
+      },
+      upsert: (data, conflictColumns) => {
+        query.type = 'insert';
+        query.data = data;
+        query.upsertConflictColumns = conflictColumns;
+        return queryBuilder;
+      },
+      first: async <T>() => {
+        query.limitValue = 1;
+        const result = await execute();
+        return result.success && result.results && result.results.length > 0
+          ? (result.results[0] as T)
+          : null;
+      },
+      get: async <T>() => {
+        const result = await execute();
+        return result.success && result.results ? (result.results as T[]) : [];
+      },
+      execute
+    };
+
+    return queryBuilder;
   };
-};
 
-// Re-export for backwards compatibility
-export const supabase = d1;
+  return {
+    from: (table) => createQueryBuilder(table),
+    raw: async (query, params) => {
+      const stmt = db.prepare(query);
+      if (params) {
+        return stmt.bind(...params).all();
+      }
+      return stmt.all();
+    },
+    exec: async (query, params) => {
+      const stmt = db.prepare(query);
+      if (params) {
+        return stmt.bind(...params).run();
+      }
+      return stmt.run();
+    },
+    batch: async (statements) => {
+      const batch = db.batch(statements.map(s => db.prepare(s)));
+      return batch.run();
+    },
+    prepare: (query) => db.prepare(query)
+  };
+}
+
+// Export a mock D1 database wrapper for use in the application
+// This will be replaced in production with a real D1 database
+export const d1 = createD1DatabaseWrapper({} as D1Database);

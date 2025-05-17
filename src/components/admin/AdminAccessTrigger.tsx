@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { d1 } from "@/lib/d1Database";
-import { useAuth } from "@/modules/auth/context/AuthContext";
+import { useAuth } from "@/modules/auth/context/EOSAuthContext";
 import { toast } from "@/hooks/use-toast";
 
 const ADMIN_PASSWORD = "Adanacia23.";
@@ -93,12 +93,9 @@ const AdminAccessTrigger: React.FC<AdminAccessTriggerProps> = ({ onAuthenticated
 
     try {
       // Set the user as an admin using the d1 wrapper
-      const db = d1.from('profiles');
-      await db.update({ is_admin: true }).eq('id', user.id);
-
-      if (db.error) {
-        throw db.error;
-      }
+      await d1.from('profiles')
+        .update({ is_admin: true })
+        .eq('id', user.id);
 
       toast({
         title: "Admin Access Granted",

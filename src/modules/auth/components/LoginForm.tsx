@@ -1,58 +1,12 @@
 
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle, Loader2 } from 'lucide-react';
-
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Link } from 'react-router-dom';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { useAuth } from '../context/EOSAuthContext';
+import { AlertCircle } from 'lucide-react';
 import EpicGamesButton from './EpicGamesButton';
-import { Separator } from '@/components/ui/separator';
-
-const loginSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginForm: React.FC = () => {
-  const { signIn } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  
-  // Initialize form
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
-  
-  // Handle form submission
-  const onSubmit = async (values: LoginFormValues) => {
-    setIsLoading(true);
-    setLoginError(null);
-    
-    try {
-      await signIn(values.email, values.password);
-      
-      // Navigation is handled in the auth context
-    } catch (error: any) {
-      setLoginError(error.message || 'Failed to sign in');
-    } finally {
-      setIsLoading(false);
-    }
-  };
   
   return (
     <div className="space-y-6">
@@ -63,103 +17,29 @@ const LoginForm: React.FC = () => {
         </Alert>
       )}
       
-      <div className="space-y-4">
-        <EpicGamesButton variant="outline" />
-        
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
-              Or continue with email
-            </span>
-          </div>
+      <div className="space-y-6">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold">Sign In with Epic Games</h2>
+          <p className="text-muted-foreground mt-1">
+            Use your Epic Games account to sign in
+          </p>
         </div>
-      </div>
-      
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <Label htmlFor="email">Email</Label>
-                <FormControl>
-                  <Input
-                    id="email"
-                    placeholder="you@example.com"
-                    type="email"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    autoCorrect="off"
-                    disabled={isLoading}
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    to="/reset-password"
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <FormControl>
-                  <Input
-                    id="password"
-                    placeholder="••••••••"
-                    type="password"
-                    autoCapitalize="none"
-                    autoComplete="current-password"
-                    disabled={isLoading}
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              'Sign In with Email'
-            )}
-          </Button>
-        </form>
-      </Form>
-      
-      <div className="text-center">
-        <p className="text-sm text-muted-foreground">
-          Don't have an account?{' '}
-          <Link
-            to="/register"
-            className="text-primary hover:underline"
-          >
-            Sign up
-          </Link>
-        </p>
+        
+        <EpicGamesButton variant="default" />
+        
+        <div className="text-center pt-4">
+          <p className="text-sm text-muted-foreground">
+            Don't have an Epic Games account?{' '}
+            <a 
+              href="https://www.epicgames.com/id/register" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-primary hover:underline"
+            >
+              Create one
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -6,13 +6,12 @@ export interface UserProfile {
   name?: string;
   surname?: string;
   country?: string;
-  created_at?: string;
-  updated_at?: string;
-  is_admin: boolean;
-  music_unlocked: boolean;
+  created_at: string;
   has_paid?: boolean;
+  is_admin?: boolean;
+  music_unlocked?: boolean;
+  displayName: string;
   profile_image_url?: string;
-  bio?: string;
   favorite_animorph?: string;
   favorite_battle_mode?: string;
   online_times_gmt2?: string;
@@ -21,61 +20,23 @@ export interface UserProfile {
   ai_points?: number;
   lbp_points?: number;
   digi_balance?: number;
-  displayName?: string;  // Added for compatibility with EOSVoice
-}
-
-export interface PaymentInfo {
-  has_paid: boolean;
-  payment_date?: string;
-  payment_method?: string;
-  transaction_id?: string;
-  created_at?: string;
-  updated_at?: string;
-  id?: string;
-}
-
-export interface MusicSubscription {
-  id: string;
-  user_id: string;
-  subscription_type: string;
-  start_date: string;
-  end_date: string;
-  created_at: string;
-}
-
-export interface User {
-  id: string;
-  username: string;
-  displayName?: string;
-  email?: string;
-  profile?: UserProfile;
-  paymentInfo?: PaymentInfo;
-  musicSubscription?: MusicSubscription;
-}
-
-export interface AuthToken {
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
-}
-
-export interface AuthState {
-  user: User | null;
-  token: AuthToken | null;
-  loading: boolean;
-  error: Error | null;
 }
 
 export interface Session {
   access_token: string;
   token_type: string;
   expires_in: number;
-  expires_at?: number;
+  expires_at: number;
   refresh_token?: string;
   user?: any;
 }
 
-// AuthContext Props interface to ensure all required properties are defined
+export interface AuthToken {
+  access_token: string;
+  refresh_token?: string;
+  expires_at: number;
+}
+
 export interface AuthContextProps {
   session: Session | null;
   user: UserProfile | null;
@@ -83,9 +44,9 @@ export interface AuthContextProps {
   error: string | null;
   token: AuthToken | null;
   userProfile: UserProfile | null;
-  login: (credentials: any) => Promise<void>;
+  handleEpicAuthCallback: (url: URL) => Promise<boolean>;
   logout: () => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<void>; // Alias for compatibility
   authenticateAdmin: (totpCode: string) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
   isLoading: boolean;

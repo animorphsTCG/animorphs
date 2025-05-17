@@ -4,6 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { Session, UserProfile, AuthToken, AuthContextProps } from '../types';
 import { toast } from '@/components/ui/use-toast';
 import { d1Database } from '@/lib/d1Database';
+import { 
+  getEpicGamesOAuthURL, 
+  handleAuthCallback, 
+  getUserProfile, 
+  signOut as eosSignOut 
+} from '@/lib/eos/eosAuth';
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
@@ -22,12 +28,12 @@ interface EOSAuthProviderProps {
 const mapUserResponse = (data: any): UserProfile => {
   return {
     id: data.id,
-    username: data.username,
+    username: data.username || data.displayName,
     email: data.email,
     name: data.name,
     surname: data.surname,
     country: data.country,
-    created_at: data.created_at,
+    created_at: data.created_at || new Date().toISOString(),
     has_paid: Boolean(data.has_paid),
     is_admin: Boolean(data.is_admin),
     music_unlocked: Boolean(data.music_unlocked || false),
@@ -48,13 +54,13 @@ const mapUserResponse = (data: any): UserProfile => {
 export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<AuthToken | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedSession = localStorage.getItem('session');
+    const storedSession = localStorage.getItem('eos_session');
     if (storedSession) {
       try {
         const parsedSession: Session = JSON.parse(storedSession);
@@ -74,11 +80,12 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
         console.error("Error parsing stored session", err);
       }
     }
+    setLoading(false);
   }, []);
 
   const updateSession = (newSession: Session | null) => {
     if (newSession) {
-      localStorage.setItem('session', JSON.stringify(newSession));
+      localStorage.setItem('eos_session', JSON.stringify(newSession));
       
       if (newSession.access_token) {
         setToken({
@@ -88,58 +95,59 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
         });
       }
     } else {
-      localStorage.removeItem('session');
+      localStorage.removeItem('eos_session');
       setToken(null);
     }
     setSession(newSession);
   };
 
-  const handleLogin = async (credentials: any) => {
+  // Handle EOS Auth Callback
+  const handleEpicAuthCallback = async (url: URL) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Login failed');
-      }
-
-      const data = await response.json();
+      // Exchange code for token
+      const authResponse = await handleAuthCallback(url);
+      
+      // Get user profile with the token
+      const userProfile = await getUserProfile(authResponse.access_token);
+      
       const newSession: Session = {
-        access_token: data.access_token,
-        token_type: data.token_type,
-        expires_in: data.expires_in,
-        expires_at: Date.now() + (data.expires_in * 1000),
-        user: data.user,
+        access_token: authResponse.access_token,
+        token_type: authResponse.token_type,
+        refresh_token: authResponse.refresh_token,
+        expires_in: authResponse.expires_in,
+        expires_at: authResponse.expires_at || Date.now() + (authResponse.expires_in * 1000),
+        user: {
+          ...userProfile,
+          id: userProfile.id
+        }
       };
 
       updateSession(newSession);
       
-      if (data.user) {
-        const mappedUser = mapUserResponse(data.user);
-        setUser(mappedUser);
-      }
+      const mappedUser = mapUserResponse({
+        ...userProfile,
+        id: userProfile.id
+      });
+      setUser(mappedUser);
       
       navigate('/');
       toast({
         title: "Login Successful",
-        description: `Welcome, ${data.user.username}!`,
+        description: `Welcome, ${userProfile.displayName}!`,
       });
+
+      return true;
     } catch (err: any) {
       setError(err.message);
       toast({
         variant: "destructive",
-        title: "Login Failed",
+        title: "Epic Games Login Failed",
         description: err.message,
       });
+      return false;
     } finally {
       setLoading(false);
     }
@@ -150,12 +158,7 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
     setError(null);
 
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      await eosSignOut();
 
       updateSession(null);
       setUser(null);
@@ -185,6 +188,7 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token?.access_token}`,
         },
         body: JSON.stringify({ totp: totpCode }),
       });
@@ -254,7 +258,7 @@ export const EOSAuthProvider: React.FC<EOSAuthProviderProps> = ({ children }) =>
     error,
     token,
     userProfile: user,
-    login: handleLogin,
+    handleEpicAuthCallback,
     logout: handleLogout,
     signOut: handleLogout, // Alias for compatibility
     authenticateAdmin,

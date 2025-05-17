@@ -21,10 +21,23 @@ const EpicGamesButton: React.FC<EpicGamesButtonProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  // Save the current path for redirect after auth
+  const saveReturnPath = () => {
+    const currentPath = window.location.pathname;
+    if (currentPath !== '/login' && currentPath !== '/register' && !currentPath.includes('/auth/')) {
+      sessionStorage.setItem('auth_return_path', currentPath);
+    }
+  };
+
   const handleEpicLogin = () => {
     try {
       setIsLoading(true);
       console.log("Initiating Epic Games login flow...");
+      
+      // Save return path for redirect after auth
+      saveReturnPath();
+      
+      // Get OAuth URL and redirect
       const epicOAuthURL = getEpicGamesOAuthURL();
       console.log("Generated OAuth URL:", epicOAuthURL);
       window.location.href = epicOAuthURL;

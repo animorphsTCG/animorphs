@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Song, R2Song } from '@/types/music.d';
+import { Song } from '@/types/music.d';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 
 interface R2MusicPlayerProps {
-  currentSong: Song | R2Song | null;
+  currentSong: Song | null;
   isPlaying: boolean;
   isMuted: boolean;
   volume: number;
@@ -31,7 +31,7 @@ const R2MusicPlayer: React.FC<R2MusicPlayerProps> = ({
         return;
       }
 
-      // Check if it's an R2 song
+      // Check if it's an R2 song (has name property)
       if ('name' in currentSong) {
         if (!getSongStreamUrl) {
           console.error("getSongStreamUrl function is required for R2 songs");
@@ -52,6 +52,10 @@ const R2MusicPlayer: React.FC<R2MusicPlayerProps> = ({
         } finally {
           setIsLoading(false);
         }
+      } 
+      // Check if it has an r2_url directly
+      else if ('r2_url' in currentSong && currentSong.r2_url) {
+        setStreamUrl(currentSong.r2_url);
       }
       // If it's a YouTube song, we don't handle it here
     };

@@ -16,9 +16,10 @@ export interface EnhancedD1QueryBuilder<T> {
   insert: (values: Partial<T>) => Promise<EnhancedD1QueryResult<T>>;
   update: (values: Partial<T>) => EnhancedD1QueryBuilder<T>;
   delete: () => EnhancedD1QueryBuilder<T>;
+  get: () => Promise<T | null>;
+  // Add these properties to fix the errors
   data: T[] | null;
   error: Error | null;
-  get: () => Promise<T | null>;
 }
 
 export interface D1WorkerClient {

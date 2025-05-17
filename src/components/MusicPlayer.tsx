@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/modules/auth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
-import { Song, R2Song } from "@/types/music.d";
+import { Song } from "@/types/music.d";
 import { Loader2, AlertCircle } from "lucide-react";
 import SongInfo from "./music/SongInfo";
 import PlaybackControls from "./music/PlaybackControls";
@@ -11,9 +11,7 @@ import VolumeControl from "./music/VolumeControl";
 import YouTubeEmbed from "./music/YouTubeEmbed";
 import { Button } from "@/components/ui/button";
 import { useMusicPlayer } from "@/modules/music/hooks/useMusicPlayer";
-
-// Removed redundant declaration that was causing the type conflict
-// The global YouTube type definitions are now only defined in src/types/youtube.d.ts
+import R2MusicPlayer from "./music/R2MusicPlayer";
 
 const MusicPlayer: React.FC = () => {
   const {
@@ -33,7 +31,9 @@ const MusicPlayer: React.FC = () => {
     prevSong,
     toggleMute,
     handleVolumeChange,
-    handleRetry
+    handleRetry,
+    getSongStreamUrl,
+    extractVideoId
   } = useMusicPlayer();
   
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -71,14 +71,14 @@ const MusicPlayer: React.FC = () => {
     );
   }
 
-  // Make TypeScript happy by using a type assertion since we've unified the interfaces
-  const typedCurrentSong = currentSong as (Song | null);
+  // Determine if this is an R2 song (has name property) or YouTube song (has youtube_url)
+  const isR2Song = currentSong && ('name' in currentSong || 'r2_key' in currentSong || 'r2_url' in currentSong);
 
   return (
     <div className="bg-black/60 border border-fantasy-primary/30 rounded-md p-3">
       <div className="flex items-center justify-between">
         <SongInfo
-          currentSong={typedCurrentSong}
+          currentSong={currentSong}
           isPreviewMode={isPreviewMode}
           hasSubscription={hasSubscription}
         />
@@ -100,15 +100,26 @@ const MusicPlayer: React.FC = () => {
         </div>
       </div>
 
-      <YouTubeEmbed
-        currentSong={typedCurrentSong}
-        isPlaying={isPlaying}
-        isMuted={isMuted}
-        isPreviewMode={isPreviewMode}
-        ytApiReady={ytApiReady}
-        iframeRef={iframeRef}
-        playerRef={playerRef}
-      />
+      {/* Conditionally render either R2 or YouTube player based on song type */}
+      {isR2Song ? (
+        <R2MusicPlayer
+          currentSong={currentSong}
+          isPlaying={isPlaying}
+          isMuted={isMuted}
+          volume={volume}
+          getSongStreamUrl={getSongStreamUrl}
+        />
+      ) : (
+        <YouTubeEmbed
+          currentSong={currentSong}
+          isPlaying={isPlaying}
+          isMuted={isMuted}
+          isPreviewMode={isPreviewMode}
+          ytApiReady={ytApiReady}
+          playerRef={playerRef}
+          extractVideoId={extractVideoId}
+        />
+      )}
     </div>
   );
 };

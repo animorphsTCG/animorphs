@@ -1,11 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { useD1Songs } from '@/hooks/useD1Songs';
-import { Song } from '@/types/music';
-import { R2Song } from '@/types/music.d';
+import { Song } from '@/types/music.d';
 
 interface YouTubeEmbedProps {
-  currentSong: Song | R2Song | null;
+  currentSong: Song | null;
   isPlaying: boolean;
   isMuted: boolean;
   isPreviewMode: boolean;
@@ -45,7 +43,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
   useEffect(() => {
     if (!currentSong) return;
     
-    // Skip if this is an R2 song (indicated by r2_key or r2_url property)
+    // Skip if this is an R2 song (indicated by r2_key or name property)
     if ('r2_key' in currentSong || 'name' in currentSong || 'url' in currentSong) {
       setVideoId("");
       return;
@@ -100,7 +98,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
               event.target.unMute();
             }
             
-            if (isPreviewMode && currentSong && 'preview_start_seconds' in currentSong) {
+            if (isPreviewMode && currentSong && 'preview_start_seconds' in currentSong && currentSong.preview_start_seconds) {
               event.target.seekTo(currentSong.preview_start_seconds || 0);
             }
           },

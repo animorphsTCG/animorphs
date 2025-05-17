@@ -72,9 +72,9 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
       const elementId = "youtube-player";
       
       // Handle iframe reference correctly
-      const playerElement = iframeRef?.current ? iframeRef.current.id : elementId;
+      const playerElementId = iframeRef?.current ? iframeRef.current.id : elementId;
       
-      playerRef.current = new window.YT.Player(playerElement, {
+      playerRef.current = new window.YT.Player(playerElementId, {
         height: "0",
         width: "0",
         videoId: videoId,
@@ -108,7 +108,7 @@ const YouTubeEmbed: React.FC<YouTubeEmbedProps> = ({
     } catch (error) {
       console.error("YouTube player initialization error:", error);
     }
-  }, [videoId, ytApiReady, iframeRef]);
+  }, [videoId, ytApiReady, iframeRef, isPlaying, isMuted, isPreviewMode, currentSong, playerRef]);
   
   // Handle play state changes
   useEffect(() => {

@@ -16,7 +16,7 @@ export interface Channel {
 export function createChannel(name: string, userId: string): Channel {
   let isSubscribed = false;
   
-  return {
+  const channel = {
     name,
     userId,
     get subscribed() { return isSubscribed; },
@@ -35,4 +35,6 @@ export function createChannel(name: string, userId: string): Channel {
       return true;
     }
   };
+  
+  return channel;
 }

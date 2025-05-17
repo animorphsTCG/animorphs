@@ -1,26 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
-import { Session, User, UserProfile } from '../types';
+import { Session, User } from '../types';
 import { d1Worker } from '@/lib/cloudflare/d1Worker';
 import { signUpApi, resetPasswordApi, updatePasswordApi } from '@/lib/auth/authApi';
+import { UserProfile as AuthUserProfile } from '../types';
 
-// Define the UserProfile interface
-interface UserProfile {
-  id: string;
-  username: string;
-  email?: string;
-  name?: string;
-  surname?: string;
-  country?: string;
-  created_at: string;
-  has_paid?: boolean;
-  is_admin?: boolean;
-}
-
+// Define the AuthState interface
 interface AuthState {
   user: User | null;
   token: {access_token: string} | null;
-  userProfile: UserProfile | null;
+  userProfile: AuthUserProfile | null;
   isLoading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
@@ -54,7 +43,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<{access_token: string} | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<AuthUserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       
       // Create a valid profile object
-      const profileData: UserProfile = {
+      const profileData: AuthUserProfile = {
         id: profile.id,
         username: profile.username || `User-${profile.id.substring(0, 5)}`,
         email: profile.email || user?.email || '',

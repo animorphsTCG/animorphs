@@ -17,8 +17,12 @@ interface CollectionProps {
   user: any;
 }
 
+interface UserCardData extends CardData {
+  quantity?: number;
+}
+
 const Collection = ({ user }: CollectionProps) => {
-  const [userCards, setUserCards] = useState<CardData[]>([]);
+  const [userCards, setUserCards] = useState<UserCardData[]>([]);
   const [allCards, setAllCards] = useState<CardData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,14 +46,14 @@ const Collection = ({ user }: CollectionProps) => {
       // Load user's cards if not in demo mode
       if (user.id !== 0) {
         const userCardData = await apiClient.getUserCards(user.id);
-        const userCardsWithDetails = userCardData.map(uc => ({
+        const userCardsWithDetails: UserCardData[] = userCardData.map(uc => ({
           ...uc.card!,
           quantity: uc.quantity,
         }));
         setUserCards(userCardsWithDetails);
       } else {
         // Demo mode - show some sample cards
-        const demoCards = cards.slice(0, 20).map(card => ({
+        const demoCards: UserCardData[] = cards.slice(0, 20).map(card => ({
           ...card,
           quantity: Math.floor(Math.random() * 3) + 1,
         }));

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,23 +114,26 @@ const Battle = ({ user }: BattleProps) => {
     }));
 
     // Auto-select opponent card (AI)
-    const availableOpponentCards = prev.opponentCards.filter(c => 
-      !prev.battleLog.some(log => log.includes(`Opponent played ${c.name}`))
-    );
-    
-    if (availableOpponentCards.length > 0) {
-      const opponentCard = availableOpponentCards[Math.floor(Math.random() * availableOpponentCards.length)];
+    setBattleState(prev => {
+      const availableOpponentCards = prev.opponentCards.filter(c => 
+        !prev.battleLog.some(log => log.includes(`Opponent played ${c.name}`))
+      );
       
-      setBattleState(prev => ({
-        ...prev,
-        opponentCard,
-      }));
+      if (availableOpponentCards.length > 0) {
+        const opponentCard = availableOpponentCards[Math.floor(Math.random() * availableOpponentCards.length)];
+        
+        // Process battle round
+        setTimeout(() => {
+          processBattleRound(card, opponentCard);
+        }, 1000);
 
-      // Process battle round
-      setTimeout(() => {
-        processBattleRound(card, opponentCard);
-      }, 1000);
-    }
+        return {
+          ...prev,
+          opponentCard,
+        };
+      }
+      return prev;
+    });
   };
 
   const processBattleRound = (playerCard: CardData, opponentCard: CardData) => {

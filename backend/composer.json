@@ -1,0 +1,14 @@
+
+{
+    "name": "animorphs/tcg-backend",
+    "description": "Animorphs TCG Backend API",
+    "type": "project",
+    "require": {
+        "php": ">=8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Animorphs\\": "src/"
+        }
+    }
+}

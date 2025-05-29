@@ -5,32 +5,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Gamepad2, Music, Trophy, Wallet, Users, Zap } from "lucide-react";
 import { eosManager } from "@/lib/eos";
 import { web3Manager } from "@/lib/web3";
-
 const Index = () => {
   const [isEOSAuthenticated, setIsEOSAuthenticated] = useState(false);
   const [walletConnection, setWalletConnection] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-
   useEffect(() => {
     // Check authentication status on load
     const checkAuthStatus = () => {
       const eosUser = localStorage.getItem('eos_user');
       const walletAddress = localStorage.getItem('wallet_address');
-      
       setIsEOSAuthenticated(!!eosUser);
       if (walletAddress) {
-        setWalletConnection({ address: walletAddress, isConnected: true });
+        setWalletConnection({
+          address: walletAddress,
+          isConnected: true
+        });
       }
     };
-
     checkAuthStatus();
   }, []);
-
   const handleConnectWallet = async () => {
     if (!isEOSAuthenticated) {
       return; // Should not happen due to UI logic, but safety check
     }
-
     try {
       setIsConnecting(true);
       const connection = await web3Manager.connectWallet();
@@ -42,7 +39,6 @@ const Index = () => {
       setIsConnecting(false);
     }
   };
-
   const getConnectButtonText = () => {
     if (!isEOSAuthenticated) {
       return "Login with Epic Games First";
@@ -52,13 +48,10 @@ const Index = () => {
     }
     return isConnecting ? "Connecting..." : "Connect Wallet";
   };
-
   const shouldShowConnectButton = () => {
     return isEOSAuthenticated;
   };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+  return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       {/* Header */}
       <header className="bg-black/20 backdrop-blur-md border-b border-white/10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
@@ -72,21 +65,12 @@ const Index = () => {
             <Link to="/music" className="text-white hover:text-yellow-400 transition-colors">Music</Link>
             <Link to="/leaderboard" className="text-white hover:text-yellow-400 transition-colors">Leaderboard</Link>
             
-            {!isEOSAuthenticated ? (
-              <Button variant="outline" className="text-white border-white hover:bg-white hover:text-black" disabled>
+            {!isEOSAuthenticated ? <Button variant="outline" disabled className="text-white border-white hover:text-black bg-fuchsia-700 hover:bg-fuchsia-600">
                 Login Required
-              </Button>
-            ) : shouldShowConnectButton() ? (
-              <Button 
-                variant="outline" 
-                className="text-white border-white hover:bg-white hover:text-black"
-                onClick={handleConnectWallet}
-                disabled={isConnecting || walletConnection?.isConnected}
-              >
+              </Button> : shouldShowConnectButton() ? <Button variant="outline" className="text-white border-white hover:bg-white hover:text-black" onClick={handleConnectWallet} disabled={isConnecting || walletConnection?.isConnected}>
                 <Wallet className="h-4 w-4 mr-2" />
                 {getConnectButtonText()}
-              </Button>
-            ) : null}
+              </Button> : null}
           </nav>
         </div>
       </header>
@@ -253,8 +237,6 @@ const Index = () => {
           <p>&copy; 2024 Animorphs TCG. Powered by Epic Online Services & Polygon Network.</p>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;

@@ -161,7 +161,7 @@ export const AIAssistantPage = ({
                   </label>
                   <div className="flex gap-2">
                     <input ref={fileInputRef} type="file" onChange={handleKnowledgeUpload} accept=".txt,.md,.json,.php,.js,.ts,.tsx,.jsx" className="hidden" />
-                    <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="text-white border-white/20 hover:bg-white/10">
+                    <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="text-white border-white/20 bg-sky-600 hover:bg-sky-500">
                       <FileText className="h-4 w-4 mr-2" />
                       Choose Files
                     </Button>

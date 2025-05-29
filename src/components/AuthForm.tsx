@@ -16,21 +16,23 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [walletConnection, setWalletConnection] = useState<WalletConnection | null>(null);
   const [eosUser, setEosUser] = useState<EOSUser | null>(null);
+  const [authStep, setAuthStep] = useState<'eos' | 'wallet' | 'complete'>('eos');
 
-  const handleConnectWallet = async () => {
+  const handleEOSLogin = async () => {
     try {
       setIsLoading(true);
-      const connection = await web3Manager.connectWallet();
-      setWalletConnection(connection);
+      const user = await eosManager.login();
+      setEosUser(user);
+      setAuthStep('wallet');
       
       toast({
-        title: "Wallet Connected",
-        description: `Connected to ${connection.address.substring(0, 8)}...`,
+        title: "Epic Games Login Successful",
+        description: `Welcome, ${user.displayName || user.productUserId}! Now connect your wallet to access NFTs.`,
       });
     } catch (error) {
       toast({
-        title: "Connection Failed",
-        description: error instanceof Error ? error.message : "Failed to connect wallet",
+        title: "Epic Games Login Failed",
+        description: error instanceof Error ? error.message : "Failed to login with Epic Games",
         variant: "destructive",
       });
     } finally {
@@ -38,20 +40,30 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
     }
   };
 
-  const handleEOSLogin = async () => {
+  const handleConnectWallet = async () => {
+    if (!eosUser) {
+      toast({
+        title: "Epic Games Login Required",
+        description: "Please login with Epic Games first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const user = await eosManager.login();
-      setEosUser(user);
+      const connection = await web3Manager.connectWallet();
+      setWalletConnection(connection);
+      setAuthStep('complete');
       
       toast({
-        title: "EOS Login Successful",
-        description: `Welcome, ${user.displayName || user.productUserId}!`,
+        title: "Wallet Connected Successfully",
+        description: `Connected to ${connection.address.substring(0, 8)}... on Polygon network`,
       });
     } catch (error) {
       toast({
-        title: "EOS Login Failed",
-        description: error instanceof Error ? error.message : "Failed to login with EOS",
+        title: "Wallet Connection Failed",
+        description: error instanceof Error ? error.message : "Failed to connect MetaMask wallet",
         variant: "destructive",
       });
     } finally {
@@ -62,8 +74,8 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
   const handleCompleteAuth = async () => {
     if (!eosUser) {
       toast({
-        title: "EOS Login Required",
-        description: "Please login with Epic Online Services first",
+        title: "Epic Games Login Required",
+        description: "Please complete Epic Games authentication first",
         variant: "destructive",
       });
       return;
@@ -78,7 +90,7 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
         walletConnection?.address
       );
 
-      // Store auth token
+      // Store auth token and user data
       localStorage.setItem('auth_token', authResult.token);
       localStorage.setItem('eos_user', JSON.stringify(eosUser));
       
@@ -91,8 +103,8 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
         try {
           await apiClient.syncNFTs(walletConnection.address);
           toast({
-            title: "NFTs Synchronized",
-            description: "Your card collection has been updated",
+            title: "NFT Collection Synchronized",
+            description: "Your cards have been loaded from the blockchain",
           });
         } catch (syncError) {
           console.warn('NFT sync failed:', syncError);
@@ -103,8 +115,8 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
       onAuthSuccess(authResult.user);
       
       toast({
-        title: "Login Successful",
-        description: "Welcome to Animorphs TCG!",
+        title: "Authentication Complete",
+        description: "Welcome to Animorphs TCG! Ready to battle.",
       });
     } catch (error) {
       toast({
@@ -132,8 +144,8 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
     onAuthSuccess(demoUser);
     
     toast({
-      title: "Demo Mode",
-      description: "Playing in demo mode with AI battles",
+      title: "Demo Mode Activated",
+      description: "Playing in demo mode with AI battles (no NFTs)",
     });
   };
 
@@ -146,66 +158,72 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
           </div>
           <CardTitle className="text-2xl">Welcome to Animorphs TCG</CardTitle>
           <CardDescription className="text-gray-300">
-            Connect your accounts to start playing
+            {authStep === 'eos' && "Connect your Epic Games account to start"}
+            {authStep === 'wallet' && "Now connect your MetaMask wallet for NFTs"}
+            {authStep === 'complete' && "Complete your authentication"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* EOS Login */}
+          {/* Step 1: Epic Games Login */}
           <div className="space-y-2">
             <Button
               onClick={handleEOSLogin}
               disabled={isLoading || !!eosUser}
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
             >
+              {isLoading && authStep === 'eos' ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Zap className="h-4 w-4 mr-2" />
+              )}
+              {eosUser ? `✓ Epic Games: ${eosUser.displayName || eosUser.productUserId}` : 'Login with Epic Games'}
+            </Button>
+            {eosUser && (
+              <p className="text-xs text-gray-400 text-center">
+                Step 1 Complete - EOS ID: {eosUser.productUserId}
+              </p>
+            )}
+          </div>
+
+          {/* Step 2: MetaMask Wallet Connection (only after EOS login) */}
+          {authStep !== 'eos' && (
+            <div className="space-y-2">
+              <Button
+                onClick={handleConnectWallet}
+                disabled={isLoading || !eosUser || !!walletConnection}
+                variant="outline"
+                className="w-full text-white border-white hover:bg-white hover:text-black"
+              >
+                {isLoading && authStep === 'wallet' ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Wallet className="h-4 w-4 mr-2" />
+                )}
+                {walletConnection ? `✓ Wallet: ${walletConnection.address.substring(0, 8)}...` : 'Connect MetaMask Wallet'}
+              </Button>
+              {walletConnection && (
+                <p className="text-xs text-gray-400 text-center">
+                  Step 2 Complete - Polygon Network: {walletConnection.address}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Complete Authentication */}
+          {authStep === 'complete' && (
+            <Button
+              onClick={handleCompleteAuth}
+              disabled={isLoading || !eosUser}
+              className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+            >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
                 <Zap className="h-4 w-4 mr-2" />
               )}
-              {eosUser ? `✓ Connected as ${eosUser.displayName || eosUser.productUserId}` : 'Login with Epic Games'}
+              Enter Game
             </Button>
-            {eosUser && (
-              <p className="text-xs text-gray-400 text-center">
-                EOS ID: {eosUser.productUserId}
-              </p>
-            )}
-          </div>
-
-          {/* Wallet Connection */}
-          <div className="space-y-2">
-            <Button
-              onClick={handleConnectWallet}
-              disabled={isLoading || !!walletConnection}
-              variant="outline"
-              className="w-full text-white border-white hover:bg-white hover:text-black"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Wallet className="h-4 w-4 mr-2" />
-              )}
-              {walletConnection ? `✓ ${walletConnection.address.substring(0, 8)}...` : 'Connect Wallet (Optional)'}
-            </Button>
-            {walletConnection && (
-              <p className="text-xs text-gray-400 text-center">
-                Chain: Polygon • {walletConnection.address}
-              </p>
-            )}
-          </div>
-
-          {/* Complete Authentication */}
-          <Button
-            onClick={handleCompleteAuth}
-            disabled={isLoading || !eosUser}
-            className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Zap className="h-4 w-4 mr-2" />
-            )}
-            Enter Game
-          </Button>
+          )}
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -222,12 +240,13 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
             variant="ghost"
             className="w-full text-gray-300 hover:text-white hover:bg-white/10"
           >
-            Try Demo Mode (10v10 AI Battles)
+            Try Demo Mode (No Login Required)
           </Button>
 
           <div className="text-center text-xs text-gray-400 pt-4">
-            <p>EOS provides matchmaking, voice chat, and achievements</p>
-            <p>Wallet connection enables NFT card ownership</p>
+            <p><strong>Step 1:</strong> Epic Games login for matchmaking & achievements</p>
+            <p><strong>Step 2:</strong> MetaMask wallet for NFT card ownership</p>
+            <p><strong>NFT Contract:</strong> 0xb08882e1804B444171B560Cf7cEe99aDD26f7f62</p>
           </div>
         </CardContent>
       </Card>

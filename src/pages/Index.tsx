@@ -1,12 +1,61 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Gamepad2, Music, Trophy, Wallet, Users, Zap } from "lucide-react";
+import { eosManager } from "@/lib/eos";
+import { web3Manager } from "@/lib/web3";
 
 const Index = () => {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isEOSAuthenticated, setIsEOSAuthenticated] = useState(false);
+  const [walletConnection, setWalletConnection] = useState<any>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  useEffect(() => {
+    // Check authentication status on load
+    const checkAuthStatus = () => {
+      const eosUser = localStorage.getItem('eos_user');
+      const walletAddress = localStorage.getItem('wallet_address');
+      
+      setIsEOSAuthenticated(!!eosUser);
+      if (walletAddress) {
+        setWalletConnection({ address: walletAddress, isConnected: true });
+      }
+    };
+
+    checkAuthStatus();
+  }, []);
+
+  const handleConnectWallet = async () => {
+    if (!isEOSAuthenticated) {
+      return; // Should not happen due to UI logic, but safety check
+    }
+
+    try {
+      setIsConnecting(true);
+      const connection = await web3Manager.connectWallet();
+      setWalletConnection(connection);
+      localStorage.setItem('wallet_address', connection.address);
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const getConnectButtonText = () => {
+    if (!isEOSAuthenticated) {
+      return "Login with Epic Games First";
+    }
+    if (walletConnection?.isConnected) {
+      return `Connected: ${walletConnection.address.substring(0, 8)}...`;
+    }
+    return isConnecting ? "Connecting..." : "Connect Wallet";
+  };
+
+  const shouldShowConnectButton = () => {
+    return isEOSAuthenticated;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -22,9 +71,22 @@ const Index = () => {
             <Link to="/battle" className="text-white hover:text-yellow-400 transition-colors">Battle</Link>
             <Link to="/music" className="text-white hover:text-yellow-400 transition-colors">Music</Link>
             <Link to="/leaderboard" className="text-white hover:text-yellow-400 transition-colors">Leaderboard</Link>
-            <Button variant="outline" className="text-white border-white hover:bg-white hover:text-black">
-              {isConnected ? "Connected" : "Connect Wallet"}
-            </Button>
+            
+            {!isEOSAuthenticated ? (
+              <Button variant="outline" className="text-white border-white hover:bg-white hover:text-black" disabled>
+                Login Required
+              </Button>
+            ) : shouldShowConnectButton() ? (
+              <Button 
+                variant="outline" 
+                className="text-white border-white hover:bg-white hover:text-black"
+                onClick={handleConnectWallet}
+                disabled={isConnecting || walletConnection?.isConnected}
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                {getConnectButtonText()}
+              </Button>
+            ) : null}
           </nav>
         </div>
       </header>

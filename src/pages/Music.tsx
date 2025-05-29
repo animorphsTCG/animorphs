@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,26 +6,24 @@ import { toast } from "@/hooks/use-toast";
 import { apiClient, Song } from "@/lib/api";
 import { ArrowLeft, Play, Pause, Music as MusicIcon, Lock, Crown } from "lucide-react";
 import { Link } from "react-router-dom";
-
 interface MusicProps {
   user: any;
 }
-
-const Music = ({ user }: MusicProps) => {
+const Music = ({
+  user
+}: MusicProps) => {
   const [songs, setSongs] = useState<Song[]>([]);
   const [userSongs, setUserSongs] = useState<Song[]>([]);
   const [selectedSongs, setSelectedSongs] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
-
   useEffect(() => {
     loadMusic();
   }, [user.id]);
-
   const loadMusic = async () => {
     try {
       setIsLoading(true);
-      
+
       // Load all available songs
       const allSongs = await apiClient.getSongs();
       setSongs(allSongs);
@@ -46,13 +43,12 @@ const Music = ({ user }: MusicProps) => {
       toast({
         title: "Failed to load music",
         description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
-
   const toggleSongSelection = (songId: number) => {
     if (user.has_battle_pass) {
       // Battle Pass holders have access to all songs
@@ -71,71 +67,63 @@ const Music = ({ user }: MusicProps) => {
         toast({
           title: "Free Limit Reached",
           description: "Free users can select up to 5 songs. Get Battle Pass for unlimited access!",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     }
   };
-
   const saveSelection = async () => {
     try {
       await apiClient.selectFreeSongs(selectedSongs);
       toast({
         title: "Selection Saved",
-        description: "Your music selection has been updated",
+        description: "Your music selection has been updated"
       });
       await loadMusic();
     } catch (error) {
       toast({
         title: "Failed to save selection",
         description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const playPreview = (songId: number) => {
     // TODO: Implement actual audio playback
     if (currentlyPlaying === songId) {
       setCurrentlyPlaying(null);
       toast({
         title: "Music Stopped",
-        description: "Playback stopped",
+        description: "Playback stopped"
       });
     } else {
       setCurrentlyPlaying(songId);
       const song = songs.find(s => s.id === songId);
       toast({
         title: "Now Playing",
-        description: song?.title || "Unknown Song",
+        description: song?.title || "Unknown Song"
       });
-      
+
       // Simulate playback duration
       setTimeout(() => {
         setCurrentlyPlaying(null);
       }, 30000); // 30 second preview
     }
   };
-
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
-
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+    return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center text-white">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
           <p>Loading music library...</p>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+  return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       {/* Header */}
       <header className="bg-black/20 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -151,16 +139,12 @@ const Music = ({ user }: MusicProps) => {
             </div>
             
             <div className="flex items-center space-x-4">
-              {user.has_battle_pass ? (
-                <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500">
+              {user.has_battle_pass ? <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500">
                   <Crown className="h-3 w-3 mr-1" />
                   Battle Pass
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-white border-white">
+                </Badge> : <Badge variant="outline" className="text-white border-white">
                   Free Tier ({selectedSongs.length}/5)
-                </Badge>
-              )}
+                </Badge>}
             </div>
           </div>
         </div>
@@ -207,9 +191,8 @@ const Music = ({ user }: MusicProps) => {
         </div>
 
         {/* Battle Pass Promotion */}
-        {!user.has_battle_pass && (
-          <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-500/30 text-white mb-8">
-            <CardHeader>
+        {!user.has_battle_pass && <Card className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-500/30 text-white mb-8">
+            <CardHeader className="bg-orange-500">
               <CardTitle className="flex items-center space-x-2">
                 <Crown className="h-6 w-6 text-yellow-400" />
                 <span>Upgrade to Battle Pass</span>
@@ -223,8 +206,7 @@ const Music = ({ user }: MusicProps) => {
                 Get Battle Pass
               </Button>
             </CardContent>
-          </Card>
-        )}
+          </Card>}
 
         {/* Music Categories */}
         <div className="space-y-8">
@@ -240,46 +222,26 @@ const Music = ({ user }: MusicProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {userSongs.length > 0 ? (
-                <div className="space-y-2">
-                  {userSongs.map((song) => (
-                    <div key={song.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              {userSongs.length > 0 ? <div className="space-y-2">
+                  {userSongs.map(song => <div key={song.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <Button
-                          size="sm"
-                          variant={currentlyPlaying === song.id ? "secondary" : "outline"}
-                          onClick={() => playPreview(song.id)}
-                          className="w-8 h-8 p-0"
-                        >
-                          {currentlyPlaying === song.id ? (
-                            <Pause className="h-3 w-3" />
-                          ) : (
-                            <Play className="h-3 w-3" />
-                          )}
+                        <Button size="sm" variant={currentlyPlaying === song.id ? "secondary" : "outline"} onClick={() => playPreview(song.id)} className="w-8 h-8 p-0">
+                          {currentlyPlaying === song.id ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
                         </Button>
                         <div>
                           <div className="font-medium">{song.title}</div>
                           <div className="text-sm text-gray-400">{formatDuration(song.duration)}</div>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => toggleSongSelection(song.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
+                      <Button size="sm" variant="ghost" onClick={() => toggleSongSelection(song.id)} className="text-red-400 hover:text-red-300">
                         Remove
                       </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-400">
+                    </div>)}
+                </div> : <div className="text-center py-8 text-gray-400">
                   <MusicIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No songs selected yet</p>
                   <p className="text-sm">Choose from the library below</p>
-                </div>
-              )}
+                </div>}
             </CardContent>
           </Card>
 
@@ -293,26 +255,13 @@ const Music = ({ user }: MusicProps) => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {songs.map((song) => {
-                  const isSelected = selectedSongs.includes(song.id);
-                  const canSelect = user.has_battle_pass || selectedSongs.length < 5 || isSelected;
-                  
-                  return (
-                    <div key={song.id} className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-                      isSelected ? 'bg-green-500/20 border border-green-500/30' : 'bg-white/5 hover:bg-white/10'
-                    }`}>
+                {songs.map(song => {
+                const isSelected = selectedSongs.includes(song.id);
+                const canSelect = user.has_battle_pass || selectedSongs.length < 5 || isSelected;
+                return <div key={song.id} className={`flex items-center justify-between p-3 rounded-lg transition-colors ${isSelected ? 'bg-green-500/20 border border-green-500/30' : 'bg-white/5 hover:bg-white/10'}`}>
                       <div className="flex items-center space-x-3">
-                        <Button
-                          size="sm"
-                          variant={currentlyPlaying === song.id ? "secondary" : "outline"}
-                          onClick={() => playPreview(song.id)}
-                          className="w-8 h-8 p-0"
-                        >
-                          {currentlyPlaying === song.id ? (
-                            <Pause className="h-3 w-3" />
-                          ) : (
-                            <Play className="h-3 w-3" />
-                          )}
+                        <Button size="sm" variant={currentlyPlaying === song.id ? "secondary" : "outline"} onClick={() => playPreview(song.id)} className="w-8 h-8 p-0">
+                          {currentlyPlaying === song.id ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
                         </Button>
                         <div>
                           <div className="font-medium">{song.title}</div>
@@ -321,40 +270,24 @@ const Music = ({ user }: MusicProps) => {
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        {!user.has_battle_pass && !canSelect && (
-                          <Lock className="h-4 w-4 text-gray-400" />
-                        )}
-                        <Button
-                          size="sm"
-                          variant={isSelected ? "secondary" : "outline"}
-                          onClick={() => toggleSongSelection(song.id)}
-                          disabled={!canSelect}
-                          className={isSelected ? "text-green-400" : ""}
-                        >
+                        {!user.has_battle_pass && !canSelect && <Lock className="h-4 w-4 text-gray-400" />}
+                        <Button size="sm" variant={isSelected ? "secondary" : "outline"} onClick={() => toggleSongSelection(song.id)} disabled={!canSelect} className={isSelected ? "text-green-400" : ""}>
                           {isSelected ? "Selected" : "Select"}
                         </Button>
                       </div>
-                    </div>
-                  );
-                })}
+                    </div>;
+              })}
               </div>
               
-              {user.id !== 0 && (
-                <div className="mt-6 pt-6 border-t border-white/10">
-                  <Button
-                    onClick={saveSelection}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                  >
+              {user.id !== 0 && <div className="mt-6 pt-6 border-t border-white/10">
+                  <Button onClick={saveSelection} className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
                     Save Selection
                   </Button>
-                </div>
-              )}
+                </div>}
             </CardContent>
           </Card>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default Music;

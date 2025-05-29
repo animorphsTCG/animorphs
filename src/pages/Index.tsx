@@ -7,7 +7,6 @@ import { eosManager } from "@/lib/eos";
 import { web3Manager } from "@/lib/web3";
 import { AuthForm } from "@/components/AuthForm";
 import { PasswordDialog, AIAssistantPage } from "@/components/AIAssistant";
-
 const Index = () => {
   const [isEOSAuthenticated, setIsEOSAuthenticated] = useState(false);
   const [walletConnection, setWalletConnection] = useState<any>(null);
@@ -15,7 +14,6 @@ const Index = () => {
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-
   useEffect(() => {
     // Check authentication status on load
     const checkAuthStatus = () => {
@@ -31,12 +29,10 @@ const Index = () => {
     };
     checkAuthStatus();
   }, []);
-
   const handleConnectWallet = async () => {
     if (!isEOSAuthenticated) {
       return; // Should not happen due to UI logic, but safety check
     }
-
     try {
       setIsConnecting(true);
       const connection = await web3Manager.connectWallet();
@@ -48,7 +44,6 @@ const Index = () => {
       setIsConnecting(false);
     }
   };
-
   const getConnectButtonText = () => {
     if (!isEOSAuthenticated) {
       return "Login with Epic Games First";
@@ -58,37 +53,28 @@ const Index = () => {
     }
     return isConnecting ? "Connecting..." : "Connect Wallet";
   };
-
   const shouldShowConnectButton = () => {
     return isEOSAuthenticated;
   };
-
   const handleLoginClick = () => {
     setShowAuthForm(true);
   };
-
   const handleAuthClose = () => {
     setShowAuthForm(false);
   };
-
   const handleAIAccess = () => {
     setShowPasswordDialog(true);
   };
-
   const handleAIAuthenticated = () => {
     setShowAIAssistant(true);
   };
-
   const handleBackFromAI = () => {
     setShowAIAssistant(false);
   };
-
   if (showAIAssistant) {
     return <AIAssistantPage onBack={handleBackFromAI} />;
   }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+  return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       {/* Header */}
       <header className="bg-black/20 backdrop-blur-md border-b border-white/10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
@@ -103,26 +89,13 @@ const Index = () => {
             <Link to="/leaderboard" className="text-white hover:text-yellow-400 transition-colors">Leaderboard</Link>
             <Link to="/profile" className="text-white hover:text-yellow-400 transition-colors">Profile</Link>
             
-            {!isEOSAuthenticated ? (
-              <Button 
-                variant="outline" 
-                className="text-white border-white hover:bg-white hover:text-black bg-transparent"
-                onClick={handleLoginClick}
-              >
+            {!isEOSAuthenticated ? <Button variant="outline" className="text-white border-white hover:bg-white hover:text-black bg-transparent" onClick={handleLoginClick}>
                 <Zap className="h-4 w-4 mr-2" />
                 Login with Epic Games
-              </Button>
-            ) : shouldShowConnectButton() ? (
-              <Button 
-                variant="outline" 
-                className="text-white border-white hover:bg-white hover:text-black" 
-                onClick={handleConnectWallet} 
-                disabled={isConnecting || walletConnection?.isConnected}
-              >
+              </Button> : shouldShowConnectButton() ? <Button variant="outline" className="text-white border-white hover:bg-white hover:text-black" onClick={handleConnectWallet} disabled={isConnecting || walletConnection?.isConnected}>
                 <Wallet className="h-4 w-4 mr-2" />
                 {getConnectButtonText()}
-              </Button>
-            ) : null}
+              </Button> : null}
           </nav>
         </div>
       </header>
@@ -140,7 +113,7 @@ const Index = () => {
           <Button size="lg" className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
             Start Playing
           </Button>
-          <Button size="lg" variant="outline" className="text-white border-white hover:bg-white hover:text-black">
+          <Button size="lg" variant="outline" className="text-white border-white hover:text-black bg-blue-600 hover:bg-blue-500">
             Watch Demo
           </Button>
         </div>
@@ -291,42 +264,25 @@ const Index = () => {
       </footer>
 
       {/* AI Assistant Access Button */}
-      <Button
-        onClick={handleAIAccess}
-        className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 shadow-lg"
-        size="icon"
-      >
+      <Button onClick={handleAIAccess} className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 shadow-lg" size="icon">
         <Shield className="h-6 w-6" />
       </Button>
 
       {/* Password Dialog */}
-      <PasswordDialog
-        open={showPasswordDialog}
-        onOpenChange={setShowPasswordDialog}
-        onAuthenticated={handleAIAuthenticated}
-      />
+      <PasswordDialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog} onAuthenticated={handleAIAuthenticated} />
 
       {/* Auth Form Modal */}
-      {showAuthForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      {showAuthForm && <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="relative max-w-md w-full">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute -top-12 right-0 text-white hover:text-gray-300"
-              onClick={handleAuthClose}
-            >
+            <Button variant="ghost" size="sm" className="absolute -top-12 right-0 text-white hover:text-gray-300" onClick={handleAuthClose}>
               ✕ Close
             </Button>
-            <AuthForm onAuthSuccess={(user) => {
-              setShowAuthForm(false);
-              window.location.href = '/profile';
-            }} />
+            <AuthForm onAuthSuccess={user => {
+          setShowAuthForm(false);
+          window.location.href = '/profile';
+        }} />
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>}
+    </div>;
 };
-
 export default Index;

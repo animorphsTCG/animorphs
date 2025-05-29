@@ -7,7 +7,7 @@ class Database {
     private function __construct() {
         $host = $_ENV['DB_HOST'] ?? 'localhost';
         $port = $_ENV['DB_PORT'] ?? '3306';
-        $dbname = $_ENV['DB_NAME'] ?? 'animorphs_db';
+        $dbname = $_ENV['DB_NAME'] ?? 'animorph_cards';
         $username = $_ENV['DB_USER'] ?? 'lovable_admin';
         $password = $_ENV['DB_PASS'] ?? 'zwsQGJtuhRwQu7M';
         

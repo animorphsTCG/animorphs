@@ -11,7 +11,7 @@ class CardController {
     
     public function getAllCards($params) {
         try {
-            $cards = $this->db->fetchAll("SELECT * FROM cards ORDER BY element, token_id");
+            $cards = $this->db->fetchAll("SELECT * FROM animorph_cards ORDER BY animorph_type, token_id");
             return json_encode($cards);
         } catch (Exception $e) {
             error_log("Get all cards error: " . $e->getMessage());
@@ -30,11 +30,11 @@ class CardController {
         
         try {
             $userCards = $this->db->fetchAll(
-                "SELECT uc.user_id, uc.token_id, uc.quantity, uc.acquired_at, c.*
+                "SELECT uc.user_id, uc.token_id, uc.quantity, uc.acquired_at, ac.*
                  FROM user_cards uc 
-                 JOIN cards c ON uc.token_id = c.token_id 
+                 JOIN animorph_cards ac ON uc.token_id = ac.token_id 
                  WHERE uc.user_id = ? 
-                 ORDER BY c.element, c.token_id",
+                 ORDER BY ac.animorph_type, ac.token_id",
                 [$userId]
             );
             
@@ -47,14 +47,15 @@ class CardController {
                     'acquired_at' => $row['acquired_at'],
                     'card' => [
                         'token_id' => $row['token_id'],
-                        'name' => $row['name'],
-                        'element' => $row['element'],
-                        'power' => $row['power'],
+                        'name' => $row['nft_name'],
+                        'display_name' => $row['display_name'],
+                        'element' => $row['animorph_type'],
+                        'power' => $row['power_rating'],
                         'health' => $row['health'],
                         'attack' => $row['attack'],
                         'sats' => $row['sats'],
                         'size' => $row['size'],
-                        'metadata_uri' => $row['metadata_uri']
+                        'card_image_filename' => $row['card_image_filename']
                     ]
                 ];
             }, $userCards);

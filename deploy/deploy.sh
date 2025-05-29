@@ -1,12 +1,11 @@
-
 #!/bin/bash
 
-# Animorphs TCG Deployment Script for Contabo VPS
+# Animorph Cards TCG Deployment Script for Contabo VPS
 # Server: 195.179.228.179
 
 set -e
 
-echo "Starting Animorphs TCG deployment..."
+echo "Starting Animorph Cards TCG deployment..."
 
 # Update system packages
 echo "Updating system packages..."
@@ -40,14 +39,14 @@ sudo systemctl start mariadb
 sudo systemctl enable mariadb
 
 # Create database and user
-mysql -u root -e "CREATE DATABASE IF NOT EXISTS animorphs_db;"
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS animorph_cards;"
 mysql -u root -e "CREATE USER IF NOT EXISTS 'lovable_admin'@'localhost' IDENTIFIED BY 'zwsQGJtuhRwQu7M';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON animorphs_db.* TO 'lovable_admin'@'localhost';"
+mysql -u root -e "GRANT ALL PRIVILEGES ON animorph_cards.* TO 'lovable_admin'@'localhost';"
 mysql -u root -e "FLUSH PRIVILEGES;"
 
 # Import database schema
-echo "Importing database schema..."
-mysql -u lovable_admin -pzwsQGJtuhRwQu7M animorphs_db < /var/www/animorphs/database/schema.sql
+echo "Importing animorph cards schema..."
+mysql -u lovable_admin -pzwsQGJtuhRwQu7M animorph_cards < /var/www/animorphs/database/animorph_schema.sql
 
 # Backend setup
 echo "Setting up PHP backend..."
@@ -66,6 +65,11 @@ sudo cp /var/www/animorphs/deploy/apache-config.conf /etc/apache2/sites-availabl
 sudo a2enmod rewrite headers
 sudo a2ensite animorphs.conf
 sudo a2dissite 000-default.conf
+
+# Create card images directory
+echo "Setting up card images directory..."
+sudo mkdir -p /var/www/animorphs/frontend/dist/cards
+sudo chown -R www-data:www-data /var/www/animorphs/frontend/dist/cards
 
 # Create music directory symlink if doesn't exist
 sudo mkdir -p /media/ZypherDan
@@ -91,8 +95,8 @@ echo "Deployment completed!"
 echo "Application should be available at: http://195.179.228.179"
 echo ""
 echo "Next steps:"
-echo "1. Upload 200 card images to /var/www/animorphs/frontend/dist/cards/"
-echo "2. Add NFT metadata JSON file to /var/www/animorphs/frontend/dist/"
-echo "3. Upload music files to /media/ZypherDan/"
-echo "4. Configure SSL certificate"
-echo "5. Test all API endpoints"
+echo "1. Upload 200 card images to /var/www/animorphs/frontend/dist/cards/ using naming convention: {token_id}-{nft_name}.png"
+echo "2. Add music files to /media/ZypherDan/"
+echo "3. Configure SSL certificate"
+echo "4. Test NFT ownership sync with real wallet addresses"
+echo "5. Update Polygon RPC integration for production"

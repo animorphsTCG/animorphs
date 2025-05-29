@@ -23,7 +23,7 @@ class Config {
             'db' => [
                 'host' => $_ENV['DB_HOST'] ?? 'localhost',
                 'port' => $_ENV['DB_PORT'] ?? '3306',
-                'name' => $_ENV['DB_NAME'] ?? 'animorphs_db',
+                'name' => $_ENV['DB_NAME'] ?? 'animorph_cards',
                 'user' => $_ENV['DB_USER'] ?? 'lovable_admin',
                 'pass' => $_ENV['DB_PASS'] ?? 'zwsQGJtuhRwQu7M',
             ],

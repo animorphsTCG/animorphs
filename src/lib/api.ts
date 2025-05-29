@@ -1,4 +1,3 @@
-
 import { toast } from "@/hooks/use-toast";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/api';
@@ -11,6 +10,20 @@ export interface User {
   has_battle_pass: boolean;
   battle_pass_expires?: string;
   created_at: string;
+}
+
+export interface AnimorphCard {
+  token_id: number;
+  contract_address: string;
+  nft_name: string;
+  display_name: string;
+  card_image_filename: string;
+  animorph_type: 'Fire' | 'Water' | 'Ice' | 'Ground' | 'Electric';
+  power_rating: number;
+  health: number;
+  attack: number;
+  sats: number;
+  size: number;
 }
 
 export interface Card {
@@ -115,7 +128,7 @@ class ApiClient {
     return this.request(`/cards/user/${userId}`);
   }
 
-  async getAllCards(): Promise<Card[]> {
+  async getAllCards(): Promise<AnimorphCard[]> {
     return this.request('/cards');
   }
 
@@ -182,10 +195,12 @@ class ApiClient {
 
 export const apiClient = new ApiClient();
 
-// Utility functions for card images
-export const getCardImageUrl = (tokenId: number): string => {
-  // TODO: Replace with actual card images when available
-  // Card images should be placed in /public/cards/card-{token_id}.png
+// Updated utility functions for local card images
+export const getCardImageUrl = (tokenId: number, filename?: string): string => {
+  if (filename) {
+    return `/cards/${filename}`;
+  }
+  // Fallback to token-based naming
   return `/cards/card-${tokenId}.png`;
 };
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,15 +6,12 @@ import { toast } from "@/hooks/use-toast";
 import { apiClient, LeaderboardEntry } from "@/lib/api";
 import { ArrowLeft, Trophy, Crown, Medal, Target } from "lucide-react";
 import { Link } from "react-router-dom";
-
 const Leaderboard = () => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
   useEffect(() => {
     loadLeaderboard();
   }, []);
-
   const loadLeaderboard = async () => {
     try {
       setIsLoading(true);
@@ -25,20 +21,18 @@ const Leaderboard = () => {
       toast({
         title: "Failed to load leaderboard",
         description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
-
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Crown className="h-5 w-5 text-yellow-500" />;
     if (rank === 2) return <Medal className="h-5 w-5 text-gray-400" />;
     if (rank === 3) return <Medal className="h-5 w-5 text-amber-600" />;
     return <span className="text-lg font-bold text-gray-400">#{rank}</span>;
   };
-
   const getRankBadge = (rank: number) => {
     if (rank === 1) return "bg-gradient-to-r from-yellow-500 to-orange-500";
     if (rank === 2) return "bg-gradient-to-r from-gray-400 to-gray-500";
@@ -46,24 +40,18 @@ const Leaderboard = () => {
     if (rank <= 10) return "bg-gradient-to-r from-purple-600 to-blue-600";
     return "bg-gradient-to-r from-gray-600 to-gray-700";
   };
-
   const getWinRate = (wins: number, total: number): number => {
-    return total > 0 ? Math.round((wins / total) * 100) : 0;
+    return total > 0 ? Math.round(wins / total * 100) : 0;
   };
-
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+    return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center text-white">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
           <p>Loading leaderboard...</p>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+  return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       {/* Header */}
       <header className="bg-black/20 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -78,11 +66,7 @@ const Leaderboard = () => {
               <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
             </div>
             
-            <Button
-              onClick={loadLeaderboard}
-              variant="outline"
-              className="text-white border-white hover:bg-white hover:text-black"
-            >
+            <Button onClick={loadLeaderboard} variant="outline" className="text-white border-white hover:text-black bg-sky-600 hover:bg-sky-500">
               Refresh
             </Button>
           </div>
@@ -104,8 +88,7 @@ const Leaderboard = () => {
         </Card>
 
         {/* Top 3 Podium */}
-        {leaderboard.length >= 3 && (
-          <div className="grid md:grid-cols-3 gap-4 mb-8">
+        {leaderboard.length >= 3 && <div className="grid md:grid-cols-3 gap-4 mb-8">
             {/* 2nd Place */}
             <div className="md:order-1 flex flex-col items-center">
               <Card className="bg-gradient-to-br from-gray-400/20 to-gray-500/20 border-gray-400/30 text-white w-full">
@@ -165,8 +148,7 @@ const Leaderboard = () => {
                 </CardContent>
               </Card>
             </div>
-          </div>
-        )}
+          </div>}
 
         {/* Full Leaderboard */}
         <Card className="bg-black/20 border-white/10 text-white">
@@ -180,15 +162,10 @@ const Leaderboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {leaderboard.length > 0 ? (
-              <div className="space-y-2">
+            {leaderboard.length > 0 ? <div className="space-y-2">
                 {leaderboard.map((entry, index) => {
-                  const rank = index + 1;
-                  return (
-                    <div
-                      key={entry.user_id}
-                      className={`flex items-center justify-between p-4 rounded-lg ${getRankBadge(rank)}/10 border border-white/10 hover:bg-white/5 transition-colors`}
-                    >
+              const rank = index + 1;
+              return <div key={entry.user_id} className={`flex items-center justify-between p-4 rounded-lg ${getRankBadge(rank)}/10 border border-white/10 hover:bg-white/5 transition-colors`}>
                       <div className="flex items-center space-x-4">
                         <div className="flex items-center justify-center w-10 h-10">
                           {getRankIcon(rank)}
@@ -215,12 +192,9 @@ const Leaderboard = () => {
                           {getWinRate(entry.total_wins, entry.total_matches)}% Win Rate
                         </Badge>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-400">
+                    </div>;
+            })}
+              </div> : <div className="text-center py-12 text-gray-400">
                 <Trophy className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg mb-2">No rankings yet</p>
                 <p className="text-sm">Be the first to battle and claim the top spot!</p>
@@ -229,8 +203,7 @@ const Leaderboard = () => {
                     Start Battling
                   </Button>
                 </Link>
-              </div>
-            )}
+              </div>}
           </CardContent>
         </Card>
 
@@ -263,8 +236,6 @@ const Leaderboard = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default Leaderboard;

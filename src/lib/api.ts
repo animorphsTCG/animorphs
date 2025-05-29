@@ -1,3 +1,4 @@
+
 import { toast } from "@/hooks/use-toast";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost/api';
@@ -26,24 +27,12 @@ export interface AnimorphCard {
   size: number;
 }
 
-export interface Card {
-  token_id: number;
-  name: string;
-  element: 'Fire' | 'Water' | 'Ice' | 'Ground' | 'Electric';
-  power: number;
-  health: number;
-  attack: number;
-  sats: number;
-  size: number;
-  metadata_uri?: string;
-}
-
 export interface UserCard {
   user_id: number;
   token_id: number;
   quantity: number;
   acquired_at: string;
-  card?: Card;
+  card?: AnimorphCard;
 }
 
 export interface Match {
@@ -195,20 +184,21 @@ class ApiClient {
 
 export const apiClient = new ApiClient();
 
-// Updated utility functions for local card images
-export const getCardImageUrl = (tokenId: number, filename?: string): string => {
-  if (filename) {
-    return `/cards/${filename}`;
+// Updated utility functions for card images using the uploaded naming convention
+export const getCardImageUrl = (card: AnimorphCard): string => {
+  // Use the exact filename from database if available
+  if (card.card_image_filename) {
+    return `/cards/${card.card_image_filename}`;
   }
-  // Fallback to token-based naming
-  return `/cards/card-${tokenId}.png`;
+  // Fallback to the uploaded naming convention
+  return `/cards/${card.token_id}-${card.nft_name}.png`;
 };
 
 export const getCardImageFallback = (): string => {
-  return '/placeholder.svg'; // Using the existing placeholder
+  return '/placeholder.svg';
 };
 
-// Utility function to get card by element color
+// Utility function to get element color
 export const getElementColor = (element: string): string => {
   switch (element) {
     case 'Fire': return 'text-red-500 bg-red-100';

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { CardDisplay } from "@/components/CardDisplay";
-import { apiClient, Card as CardData, Match } from "@/lib/api";
+import { apiClient, AnimorphCard, Match } from "@/lib/api";
 import { ArrowLeft, Swords, Bot, Users, Play, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -16,13 +17,14 @@ interface BattleProps {
 type BattlePhase = 'setup' | 'card-select' | 'battle' | 'result';
 
 interface BattleState {
-  playerCards: CardData[];
-  opponentCards: CardData[];
+  playerCards: AnimorphCard[];
+  opponentCards: AnimorphCard[];
   playerHealth: number;
   opponentHealth: number;
   currentTurn: 'player' | 'opponent';
-  selectedCard?: CardData;
-  opponentCard?: CardData;
+  selectedCard?: AnimorphCard;
+  opponentCard?: AnimorphCard;
+  selectedStat?: string;
   round: number;
   maxRounds: number;
   battleLog: string[];
@@ -30,7 +32,7 @@ interface BattleState {
 
 const Battle = ({ user }: BattleProps) => {
   const [phase, setPhase] = useState<BattlePhase>('setup');
-  const [availableCards, setAvailableCards] = useState<CardData[]>([]);
+  const [availableCards, setAvailableCards] = useState<AnimorphCard[]>([]);
   const [battleState, setBattleState] = useState<BattleState>({
     playerCards: [],
     opponentCards: [],
@@ -100,58 +102,58 @@ const Battle = ({ user }: BattleProps) => {
       battleLog: [`Battle started! ${mode === 'ai' ? 'Fighting AI opponent' : 'Fighting another player'}`],
       selectedCard: undefined,
       opponentCard: undefined,
+      selectedStat: undefined,
     });
 
     setPhase('card-select');
   };
 
-  const selectCard = (card: CardData) => {
+  const selectCard = (card: AnimorphCard) => {
     if (battleState.currentTurn !== 'player') return;
 
     setBattleState(prev => ({
       ...prev,
       selectedCard: card,
+      selectedStat: undefined,
+    }));
+  };
+
+  const selectStat = (card: AnimorphCard, stat: string, value: number) => {
+    if (battleState.currentTurn !== 'player' || !battleState.selectedCard) return;
+
+    setBattleState(prev => ({
+      ...prev,
+      selectedStat: stat,
     }));
 
-    // Auto-select opponent card (AI)
-    setBattleState(prev => {
-      const availableOpponentCards = prev.opponentCards.filter(c => 
-        !prev.battleLog.some(log => log.includes(`Opponent played ${c.name}`))
+    // Auto-select opponent card and stat
+    setTimeout(() => {
+      const availableOpponentCards = battleState.opponentCards.filter(c => 
+        !battleState.battleLog.some(log => log.includes(`Opponent played ${c.nft_name}`))
       );
       
       if (availableOpponentCards.length > 0) {
         const opponentCard = availableOpponentCards[Math.floor(Math.random() * availableOpponentCards.length)];
-        
-        // Process battle round
-        setTimeout(() => {
-          processBattleRound(card, opponentCard);
-        }, 1000);
-
-        return {
-          ...prev,
-          opponentCard,
-        };
+        processBattleRound(battleState.selectedCard!, stat, value, opponentCard);
       }
-      return prev;
-    });
+    }, 1000);
   };
 
-  const processBattleRound = (playerCard: CardData, opponentCard: CardData) => {
-    const playerPower = calculateCardPower(playerCard);
-    const opponentPower = calculateCardPower(opponentCard);
+  const processBattleRound = (playerCard: AnimorphCard, stat: string, playerValue: number, opponentCard: AnimorphCard) => {
+    const opponentValue = getStatValue(opponentCard, stat);
     
     let playerDamage = 0;
     let opponentDamage = 0;
     let roundResult = '';
 
-    if (playerPower > opponentPower) {
-      opponentDamage = Math.round((playerPower - opponentPower) * 2);
-      roundResult = `Your ${playerCard.name} defeated opponent's ${opponentCard.name}!`;
-    } else if (opponentPower > playerPower) {
-      playerDamage = Math.round((opponentPower - playerPower) * 2);
-      roundResult = `Opponent's ${opponentCard.name} defeated your ${playerCard.name}!`;
+    if (playerValue > opponentValue) {
+      opponentDamage = Math.round((playerValue - opponentValue) * 2);
+      roundResult = `Your ${playerCard.nft_name} (${stat}: ${playerValue}) defeated opponent's ${opponentCard.nft_name} (${stat}: ${opponentValue})!`;
+    } else if (opponentValue > playerValue) {
+      playerDamage = Math.round((opponentValue - playerValue) * 2);
+      roundResult = `Opponent's ${opponentCard.nft_name} (${stat}: ${opponentValue}) defeated your ${playerCard.nft_name} (${stat}: ${playerValue})!`;
     } else {
-      roundResult = `Draw! Both ${playerCard.name} and ${opponentCard.name} tied.`;
+      roundResult = `Draw! Both cards had ${stat}: ${playerValue}`;
     }
 
     setBattleState(prev => {
@@ -161,8 +163,8 @@ const Battle = ({ user }: BattleProps) => {
       
       const newLog = [
         ...prev.battleLog,
-        `Round ${prev.round}: You played ${playerCard.name} (${playerPower} power)`,
-        `Round ${prev.round}: Opponent played ${opponentCard.name} (${opponentPower} power)`,
+        `Round ${prev.round}: You played ${playerCard.nft_name} with ${stat}`,
+        `Round ${prev.round}: Opponent played ${opponentCard.nft_name} with ${stat}`,
         roundResult,
         playerDamage > 0 ? `You took ${playerDamage} damage` : '',
         opponentDamage > 0 ? `Opponent took ${opponentDamage} damage` : '',
@@ -182,14 +184,22 @@ const Battle = ({ user }: BattleProps) => {
         round: newRound,
         battleLog: newLog,
         selectedCard: undefined,
-        opponentCard: undefined,
+        opponentCard: opponentCard,
+        selectedStat: undefined,
         currentTurn: 'player' as const,
       };
     });
   };
 
-  const calculateCardPower = (card: CardData): number => {
-    return card.power + card.attack + (card.health * 0.5) + (card.sats * 2);
+  const getStatValue = (card: AnimorphCard, stat: string): number => {
+    switch (stat) {
+      case 'power': return card.power_rating;
+      case 'health': return card.health;
+      case 'attack': return card.attack;
+      case 'sats': return card.sats;
+      case 'size': return card.size;
+      default: return 0;
+    }
   };
 
   const getBattleResult = (): 'win' | 'lose' | 'draw' => {
@@ -408,11 +418,16 @@ const Battle = ({ user }: BattleProps) => {
                   <div>
                     <h3 className="text-xl font-bold">Round {battleState.round} of {battleState.maxRounds}</h3>
                     <p className="text-gray-300">
-                      {battleState.currentTurn === 'player' ? 'Your turn - select a card' : 'Opponent is thinking...'}
+                      {!battleState.selectedCard 
+                        ? 'Select a card to play' 
+                        : battleState.selectedStat 
+                        ? 'Waiting for opponent...' 
+                        : 'Choose a stat to compare'
+                      }
                     </p>
                   </div>
                   <Badge variant="outline" className="text-purple-400 border-purple-400">
-                    Turn-Based Combat
+                    Stat Battle Mode
                   </Badge>
                 </div>
               </CardContent>
@@ -425,7 +440,12 @@ const Battle = ({ user }: BattleProps) => {
                   <h4 className="text-lg font-semibold text-white mb-4">Your Card</h4>
                   {battleState.selectedCard && (
                     <div className="max-w-48 mx-auto">
-                      <CardDisplay card={battleState.selectedCard} />
+                      <CardDisplay 
+                        card={battleState.selectedCard} 
+                        battleMode={!battleState.selectedStat}
+                        onStatSelect={selectStat}
+                        selectedStat={battleState.selectedStat}
+                      />
                     </div>
                   )}
                 </div>
@@ -442,26 +462,27 @@ const Battle = ({ user }: BattleProps) => {
             )}
 
             {/* Player Cards */}
-            <Card className="bg-black/20 border-white/10 text-white">
-              <CardHeader>
-                <CardTitle>Select Your Card</CardTitle>
-                <CardDescription className="text-gray-300">
-                  Choose a card to play this round
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                  {battleState.playerCards.map((card) => (
-                    <CardDisplay
-                      key={card.token_id}
-                      card={card}
-                      onClick={() => selectCard(card)}
-                      isSelected={battleState.selectedCard?.token_id === card.token_id}
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {!battleState.selectedCard && (
+              <Card className="bg-black/20 border-white/10 text-white">
+                <CardHeader>
+                  <CardTitle>Select Your Card</CardTitle>
+                  <CardDescription className="text-gray-300">
+                    Choose a card to play this round
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                    {battleState.playerCards.map((card) => (
+                      <CardDisplay
+                        key={card.token_id}
+                        card={card}
+                        onClick={() => selectCard(card)}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Battle Log */}
             <Card className="bg-black/20 border-white/10 text-white mt-6">

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { CardGrid } from "@/components/CardDisplay";
-import { apiClient, Card as CardData } from "@/lib/api";
+import { apiClient, AnimorphCard } from "@/lib/api";
 import { web3Manager } from "@/lib/web3";
 import { ArrowLeft, Wallet, RefreshCw, Search, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -17,13 +17,10 @@ interface CollectionProps {
   user: any;
 }
 
-interface UserCardData extends CardData {
-  quantity?: number;
-}
-
 const Collection = ({ user }: CollectionProps) => {
-  const [userCards, setUserCards] = useState<UserCardData[]>([]);
-  const [allCards, setAllCards] = useState<CardData[]>([]);
+  const [userCards, setUserCards] = useState<AnimorphCard[]>([]);
+  const [allCards, setAllCards] = useState<AnimorphCard[]>([]);
+  const [cardQuantities, setCardQuantities] = useState<{ [tokenId: number]: number }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedElement, setSelectedElement] = useState<string>("all");
@@ -46,18 +43,26 @@ const Collection = ({ user }: CollectionProps) => {
       // Load user's cards if not in demo mode
       if (user.id !== 0) {
         const userCardData = await apiClient.getUserCards(user.id);
-        const userCardsWithDetails: UserCardData[] = userCardData.map(uc => ({
-          ...uc.card!,
-          quantity: uc.quantity,
-        }));
-        setUserCards(userCardsWithDetails);
+        const userCardsOnly: AnimorphCard[] = userCardData.map(uc => uc.card!);
+        const quantities: { [tokenId: number]: number } = {};
+        
+        userCardData.forEach(uc => {
+          quantities[uc.token_id] = uc.quantity;
+        });
+        
+        setUserCards(userCardsOnly);
+        setCardQuantities(quantities);
       } else {
         // Demo mode - show some sample cards
-        const demoCards: UserCardData[] = cards.slice(0, 20).map(card => ({
-          ...card,
-          quantity: Math.floor(Math.random() * 3) + 1,
-        }));
+        const demoCards: AnimorphCard[] = cards.slice(0, 20);
+        const demoQuantities: { [tokenId: number]: number } = {};
+        
+        demoCards.forEach(card => {
+          demoQuantities[card.token_id] = Math.floor(Math.random() * 3) + 1;
+        });
+        
         setUserCards(demoCards);
+        setCardQuantities(demoQuantities);
       }
     } catch (error) {
       toast({
@@ -89,7 +94,6 @@ const Collection = ({ user }: CollectionProps) => {
         description: `Synced ${result.synced} NFTs to your collection`,
       });
 
-      // Reload cards to show updated collection
       await loadCards();
     } catch (error) {
       toast({
@@ -103,19 +107,21 @@ const Collection = ({ user }: CollectionProps) => {
   };
 
   const filteredUserCards = userCards.filter(card => {
-    const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesElement = selectedElement === "all" || card.element === selectedElement;
+    const matchesSearch = card.nft_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         card.display_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesElement = selectedElement === "all" || card.animorph_type === selectedElement;
     return matchesSearch && matchesElement;
   });
 
   const filteredAllCards = allCards.filter(card => {
-    const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesElement = selectedElement === "all" || card.element === selectedElement;
+    const matchesSearch = card.nft_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         card.display_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesElement = selectedElement === "all" || card.animorph_type === selectedElement;
     return matchesSearch && matchesElement;
   });
 
   const getCollectionStats = () => {
-    const totalOwned = userCards.reduce((sum, card) => sum + (card.quantity || 1), 0);
+    const totalOwned = Object.values(cardQuantities).reduce((sum, quantity) => sum + quantity, 0);
     const uniqueCards = userCards.length;
     const totalCards = allCards.length;
     
@@ -258,6 +264,7 @@ const Collection = ({ user }: CollectionProps) => {
             <CardGrid
               cards={filteredUserCards}
               showQuantity={true}
+              quantities={cardQuantities}
               emptyMessage="No cards in your collection"
             />
           </TabsContent>

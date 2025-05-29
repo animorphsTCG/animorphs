@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -365,13 +364,13 @@ const Battle = ({ user }: BattleProps) => {
                   {availableCards.slice(0, 10).map((card, index) => (
                     <div key={card.token_id} className="aspect-[3/4] bg-gray-700 rounded-lg p-1 text-center text-xs">
                       <div className={`w-full h-3/4 rounded mb-1 ${
-                        card.element === 'Fire' ? 'bg-red-400' :
-                        card.element === 'Water' ? 'bg-blue-400' :
-                        card.element === 'Ice' ? 'bg-cyan-400' :
-                        card.element === 'Ground' ? 'bg-amber-400' :
+                        card.animorph_type === 'Fire' ? 'bg-red-400' :
+                        card.animorph_type === 'Water' ? 'bg-blue-400' :
+                        card.animorph_type === 'Ice' ? 'bg-cyan-400' :
+                        card.animorph_type === 'Ground' ? 'bg-amber-400' :
                         'bg-yellow-400'
                       }`} />
-                      <div className="text-white truncate">{card.element[0]}</div>
+                      <div className="text-white truncate">{card.animorph_type[0]}</div>
                     </div>
                   ))}
                   {availableCards.length > 10 && (
@@ -443,7 +442,7 @@ const Battle = ({ user }: BattleProps) => {
                       <CardDisplay 
                         card={battleState.selectedCard} 
                         battleMode={!battleState.selectedStat}
-                        onStatSelect={selectStat}
+                        onStatSelect={(stat, value) => selectStat(battleState.selectedCard!, stat, value)}
                         selectedStat={battleState.selectedStat}
                       />
                     </div>

@@ -1,4 +1,3 @@
-
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -18,6 +17,7 @@ require_once __DIR__ . '/battle/BattleController.php';
 require_once __DIR__ . '/payments/PaymentController.php';
 require_once __DIR__ . '/music/MusicController.php';
 require_once __DIR__ . '/leaderboard/LeaderboardController.php';
+require_once __DIR__ . '/ai/AIController.php';
 
 // Load configuration
 Config::load();
@@ -59,6 +59,12 @@ $router->post('/music/select-free', [$musicController, 'selectFreeSongs']);
 // Leaderboard routes
 $leaderboardController = new LeaderboardController();
 $router->get('/leaderboard', [$leaderboardController, 'getLeaderboard']);
+
+// AI Assistant routes
+$aiController = new AIController();
+$router->post('/ai/config', [$aiController, 'saveConfig']);
+$router->post('/ai/knowledge', [$aiController, 'uploadKnowledge']);
+$router->post('/ai/chat', [$aiController, 'chat']);
 
 // Handle the request
 try {

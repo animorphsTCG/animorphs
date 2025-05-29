@@ -2,16 +2,19 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Gamepad2, Music, Trophy, Wallet, Users, Zap } from "lucide-react";
+import { Gamepad2, Music, Trophy, Wallet, Users, Zap, Shield } from "lucide-react";
 import { eosManager } from "@/lib/eos";
 import { web3Manager } from "@/lib/web3";
 import { AuthForm } from "@/components/AuthForm";
+import { PasswordDialog, AIAssistantPage } from "@/components/AIAssistant";
 
 const Index = () => {
   const [isEOSAuthenticated, setIsEOSAuthenticated] = useState(false);
   const [walletConnection, setWalletConnection] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [showAuthForm, setShowAuthForm] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
 
   useEffect(() => {
     // Check authentication status on load
@@ -67,6 +70,22 @@ const Index = () => {
   const handleAuthClose = () => {
     setShowAuthForm(false);
   };
+
+  const handleAIAccess = () => {
+    setShowPasswordDialog(true);
+  };
+
+  const handleAIAuthenticated = () => {
+    setShowAIAssistant(true);
+  };
+
+  const handleBackFromAI = () => {
+    setShowAIAssistant(false);
+  };
+
+  if (showAIAssistant) {
+    return <AIAssistantPage onBack={handleBackFromAI} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -270,6 +289,22 @@ const Index = () => {
           <p>&copy; 2024 Animorphs TCG. Powered by Epic Online Services & Polygon Network.</p>
         </div>
       </footer>
+
+      {/* AI Assistant Access Button */}
+      <Button
+        onClick={handleAIAccess}
+        className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 shadow-lg"
+        size="icon"
+      >
+        <Shield className="h-6 w-6" />
+      </Button>
+
+      {/* Password Dialog */}
+      <PasswordDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onAuthenticated={handleAIAuthenticated}
+      />
 
       {/* Auth Form Modal */}
       {showAuthForm && (

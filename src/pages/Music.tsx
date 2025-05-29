@@ -202,7 +202,7 @@ const Music = ({
               </CardDescription>
             </CardHeader>
             <CardContent className="bg-orange-500">
-              <Button className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700">
+              <Button className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 bg-amber-500 hover:bg-amber-400 text-neutral-950">
                 Get Battle Pass
               </Button>
             </CardContent>

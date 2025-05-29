@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { CardDisplay } from "@/components/CardDisplay";
-import { apiClient, AnimorphCard, Match } from "@/lib/api";
+import { apiClient, AnimorphCard, Match, UserCard } from "@/lib/api";
 import { ArrowLeft, Swords, Bot, Users, Play, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -44,9 +44,32 @@ const Battle = ({ user }: BattleProps) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [currentMatch, setCurrentMatch] = useState<Match | null>(null);
+  const [userCards, setUserCards] = useState<UserCard[]>([]);
+  const [isLoadingCards, setIsLoadingCards] = useState(true);
 
   useEffect(() => {
     loadAvailableCards();
+  }, [user.id]);
+
+  useEffect(() => {
+    const loadUserCards = async () => {
+      try {
+        setIsLoadingCards(true);
+        const cards = await apiClient.getUserCards(user.id);
+        setUserCards(cards);
+      } catch (error) {
+        console.error('Failed to load user cards:', error);
+        toast({
+          title: "Card Loading Failed",
+          description: "Could not load your NFT collection",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingCards(false);
+      }
+    };
+
+    loadUserCards();
   }, [user.id]);
 
   const loadAvailableCards = async () => {
@@ -73,6 +96,29 @@ const Battle = ({ user }: BattleProps) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const isCardOwned = (tokenId: number): boolean => {
+    return userCards.some(userCard => userCard.token_id === tokenId);
+  };
+
+  const handleCardSelect = (card: any) => {
+    if (!isCardOwned(card.token_id)) {
+      toast({
+        title: "Card Not Owned",
+        description: "You don't own this NFT card. Purchase it from OpenSea to use in battles.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (battleState.currentTurn !== 'player') return;
+
+    setBattleState(prev => ({
+      ...prev,
+      selectedCard: card,
+      selectedStat: undefined,
+    }));
   };
 
   const startBattle = (mode: 'ai' | 'pvp') => {
@@ -475,7 +521,7 @@ const Battle = ({ user }: BattleProps) => {
                       <CardDisplay
                         key={card.token_id}
                         card={card}
-                        onClick={() => selectCard(card)}
+                        onClick={() => handleCardSelect(card)}
                       />
                     ))}
                   </div>

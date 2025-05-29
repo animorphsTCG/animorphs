@@ -5,10 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Gamepad2, Music, Trophy, Wallet, Users, Zap } from "lucide-react";
 import { eosManager } from "@/lib/eos";
 import { web3Manager } from "@/lib/web3";
+import { AuthForm } from "@/components/AuthForm";
+
 const Index = () => {
   const [isEOSAuthenticated, setIsEOSAuthenticated] = useState(false);
   const [walletConnection, setWalletConnection] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [showAuthForm, setShowAuthForm] = useState(false);
+
   useEffect(() => {
     // Check authentication status on load
     const checkAuthStatus = () => {
@@ -24,10 +28,12 @@ const Index = () => {
     };
     checkAuthStatus();
   }, []);
+
   const handleConnectWallet = async () => {
     if (!isEOSAuthenticated) {
       return; // Should not happen due to UI logic, but safety check
     }
+
     try {
       setIsConnecting(true);
       const connection = await web3Manager.connectWallet();
@@ -39,6 +45,7 @@ const Index = () => {
       setIsConnecting(false);
     }
   };
+
   const getConnectButtonText = () => {
     if (!isEOSAuthenticated) {
       return "Login with Epic Games First";
@@ -48,10 +55,21 @@ const Index = () => {
     }
     return isConnecting ? "Connecting..." : "Connect Wallet";
   };
+
   const shouldShowConnectButton = () => {
     return isEOSAuthenticated;
   };
-  return <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+
+  const handleLoginClick = () => {
+    setShowAuthForm(true);
+  };
+
+  const handleAuthClose = () => {
+    setShowAuthForm(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       {/* Header */}
       <header className="bg-black/20 backdrop-blur-md border-b border-white/10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
@@ -64,13 +82,28 @@ const Index = () => {
             <Link to="/battle" className="text-white hover:text-yellow-400 transition-colors">Battle</Link>
             <Link to="/music" className="text-white hover:text-yellow-400 transition-colors">Music</Link>
             <Link to="/leaderboard" className="text-white hover:text-yellow-400 transition-colors">Leaderboard</Link>
+            <Link to="/profile" className="text-white hover:text-yellow-400 transition-colors">Profile</Link>
             
-            {!isEOSAuthenticated ? <Button variant="outline" disabled className="text-white border-white hover:text-black bg-fuchsia-700 hover:bg-fuchsia-600">
-                Login Required
-              </Button> : shouldShowConnectButton() ? <Button variant="outline" className="text-white border-white hover:bg-white hover:text-black" onClick={handleConnectWallet} disabled={isConnecting || walletConnection?.isConnected}>
+            {!isEOSAuthenticated ? (
+              <Button 
+                variant="outline" 
+                className="text-white border-white hover:bg-white hover:text-black bg-transparent"
+                onClick={handleLoginClick}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Login with Epic Games
+              </Button>
+            ) : shouldShowConnectButton() ? (
+              <Button 
+                variant="outline" 
+                className="text-white border-white hover:bg-white hover:text-black" 
+                onClick={handleConnectWallet} 
+                disabled={isConnecting || walletConnection?.isConnected}
+              >
                 <Wallet className="h-4 w-4 mr-2" />
                 {getConnectButtonText()}
-              </Button> : null}
+              </Button>
+            ) : null}
           </nav>
         </div>
       </header>
@@ -237,6 +270,28 @@ const Index = () => {
           <p>&copy; 2024 Animorphs TCG. Powered by Epic Online Services & Polygon Network.</p>
         </div>
       </footer>
-    </div>;
+
+      {/* Auth Form Modal */}
+      {showAuthForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative max-w-md w-full">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute -top-12 right-0 text-white hover:text-gray-300"
+              onClick={handleAuthClose}
+            >
+              ✕ Close
+            </Button>
+            <AuthForm onAuthSuccess={(user) => {
+              setShowAuthForm(false);
+              window.location.href = '/profile';
+            }} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
+
 export default Index;

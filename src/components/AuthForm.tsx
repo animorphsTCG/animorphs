@@ -116,8 +116,13 @@ export const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
       
       toast({
         title: "Authentication Complete",
-        description: "Welcome to Animorphs TCG! Ready to battle.",
+        description: "Welcome to Animorphs TCG! Redirecting to your profile...",
       });
+
+      // Redirect to profile page after a short delay
+      setTimeout(() => {
+        window.location.href = '/profile';
+      }, 1500);
     } catch (error) {
       toast({
         title: "Authentication Failed",

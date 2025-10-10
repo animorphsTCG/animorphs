@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Select Your 10 Free Cards – Animorphs TCG</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; margin:0; padding:20px; }
+    h1 { text-align:center; margin:10px 0 20px; }
+    .topbar {
+      max-width: 1100px; margin: 0 auto 15px; display:flex; gap:12px; align-items:center; justify-content:space-between;
+      background:#fff; padding:12px 16px; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.08);
+    }
+    .count { font-weight:bold; }
+    .actions { display:flex; gap:10px; align-items:center; }
+    button {
+      padding:10px 14px; border:none; border-radius:6px; cursor:pointer; font-size:14px; background:#2196F3; color:#fff;
+    }
+    button[disabled] { opacity:.6; cursor:not-allowed; }
+
+    .grid {
+      max-width:1100px; margin:0 auto; display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap:16px;
+    }
+    .card {
+      background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:10px; transition: box-shadow .15s, transform .05s;
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .card:hover { box-shadow:0 4px 14px rgba(0,0,0,.12); }
+    .card.selected { outline:3px solid #673AB7; transform: translateY(-1px); }
+    .name { font-weight:700; font-size:16px; }
+    .type { color:#666; font-style:italic; }
+    .img { width:100%; border-radius:6px; height:150px; object-fit:cover; background:#eee; }
+    .stats { font-size:13px; line-height:1.5; }
+    .stat { display:flex; justify-content:space-between; border-top:1px solid #eee; padding:3px 0; }
+    .select-row { display:flex; align-items:center; justify-content:space-between; margin-top:6px; }
+    .pill {
+      padding:6px 10px; border-radius:999px; font-size:12px; background:#eee; color:#333; cursor:pointer; user-select:none;
+    }
+    .pill.sel { background:#673AB7; color:#fff; }
+    .notice { max-width: 1100px; margin:0 auto 12px; color:#c62828; font-weight:600; }
+    .search { padding:8px 10px; border:1px solid #ccc; border-radius:6px; font-size:14px; width:240px; }
+  </style>
+</head>
+<body>
+  <h1>Select Your 10 Free Cards</h1>
+
+  <div id="alreadyMsg" class="notice" style="display:none;">
+    You’ve already selected your free cards. <a href="/profile.php">Go to your profile</a>.
+  </div>
+
+  <div class="topbar">
+    <div>
+      <span class="count">Selected: <span id="selCount">0</span>/10</span>
+    </div>
+    <div class="actions">
+      <input id="search" class="search" placeholder="Search name or type…" />
+      <button id="confirmBtn" disabled>Confirm Selection</button>
+    </div>
+  </div>
+
+  <div id="grid" class="grid"></div>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const selCountEl = document.getElementById('selCount');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const alreadyMsg = document.getElementById('alreadyMsg');
+    const searchInput = document.getElementById('search');
+
+    const selected = new Set();
+    let allCards = [];
+
+    function imgUrl(path) {
+      return `image.php?file=${encodeURIComponent(path)}`;
+    }
+
+    function statRow(label, v) {
+      // numbers can be big; keep raw for comparison and string for display
+      const text = (v ?? 0).toLocaleString();
+      return `<div class="stat"><span>${label}</span><span>${text}</span></div>`;
+    }
+
+    function cardHtml(card) {
+      return `
+        <div class="card" data-id="${card.token_id}" data-name="${card.display_name.toLowerCase()}" data-type="${(card.animorph_type||'').toLowerCase()}">
+          <div class="name">${card.display_name}</div>
+          <img class="img" src="${imgUrl(card.card_image)}" alt="${card.display_name}">
+          <div class="type">${card.animorph_type ?? ''}</div>
+          <div class="stats">
+            ${statRow('Power', Number(card.power_rating))}
+            ${statRow('Health', Number(card.health))}
+            ${statRow('Attack', Number(card.attack))}
+            ${statRow('Sats', Number(card.sats))}
+            ${statRow('Size', Number(card.size))}
+          </div>
+          <div class="select-row">
+            <span class="pill ${selected.has(card.token_id) ? 'sel':''}">Select</span>
+            <span>#${card.token_id}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function render(list) {
+      grid.innerHTML = list.map(cardHtml).join('');
+      // attach handlers
+      grid.querySelectorAll('.card .pill').forEach(pill => {
+        pill.addEventListener('click', (e) => {
+          const cardEl = e.target.closest('.card');
+          const id = Number(cardEl.dataset.id);
+
+          if (selected.has(id)) {
+            selected.delete(id);
+            cardEl.classList.remove('selected');
+            pill.classList.remove('sel');
+          } else {
+            if (selected.size >= 10) {
+              alert('You can only select 10 cards.');
+              return;
+            }
+            selected.add(id);
+            cardEl.classList.add('selected');
+            pill.classList.add('sel');
+          }
+          selCountEl.textContent = selected.size;
+          confirmBtn.disabled = selected.size !== 10;
+        });
+      });
+    }
+
+    function applySearch() {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { render(allCards); return; }
+      const filtered = allCards.filter(c =>
+        (c.display_name || '').toLowerCase().includes(q) ||
+        (c.animorph_type || '').toLowerCase().includes(q)
+      );
+      render(filtered);
+    }
+
+    async function load() {
+      try {
+        const res = await fetch('select_free_cards.php', { credentials: 'same-origin' });
+        const data = await res.json();
+        if (data.status !== 'ok') throw new Error(data.message || 'Failed to load cards.');
+
+        if (data.alreadySelected) {
+          alreadyMsg.style.display = 'block';
+        }
+
+        allCards = data.cards || [];
+        render(allCards);
+      } catch (err) {
+        alert('Error loading cards. Try refreshing the page.');
+        console.error(err);
+      }
+    }
+
+    async function confirm() {
+      if (selected.size !== 10) {
+        alert('Please select exactly 10 cards.');
+        return;
+      }
+      confirmBtn.disabled = true;
+      try {
+        const res = await fetch('select_free_cards.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ token_ids: Array.from(selected) })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+          alert('Your 10 free cards have been saved!');
+          window.location.href = '/profile.php';
+        } else {
+          alert(data.message || 'There was a problem saving your selection.');
+          confirmBtn.disabled = false;
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Network error while saving your selection.');
+        confirmBtn.disabled = false;
+      }
+    }
+
+    confirmBtn.addEventListener('click', confirm);
+    searchInput.addEventListener('input', applySearch);
+
+    load();
+  </script>
+</body>
+</html>

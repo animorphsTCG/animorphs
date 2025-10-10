@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Register - Animorphs TCG</title>
+  <script>
+    async function checkUsernameAvailability(username) {
+      if (username.length >= 3) {
+        const res = await fetch("check_username.php?username=" + encodeURIComponent(username));
+        const data = await res.json();
+        const field = document.getElementById("username");
+        field.style.color = data.available ? "green" : "red";
+      }
+    }
+
+    function validateReferral() {
+      const code = document.getElementById("referral").value.trim();
+      const msg  = document.getElementById("referral_msg");
+      const btn  = document.getElementById("register_btn");
+
+      if (code === "") {
+        msg.textContent = "Optional — leave blank to default to Legacy.";
+        msg.style.color = "gray";
+        btn.disabled = false;
+        return true;
+      }
+
+      if (code.length < 3 || code.length > 8 || !/^[A-Za-z0-9]+$/.test(code)) {
+        msg.textContent = "❌ Referral code must be 3–8 letters/numbers.";
+        msg.style.color = "red";
+        btn.disabled = true;
+        return false;
+      }
+
+      msg.textContent = "✅ Code format looks good.";
+      msg.style.color = "lightgreen";
+      btn.disabled = false;
+      return true;
+    }
+
+    async function submitForm() {
+      const email    = document.getElementById("email").value;
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const referral = document.getElementById("referral").value.trim();
+
+      if (!validateReferral()) {
+        alert("Please fix the referral code before continuing.");
+        return;
+      }
+
+      const res = await fetch("register.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, username, password, referral_code: referral })
+      });
+
+      const data = await res.json();
+      alert(data.message);
+      if (data.status === "ok") {
+        window.location.href = "profile.php";
+      }
+    }
+  </script>
+</head>
+<body>
+  <h2>Register</h2>
+  <input type="email" id="email" placeholder="Email" required><br><br>
+  <input type="text" id="username" placeholder="Username" onkeyup="checkUsernameAvailability(this.value)" required><br><br>
+  <input type="password" id="password" placeholder="Password" required><br><br>
+  <input type="text" id="referral" placeholder="Referral Code (optional)" oninput="validateReferral()"><br>
+  <div id="referral_msg" style="font-size:13px;color:gray;margin-top:4px;">Optional — leave blank to default to Legacy.</div><br>
+  <button id="register_btn" onclick="submitForm()">Register</button>
+</body>
+</html>

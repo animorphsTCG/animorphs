@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Animorphs TCG – Demo Mode</title>
+  <link rel="stylesheet" href="demo.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Animorphs TCG Demo</h1>
+    <p id="instructions" class="instructions">
+      Click "Start Demo" to begin. You will draw a card and then choose a stat to battle against the AI.
+    </p>
+    <div id="startArea" class="start-area">
+      <button id="playDemo">Start Demo</button>
+    </div>
+
+    <div id="scoreboard" class="scoreboard" style="display: none;">
+      <div>Player Wins: <span id="playerWins">0</span></div>
+      <div>AI Wins: <span id="aiWins">0</span></div>
+    </div>
+
+    <div id="battlefield" class="battlefield" style="display: none;">
+      <div id="playerStats" class="card-area"><!-- Player card will render here --></div>
+      <div class="vs">VS</div>
+      <div id="aiStats" class="card-area"><!-- AI card/back will render here --></div>
+    </div>
+
+    <div id="roundResult" class="result"><!-- Round results text --></div>
+
+    <div id="restartArea" style="display: none;">
+      <button id="playAgain">Play Again</button>
+    </div>
+  </div>
+
+  <script src="demo.js"></script>
+</body>
+</html>

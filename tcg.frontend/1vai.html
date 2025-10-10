@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Animorphs TCG – 1vAI</title>
+  <link rel="stylesheet" href="demo.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>1vAI Battle</h1>
+    <p id="instructions" class="instructions">
+      Click "Start 1vAI" to begin. Your 10 selected free cards will be shuffled. Pick a stat on odd rounds; the AI picks on even rounds.
+    </p>
+
+    <div id="startArea" class="start-area">
+      <button id="play1vAI">Start 1vAI</button>
+    </div>
+
+    <div id="scoreboard" class="scoreboard" style="display:none;">
+      <div>Player Wins: <span id="playerWins">0</span></div>
+      <div>AI Wins: <span id="aiWins">0</span></div>
+    </div>
+
+    <div id="battlefield" class="battlefield" style="display:none;">
+      <div id="playerStats" class="card-area"></div>
+      <div class="vs">VS</div>
+      <div id="aiStats" class="card-area"></div>
+    </div>
+
+    <div id="roundResult" class="result"></div>
+
+    <div id="restartArea" style="display:none;">
+      <button id="playAgain">Play Again</button>
+    </div>
+  </div>
+
+  <script src="1vai.js"></script>
+</body>
+</html>

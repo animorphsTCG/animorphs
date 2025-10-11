@@ -1,94 +1,145 @@
 <?php
 // /var/www/tcg.backend/game_modes/1v1_random.php
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
 session_start();
+header('Content-Type: text/html; charset=utf-8');
+
+require_once '/var/www/vendor/autoload.php';
+use Dotenv\Dotenv;
+
+$dotenv = Dotenv::createImmutable('/home');
+$dotenv->safeLoad();
+
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login.php');
     exit;
 }
-$lobbyId = $_GET['lobby_id'] ?? null;
+
+$userId  = (int)$_SESSION['user_id'];
+$lobbyId = (int)($_GET['lobby_id'] ?? 0);
 if (!$lobbyId) {
-    header('Location: /lobbies.php');
+    http_response_code(400);
+    echo "Missing lobby_id";
+    exit;
+}
+
+try {
+    $pdo = new PDO(
+        "pgsql:host={$_ENV['TCG_DB_HOST']};port=".($_ENV['TCG_DB_PORT'] ?? 5432).";dbname={$_ENV['TCG_DB_NAME']}",
+        $_ENV['TCG_DB_USER'],
+        $_ENV['TCG_DB_PASS'],
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
+
+    $l = $pdo->prepare("SELECT owner_id, mode, status FROM lobbies WHERE id=:l");
+    $l->execute([':l'=>$lobbyId]);
+    $lobby = $l->fetch(PDO::FETCH_ASSOC);
+    if (!$lobby) { echo "Lobby not found."; exit; }
+
+} catch (Throwable $e) {
+    echo "DB error.";
     exit;
 }
 ?>
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Animorphs TCG – 1v1 Random Battle</title>
-  <link rel="stylesheet" href="/assets/style.css" />
+  <meta charset="utf-8" />
+  <title>1v1 Random Battle</title>
+  <link rel="stylesheet" href="/assets/style.css">
   <style>
-    :root { --sidebar-w: 240px; }
-    body { margin:0; }
-    .layout { display:grid; grid-template-columns: var(--sidebar-w) 1fr 300px; min-height:100vh; }
-    .sidebar { background:#0f1220; color:#fff; padding:20px; }
-    .nav a { display:block; padding:8px; margin:4px 0; border-radius:8px; background:rgba(255,255,255,0.08); text-decoration:none; color:#eee; }
-    .nav a:hover { background:rgba(255,255,255,0.15); }
-    .content { padding:20px; }
-    .chatbox { border-left:1px solid #444; display:flex; flex-direction:column; }
-    .chat-messages { flex:1; padding:10px; overflow-y:auto; background:#181b2a; color:#fff; }
-    .chat-input { display:flex; border-top:1px solid #444; }
-    .chat-input input { flex:1; padding:8px; border:none; }
-    .chat-input button { padding:8px 12px; background:#2c80ff; color:#fff; border:none; cursor:pointer; }
-    .battlefield { display:flex; align-items:center; justify-content:center; gap:20px; margin:20px 0; }
-    .card-area { width:200px; }
-    .vs { font-size:24px; font-weight:bold; }
+    body { font-family: system-ui, Arial, sans-serif; padding: 16px; }
+    .btn { padding: 8px 12px; border-radius: 6px; border: 1px solid #222; cursor: pointer; background:#f5f5f5; }
+    .btn-primary { background:#222; color:#fff; }
+    .row { margin-top: 12px; }
+    .score { margin: 12px 0; font-size: 18px; }
   </style>
 </head>
 <body>
-<div class="layout">
-  <aside class="sidebar">
-    <div class="brand">Animorphs TCG</div>
-    <div class="userbox">Logged in as: <strong><?php echo htmlspecialchars($_SESSION['username'] ?? 'Player'); ?></strong></div>
-    <nav class="nav">
-      <a href="/profile.php">Profile</a>
-      <a href="/leaderboards.php">Leaderboards</a>
-      <a href="/lobbies.php">Back to Lobbies</a>
-      <a href="/logout.php">Logout</a>
-    </nav>
-  </aside>
+  <h1>1v1 Random Battle</h1>
+  <p>Once both players are ready and the owner starts the game, click "Start Battle" to begin. You’ll get 10 random cards each. Pick stats each round to battle.</p>
 
-  <main class="content">
-    <h1>1v1 Random Battle</h1>
-    <p id="instructions">
-      Once both players are ready and the owner starts the game, click "Start Battle" to begin. 
-      You’ll get 10 random cards each. Pick stats each round to battle.
-    </p>
+  <div id="preGame" class="row" style="display:none;">
+    <?php if ((int)$lobby['owner_id'] === $userId): ?>
+      <form id="startForm" method="post" action="/tcg.backend/game_modes/1v1_random_api.php" style="display:inline;">
+        <input type="hidden" name="action" value="owner_start_match">
+        <input type="hidden" name="lobby_id" value="<?= $lobbyId ?>">
+        <button type="submit" class="btn btn-primary">Start Battle</button>
+      </form>
+    <?php else: ?>
+      <em>Waiting for the owner to start…</em>
+    <?php endif; ?>
+  </div>
 
-    <div id="startArea">
-      <button id="startBtn">Start Battle</button>
+  <div id="inGame" class="row" style="display:none;">
+    <div class="score">
+      You: <span id="youScore">0</span> &nbsp;&nbsp; Opponent: <span id="oppScore">0</span>
     </div>
+    <h2 style="margin-top:24px;">VS</h2>
 
-    <div id="scoreboard" style="display:none;">
-      <div>You: <span id="myWins">0</span></div>
-      <div>Opponent: <span id="oppWins">0</span></div>
+    <div class="row">
+      <button class="btn" onclick="playAgain()">Play Again</button>
+      <button class="btn" onclick="returnToLobby()">Return to Lobby</button>
     </div>
-
-    <div id="battlefield" class="battlefield" style="display:none;">
-      <div id="myCard" class="card-area"></div>
-      <div class="vs">VS</div>
-      <div id="oppCard" class="card-area"></div>
-    </div>
-
-    <div id="roundResult"></div>
-
-    <div id="restartArea" style="display:none;">
-      <button onclick="location.href='/lobbies.php'">Return to Lobby</button>
-    </div>
-  </main>
-
-  <aside class="chatbox">
-    <div class="chat-messages" id="chatMessages"></div>
-    <div class="chat-input">
-      <input type="text" id="chatInput" placeholder="Type a message..." />
-      <button id="sendChat">Send</button>
-    </div>
-  </aside>
-</div>
+  </div>
 
 <script>
-const lobbyId = <?php echo (int)$lobbyId; ?>;
+const lobbyId = <?= (int)$lobbyId ?>;
+const isOwner = <?= ((int)$lobby['owner_id'] === $userId) ? 'true' : 'false' ?>;
+
+async function poll() {
+  try {
+    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php?action=match_status&lobby_id=${lobbyId}`, {cache:'no-store'});
+    const j = await r.json();
+    if (j.success) {
+      if (j.phase === 'pregame') {
+        document.getElementById('preGame').style.display = '';
+        document.getElementById('inGame').style.display = 'none';
+      } else if (j.phase === 'active' || j.phase === 'finished') {
+        document.getElementById('preGame').style.display = 'none';
+        document.getElementById('inGame').style.display = '';
+        document.getElementById('youScore').textContent = j.scores?.you ?? 0;
+        document.getElementById('oppScore').textContent = j.scores?.opp ?? 0;
+      }
+      if (Array.isArray(j.signals) && j.signals.length) {
+        j.signals.forEach(s => {
+          if (s.signal === 'PLAY_AGAIN') alert(`${s.sender} clicked "Play Again"`);
+          if (s.signal === 'RETURN_TO_LOBBY') alert(`${s.sender} clicked "Return to Lobby"`);
+        });
+      }
+    }
+  } catch(e){}
+  setTimeout(poll, 3000);
+}
+poll();
+
+async function playAgain() {
+  try {
+    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php`, {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({action:'play_again', lobby_id: lobbyId})
+    });
+    const j = await r.json();
+    if (j.success) alert('You clicked "Play Again". The owner will start a new match.');
+  } catch(e){}
+}
+
+async function returnToLobby() {
+  try {
+    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php`, {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({action:'return_to_lobby', lobby_id: lobbyId})
+    });
+    const j = await r.json();
+    if (j.success) {
+      alert('You returned to the lobby.');
+      window.location.href = `/my_lobby.php?lobby_id=${lobbyId}`;
+    }
+  } catch(e){}
+}
 </script>
-<script src="/game_modes/1v1_random.js"></script>
 </body>
 </html>

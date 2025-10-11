@@ -93,9 +93,13 @@ async function poll() {
     const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php?action=match_status&lobby_id=${lobbyId}`, {cache:'no-store'});
     const j = await r.json();
     if (j.success) {
-      if (j.phase === 'pregame') {
-        document.getElementById('preGame').style.display = '';
-        document.getElementById('inGame').style.display = 'none';
+  // Show Start-Battle form immediately if owner just arrived
+  if ((j.phase === 'pregame' || j.phase === 'active') && isOwner) {
+    document.getElementById('preGame').style.display = '';
+    document.getElementById('inGame').style.display = 'none';
+  } else if (j.phase === 'active' || j.phase === 'finished') {
+    document.getElementById('preGame').style.display = 'none';
+    document.getElementById('inGame').style.display = '';
       } else if (j.phase === 'active' || j.phase === 'finished') {
         document.getElementById('preGame').style.display = 'none';
         document.getElementById('inGame').style.display = '';

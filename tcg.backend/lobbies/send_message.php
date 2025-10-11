@@ -1,43 +1,15 @@
-<?php
-// send_message.php — add chat message to a lobby
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-session_start();
-require_once '/var/www/vendor/autoload.php';
-use Dotenv\Dotenv;
+<?php require __DIR__ . '/_common.php';
 
-$dotenv = Dotenv::createImmutable('/home');
-$dotenv->safeLoad();
+$userId  = require_login();
+$lobbyId = (int)($_POST['lobby_id'] ?? 0);
+$msg     = trim((string)($_POST['message'] ?? ''));
 
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Not logged in']);
-    exit;
-}
+if (!$lobbyId || $msg==='') { http_response_code(400); echo json_encode(['error'=>'bad_params']); exit; }
 
-$userId = $_SESSION['user_id'];
-$lobbyId = $_POST['lobby_id'] ?? null;
-$message = trim($_POST['message'] ?? '');
+$pdo = pdo_tcg();
+ensure_participant($pdo, $lobbyId, $userId);
 
-if (!$lobbyId || $message === '') {
-    http_response_code(400);
-    echo json_encode(['error' => 'Missing parameters']);
-    exit;
-}
+$stmt = $pdo->prepare("INSERT INTO lobby_messages (lobby_id, user_id, message) VALUES (:l,:u,:m)");
+$stmt->execute([':l'=>$lobbyId, ':u'=>$userId, ':m'=>$msg]);
 
-try {
-    $pdo = new PDO(
-        "pgsql:host={$_ENV['TCG_DB_HOST']};port={$_ENV['TCG_DB_PORT']};dbname={$_ENV['TCG_DB_NAME']}",
-        $_ENV['TCG_DB_USER'],
-        $_ENV['TCG_DB_PASS'],
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
-
-    $stmt = $pdo->prepare("INSERT INTO lobby_messages (lobby_id, user_id, message) VALUES (:lobby, :user, :msg)");
-    $stmt->execute(['lobby' => $lobbyId, 'user' => $userId, 'msg' => $message]);
-
-    echo json_encode(['success' => true]);
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
-}
+echo json_encode(['success'=>true]);

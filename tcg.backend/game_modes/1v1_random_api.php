@@ -67,7 +67,7 @@ function other_user(PDO $pdo, int $lobbyId, int $userId): ?array {
 
 function fetch_participants(PDO $pdo, int $lobbyId): array {
     $p = $pdo->prepare("
-      SELECT u.id, u.username, p.is_ready
+      SELECT p.user_id, u.username, p.is_ready
       FROM lobby_participants p
       JOIN users u ON u.id = p.user_id
       WHERE p.lobby_id = :l
@@ -232,11 +232,9 @@ if ($action === 'owner_start_match') {
     if (count($plist) < 2) { echo json_encode(['success'=>false,'error'=>'need_two_players']); exit; }
 
     // Ensure p1 = owner, p2 = other (owner goes first / odd rounds)
-    $ownerIdx = array_search($lobby['owner_id'], array_column($plist, 'id'));
-    $ownerIdx = ($ownerIdx === false) ? 0 : (int)$ownerIdx;
-    $p1 = (int)$plist[$ownerIdx]['id'];                      // owner
-    $p2 = (int)$plist[1 - $ownerIdx]['id'];                  // opponent
-
+    $ownerIdx = array_search($lobby['owner_id'], array_column($plist, 'user_id'));
+$p1 = (int)$plist[$ownerIdx]['user_id'];
+$p2 = (int)$plist[1 - $ownerIdx]['user_id'];
     $r1 = ($plist[$ownerIdx]['is_ready'] === true || $plist[$ownerIdx]['is_ready'] === 't' || (int)$plist[$ownerIdx]['is_ready'] === 1);
     $r2 = ($plist[1 - $ownerIdx]['is_ready'] === true || $plist[1 - $ownerIdx]['is_ready'] === 't' || (int)$plist[1 - $ownerIdx]['is_ready'] === 1);
     if (!$r1 || !$r2) { echo json_encode(['success'=>false,'error'=>'both_not_ready']); exit; }

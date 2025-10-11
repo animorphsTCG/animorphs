@@ -88,19 +88,35 @@ try {
 const lobbyId = <?= (int)$lobbyId ?>;
 const isOwner = <?= ((int)$lobby['owner_id'] === $userId) ? 'true' : 'false' ?>;
 
+async function autoStartIfOwner() {
+  if (!isOwner) return; // opponent waits for redirect from poll
+  try {
+    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        action: 'owner_start_match',
+        lobby_id: lobbyId
+      })
+    });
+    const j = await r.json();
+    if (j.success) {
+      console.log('Match started automatically.');
+    } else {
+      console.warn('Auto-start failed:', j.error);
+    }
+  } catch (e) {
+    console.error('Auto-start error:', e);
+  }
+}
+
+// Poll match status for both players
 async function poll() {
   try {
     const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php?action=match_status&lobby_id=${lobbyId}`, {cache:'no-store'});
     const j = await r.json();
     if (j.success) {
-  // Show Start-Battle form immediately if owner just arrived
-  if ((j.phase === 'pregame' || j.phase === 'active') && isOwner) {
-    document.getElementById('preGame').style.display = '';
-    document.getElementById('inGame').style.display = 'none';
-  } else if (j.phase === 'active' || j.phase === 'finished') {
-    document.getElementById('preGame').style.display = 'none';
-    document.getElementById('inGame').style.display = '';
-      } else if (j.phase === 'active' || j.phase === 'finished') {
+      if (j.phase === 'active' || j.phase === 'finished') {
         document.getElementById('preGame').style.display = 'none';
         document.getElementById('inGame').style.display = '';
         document.getElementById('youScore').textContent = j.scores?.you ?? 0;
@@ -116,6 +132,9 @@ async function poll() {
   } catch(e){}
   setTimeout(poll, 3000);
 }
+
+// --- Start automatically for lobby owner ---
+autoStartIfOwner();
 poll();
 
 async function playAgain() {

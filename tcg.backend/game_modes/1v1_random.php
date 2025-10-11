@@ -192,7 +192,7 @@ async function poll() {
 // ---------- Actions (send cookies!) ----------
 async function chooseStat(stat) {
   try {
-    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php`, {
+    const r = await fetch(`/game_modes/1v1_random_api.php`, {
       method:'POST',
       credentials: 'same-origin',
       headers:{'Content-Type':'application/x-www-form-urlencoded'},

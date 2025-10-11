@@ -1,60 +1,40 @@
 <?php
-// cleanup_lobbies.php — cron job to remove empty lobbies + expired invites
-ini_set('display_errors', 0);
-error_reporting(E_ALL);
-require_once '/var/www/vendor/autoload.php';
+// /var/www/tcg.backend/lobbies/cleanup_lobbies.php
+// Safe house-keeping. Can be run via cron (e.g., every 10 minutes).
+require __DIR__ . '/_common.php';
 
-use Dotenv\Dotenv;
+$pdo = pdo_tcg();
 
-$dotenv = Dotenv::createImmutable('/home');
-$dotenv->safeLoad();
+$logPath = __DIR__ . '/cleanup.log';
+$log = function(string $line) use ($logPath) {
+    @file_put_contents($logPath, sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $line), FILE_APPEND);
+};
 
 try {
-    $host = $_ENV['TCG_DB_HOST'];
-    $db   = $_ENV['TCG_DB_NAME'];
-    $user = $_ENV['TCG_DB_USER'];
-    $pass = $_ENV['TCG_DB_PASS'];
-    $port = $_ENV['TCG_DB_PORT'] ?? 5432;
-
-    $pdo = new PDO(
-        "pgsql:host=$host;port=$port;dbname=$db",
-        $user,
-        $pass,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
-
-    // 1. Delete empty lobbies
-    $stmt = $pdo->query("
-        DELETE FROM lobbies l
-        WHERE NOT EXISTS (
-            SELECT 1 FROM lobby_participants p WHERE p.lobby_id = l.id
-        )
-        RETURNING id
-    ");
-    $deletedLobbies = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    // 2. Delete expired invites older than 10 minutes
-    $stmt2 = $pdo->query("
+    // 1) Remove accepted/declined invites older than 7 days
+    $delInv = $pdo->prepare("
         DELETE FROM lobby_invites
-        WHERE created_at < (NOW() - interval '10 minutes')
-          AND accepted = false
-          AND declined = false
-        RETURNING id
+        WHERE (accepted = true OR declined = true)
+          AND created_at < now() - interval '7 days'
     ");
-    $deletedInvites = $stmt2->fetchAll(PDO::FETCH_COLUMN);
+    $delInv->execute();
+    $log("deleted invites: " . $delInv->rowCount());
 
-    // Logging
-    echo "[" . date('Y-m-d H:i:s') . "] Cleanup run completed." . PHP_EOL;
-    if ($deletedLobbies) {
-        echo "  Deleted lobbies: " . implode(',', $deletedLobbies) . PHP_EOL;
-    }
-    if ($deletedInvites) {
-        echo "  Deleted invites: " . implode(',', $deletedInvites) . PHP_EOL;
-    }
-    if (!$deletedLobbies && !$deletedInvites) {
-        echo "  Nothing to delete this run." . PHP_EOL;
-    }
-
-} catch (Exception $e) {
-    echo "[" . date('Y-m-d H:i:s') . "] Error: " . $e->getMessage() . PHP_EOL;
+    // 2) Remove lobbies with 0 participants for > 30 minutes
+    // (CASCADE removes participants/messages due to FK)
+    $delLobby = $pdo->prepare("
+        DELETE FROM lobbies l
+        WHERE l.status='open'
+          AND l.updated_at < now() - interval '30 minutes'
+          AND NOT EXISTS (SELECT 1 FROM lobby_participants p WHERE p.lobby_id = l.id)
+    ");
+    $delLobby->execute();
+    $log("deleted empty lobbies: " . $delLobby->rowCount());
+} catch (Throwable $e) {
+    $log("error: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success'=>false,'error'=>'cleanup_error']);
+    exit;
 }
+
+echo json_encode(['success'=>true]);

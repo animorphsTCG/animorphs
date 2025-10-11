@@ -117,7 +117,7 @@ async function safeJSON(res) {
 async function autoStartIfOwner() {
   if (!isOwner) return;
   try {
-    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php`, {
+    const r = await fetch(`/game_modes/1v1_random_api.php`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -135,7 +135,7 @@ async function autoStartIfOwner() {
 // ---------- Poll match status (send cookies!) ----------
 async function poll() {
   try {
-    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php?action=match_status&lobby_id=${lobbyId}`, {
+    const r = await fetch(`/game_modes/1v1_random_api.php?action=match_status&lobby_id=${lobbyId}`, {
       credentials: 'same-origin',
       cache: 'no-store'
     });
@@ -226,7 +226,7 @@ async function chooseStat(stat) {
 
 async function playAgain() {
   try {
-    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php`, {
+    const r = await fetch(`/game_modes/1v1_random_api.php`, {
       method:'POST',
       credentials: 'same-origin',
       headers:{'Content-Type':'application/x-www-form-urlencoded'},
@@ -239,7 +239,7 @@ async function playAgain() {
 
 async function returnToLobby() {
   try {
-    const r = await fetch(`/tcg.backend/game_modes/1v1_random_api.php`, {
+    const r = await fetch(`/game_modes/1v1_random_api.php`, {
       method:'POST',
       credentials: 'same-origin',
       headers:{'Content-Type':'application/x-www-form-urlencoded'},

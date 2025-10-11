@@ -1,67 +1,32 @@
-<?php
-// invite_friend.php — invite a friend to your lobby
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-session_start();
-require_once '/var/www/vendor/autoload.php';
-use Dotenv\Dotenv;
+<?php require __DIR__ . '/_common.php';
 
-$dotenv = Dotenv::createImmutable('/home');
-$dotenv->safeLoad();
+$ownerId  = require_login();
+$lobbyId  = (int)($_POST['lobby_id'] ?? 0);
+$friendId = (int)($_POST['friend_id'] ?? 0);
 
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Not logged in']);
-    exit;
+if (!$lobbyId || !$friendId) { http_response_code(400); echo json_encode(['error'=>'bad_params']); exit; }
+
+$pdo = pdo_tcg();
+
+// Owner check
+$own = $pdo->prepare("SELECT owner_id FROM lobbies WHERE id=:l");
+$own->execute([':l'=>$lobbyId]);
+if ((int)($own->fetchColumn() ?? 0) !== $ownerId) {
+    http_response_code(403); echo json_encode(['error'=>'not_owner']); exit;
 }
 
-$userId   = $_SESSION['user_id'];
-$lobbyId  = $_POST['lobby_id'] ?? null;
-$friendId = $_POST['friend_id'] ?? null;
+// Confirm accepted friendship
+$fr = $pdo->prepare("SELECT 1 FROM friends WHERE user_id=:u AND friend_user_id=:f AND status='accepted'");
+$fr->execute([':u'=>$ownerId, ':f'=>$friendId]);
+if (!$fr->fetchColumn()) { http_response_code(403); echo json_encode(['error'=>'not_friends']); exit; }
 
-if (!$lobbyId || !$friendId) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Missing parameters']);
-    exit;
-}
+// De-dupe pending invite
+$du = $pdo->prepare("SELECT 1 FROM lobby_invites WHERE lobby_id=:l AND to_user_id=:f AND accepted=false AND declined=false");
+$du->execute([':l'=>$lobbyId, ':f'=>$friendId]);
+if ($du->fetchColumn()) { echo json_encode(['success'=>true,'note'=>'invite_already_pending']); exit; }
 
-try {
-    $host = $_ENV['TCG_DB_HOST'];
-    $db   = $_ENV['TCG_DB_NAME'];
-    $user = $_ENV['TCG_DB_USER'];
-    $pass = $_ENV['TCG_DB_PASS'];
-    $port = $_ENV['TCG_DB_PORT'] ?? 5432;
+// Insert invite
+$ins = $pdo->prepare("INSERT INTO lobby_invites (lobby_id, from_user_id, to_user_id) VALUES (:l,:from,:to)");
+$ins->execute([':l'=>$lobbyId, ':from'=>$ownerId, ':to'=>$friendId]);
 
-    $pdo = new PDO(
-        "pgsql:host=$host;port=$port;dbname=$db",
-        $user,
-        $pass,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
-
-    // Ensure lobby exists and current user is the owner
-    $stmt = $pdo->prepare("SELECT owner_id FROM lobbies WHERE id = :id");
-    $stmt->execute(['id' => $lobbyId]);
-    $ownerId = $stmt->fetchColumn();
-    if ($ownerId != $userId) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Only the lobby owner can invite friends']);
-        exit;
-    }
-
-    // Insert invite
-    $stmt = $pdo->prepare("
-        INSERT INTO lobby_invites (lobby_id, from_user_id, to_user_id)
-        VALUES (:lobby, :from, :to)
-    ");
-    $stmt->execute([
-        'lobby' => $lobbyId,
-        'from'  => $userId,
-        'to'    => $friendId
-    ]);
-
-    echo json_encode(['success' => true]);
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
-}
+echo json_encode(['success'=>true]);

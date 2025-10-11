@@ -1,94 +1,40 @@
-<?php
-// /var/www/tcg.backend/lobbies/kick_player.php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-session_start();
-require_once '/var/www/vendor/autoload.php';
+<?php require __DIR__ . '/_common.php';
 
-use Dotenv\Dotenv;
+$ownerId = require_login();
+$lobbyId = (int)($_POST['lobby_id'] ?? 0);
+$userId  = (int)($_POST['user_id'] ?? 0);
 
-$dotenv = Dotenv::createImmutable('/home');
-$dotenv->safeLoad();
+if (!$lobbyId || !$userId) { http_response_code(400); echo json_encode(['error'=>'bad_params']); exit; }
 
-header('Content-Type: application/json');
-
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Not logged in']);
-    exit;
-}
-
-$ownerId      = $_SESSION['user_id'];
-$lobbyId      = (int)($_POST['lobby_id'] ?? 0);
-$targetUserId = (int)($_POST['target_user_id'] ?? 0);
-
-if (!$lobbyId || !$targetUserId) {
-    echo json_encode(['success' => false, 'error' => 'Lobby ID and target user required']);
-    exit;
-}
+$pdo = pdo_tcg();
+$pdo->beginTransaction();
 
 try {
-    $host = $_ENV['TCG_DB_HOST'];
-    $db   = $_ENV['TCG_DB_NAME'];
-    $user = $_ENV['TCG_DB_USER'];
-    $pass = $_ENV['TCG_DB_PASS'];
-    $port = $_ENV['TCG_DB_PORT'] ?? 5432;
+    // Owner check
+    $own = $pdo->prepare("SELECT owner_id FROM lobbies WHERE id=:l FOR UPDATE");
+    $own->execute([':l'=>$lobbyId]);
+    $owner = (int)($own->fetchColumn() ?? 0);
+    if ($owner !== $ownerId) throw new RuntimeException('not_owner');
 
-    $pdo = new PDO(
-        "pgsql:host=$host;port=$port;dbname=$db",
-        $user,
-        $pass,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
+    if ($userId === $ownerId) throw new RuntimeException('cannot_kick_owner');
 
-    $pdo->beginTransaction();
+    // Is target participant?
+    $chk = $pdo->prepare("SELECT 1 FROM lobby_participants WHERE lobby_id=:l AND user_id=:u");
+    $chk->execute([':l'=>$lobbyId, ':u'=>$userId]);
+    if (!$chk->fetchColumn()) throw new RuntimeException('user_not_in_lobby');
 
-    // 1. Verify owner
-    $stmt = $pdo->prepare("SELECT owner_id FROM lobbies WHERE id = :lobby");
-    $stmt->execute(['lobby' => $lobbyId]);
-    $lobby = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Remove
+    $pdo->prepare("DELETE FROM lobby_participants WHERE lobby_id=:l AND user_id=:u")
+        ->execute([':l'=>$lobbyId, ':u'=>$userId]);
 
-    if (!$lobby) {
-        $pdo->rollBack();
-        echo json_encode(['success' => false, 'error' => 'Lobby not found']);
-        exit;
-    }
-
-    if ((int)$lobby['owner_id'] !== $ownerId) {
-        $pdo->rollBack();
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Only the lobby owner can kick players']);
-        exit;
-    }
-
-    // 2. Remove target user from participants
-    $stmt = $pdo->prepare("DELETE FROM lobby_participants WHERE lobby_id = :lobby AND user_id = :uid");
-    $stmt->execute(['lobby' => $lobbyId, 'uid' => $targetUserId]);
-
-    // 3. Clear target user presence
-    $stmt = $pdo->prepare("
-        UPDATE user_presence
-        SET in_lobby = NULL, last_seen = now()
-        WHERE user_id = :uid
-    ");
-    $stmt->execute(['uid' => $targetUserId]);
-
-    // 4. Check if lobby has any participants left
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM lobby_participants WHERE lobby_id = :lobby");
-    $stmt->execute(['lobby' => $lobbyId]);
-    $count = (int)$stmt->fetchColumn();
-
-    if ($count === 0) {
-        // Delete the empty lobby
-        $stmt = $pdo->prepare("DELETE FROM lobbies WHERE id = :lobby");
-        $stmt->execute(['lobby' => $lobbyId]);
-    }
+    // Clear presence
+    $pdo->prepare("UPDATE user_presence SET in_lobby=NULL, last_seen=now() WHERE user_id=:u")
+        ->execute([':u'=>$userId]);
 
     $pdo->commit();
-
-    echo json_encode(['success' => true, 'message' => 'Player kicked', 'lobby_empty' => ($count === 0)]);
-} catch (Exception $e) {
+    echo json_encode(['success'=>true]);
+} catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
-    http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    http_response_code(400);
+    echo json_encode(['success'=>false,'error'=>$e->getMessage()]);
 }

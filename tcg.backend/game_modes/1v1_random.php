@@ -4,7 +4,7 @@
 // Page shows 5 stat buttons for the current player to choose each round.
 // Polling updates the score display and handles signals/alerts.
 
-ini_set('display_errors', 0);
+ini_set('display_errors', 1);
 error_reporting(E_ALL);
 session_start();
 header('Content-Type: text/html; charset=utf-8');

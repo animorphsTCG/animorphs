@@ -395,28 +395,16 @@ if(currentLobby){
 // --- NEW: auto-redirect when match starts ---
 function pollMatchStart() {
   if (!currentLobby) return;
-  fetch(`/game_modes/1v1_random_api.php?action=lobby_status&lobby_id=${currentLobby}`, {cache:'no-store'})
+  fetch(`/tcg.backend/game_modes/1v1_random_api.php?action=lobby_status&lobby_id=${currentLobby}`, {cache:'no-store'})
     .then(r => r.json())
     .then(j => {
-      if (!j || !j.success) return;
-
-      // ✅ Detect the new broadcast signal
-      if (Array.isArray(j.signals)) {
-        const hasLaunch = j.signals.some(s => s.signal === 'MATCH_LAUNCH');
-        if (hasLaunch) {
-          window.location.href = `/game_modes/1v1_random.php?lobby_id=${currentLobby}`;
-          return;
-        }
-      }
-
-      // Fallback: detect when lobby status itself switches to in_match
-      if (j.status === 'in_match' && j.mode === '1v1_random') {
+      if (j && j.success && j.status === 'in_match' && j.mode === '1v1_random') {
         window.location.href = `/game_modes/1v1_random.php?lobby_id=${currentLobby}`;
       }
     })
     .catch(()=>{});
 }
-setInterval(pollMatchStart, 3000);
+setInterval(pollMatchStart, 4000);
 </script>
 </body>
 </html>

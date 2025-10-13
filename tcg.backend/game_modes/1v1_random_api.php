@@ -90,10 +90,27 @@ function statcol(string $label): ?string {
   return $map[strtolower(trim($label))] ?? null;
 }
 function load_battle(PDO $p, int $l): ?array {
-  $s = $p->prepare("SELECT id, lobby_id, mode, p1_user_id, p2_user_id, status, state_json, winner_user_id FROM battles WHERE lobby_id=:l ORDER BY id DESC LIMIT 1");
-  $s->execute([':l'=>$l]);
-  $r = $s->fetch(PDO::FETCH_ASSOC);
-  return $r ?: null;
+  try {
+    $sql = "SELECT id, lobby_id, mode, p1_user_id, p2_user_id,
+                   status, state_json, winner_id AS winner_user_id
+            FROM battles
+            WHERE lobby_id = :l
+            ORDER BY id DESC
+            LIMIT 1";
+    $s = $p->prepare($sql);
+    $s->execute([':l' => $l]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    return $r ?: null;
+  } catch (Throwable $e) {
+    file_put_contents(
+      '/var/log/tcg_match_start.log',
+      sprintf("[%s] load_battle() failed for lobby %d: %s\n",
+        date('Y-m-d H:i:s'), $l, $e->getMessage()
+      ),
+      FILE_APPEND
+    );
+    return null;
+  }
 }
 function persist(PDO $p, int $id, array $state, ?string $status = null, ?int $winner = null): void {
   $sql = "UPDATE battles SET state_json=:s, updated_at=now()";

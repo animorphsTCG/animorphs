@@ -83,6 +83,6 @@ const LOBBY_ID = <?= (int)$lobbyId ?>;
   </div>
 </div>
 
-<script src="/tcg.backend/game_modes/1v1_random.js"></script>
+<script src="/game_modes/1v1_random.js"></script>
 </body>
 </html>

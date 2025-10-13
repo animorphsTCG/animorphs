@@ -405,6 +405,22 @@ function pollMatchStart() {
     .catch(()=>{});
 }
 setInterval(pollMatchStart, 4000);
+              // --- NEW PATCH: also detect MATCH_LAUNCH so both players redirect ---
+async function pollMatchSignal() {
+  if (!currentLobby) return;
+  try {
+    const res = await fetch(`/tcg.backend/game_modes/1v1_random_api.php?action=lobby_status&lobby_id=${currentLobby}`, {cache:'no-store'});
+    const data = await res.json();
+    if (data && data.signals) {
+      const gotLaunch = data.signals.some(s => s.signal === 'MATCH_LAUNCH');
+      if (gotLaunch) {
+        window.location.href = `/game_modes/1v1_random.php?lobby_id=${currentLobby}`;
+      }
+    }
+  } catch(e){ /* ignore network blips */ }
+}
+// poll every 4 s
+setInterval(pollMatchSignal, 4000);  
 </script>
 </body>
 </html>

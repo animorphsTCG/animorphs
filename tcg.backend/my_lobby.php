@@ -189,7 +189,7 @@ function checkStartAvailability(){
 function startMatch(){
   if(!chosenMode){ alert("Choose a mode first"); return; }
 
-  // === NEW: trigger the backend to actually start the match ===
+  // 1. Owner triggers match creation on the API (no redirect yet)
   fetch('/game_modes/1v1_random_api.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -201,8 +201,8 @@ function startMatch(){
   .then(r => r.json())
   .then(data => {
     if (data.success) {
-      // Notify: match created successfully, redirect owner to game
-      window.location.href = `/game_modes/${chosenMode}.php?lobby_id=${currentLobby}`;
+      // 2. Wait for the signal poller (pollMatchSignal) to detect MATCH_LAUNCH
+      alert("Match initializing... both players will be redirected automatically.");
     } else {
       alert("Error starting match: " + (data.error || "Unknown"));
     }
@@ -212,6 +212,7 @@ function startMatch(){
     alert("Failed to start match. Please try again.");
   });
 }
+
 
 // Toggle ready state
 function toggleReady(){

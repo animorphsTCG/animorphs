@@ -1,4 +1,5 @@
 // /var/www/tcg.backend/game_modes/1v1_random.js
+
 const STAT_LABELS = {
   power_rating: "Power",
   health: "Health",
@@ -12,14 +13,16 @@ function imageUrl(path) {
 }
 
 let elScore, elField, elRes, elP1, elP2, elInstr, btnAgain, btnLobby;
+let lastPhase = null; // to avoid duplicate popups on same finish frame
+let myTurn = false;
 
 document.addEventListener("DOMContentLoaded", () => {
-  elScore = document.getElementById("scoreboard");
-  elField = document.getElementById("battlefield");
-  elRes = document.getElementById("roundResult");
-  elP1 = document.getElementById("p1Card");
-  elP2 = document.getElementById("p2Card");
-  elInstr = document.getElementById("instructions");
+  elScore  = document.getElementById("scoreboard");
+  elField  = document.getElementById("battlefield");
+  elRes    = document.getElementById("roundResult");
+  elP1     = document.getElementById("p1Card");
+  elP2     = document.getElementById("p2Card");
+  elInstr  = document.getElementById("instructions");
   btnAgain = document.getElementById("playAgain");
   btnLobby = document.getElementById("returnLobby");
 
@@ -45,20 +48,32 @@ async function pollMatch() {
       if (j.phase === "active") {
         elScore.style.display = "flex";
         elField.style.display = "flex";
-        renderCards(j.current);
-        elInstr.textContent = j.turn_is_me ? "Your turn: choose a stat" : "Opponent’s turn…";
+        renderCards(j.current, j.turn_is_me);
+        myTurn = !!j.turn_is_me;
+        elInstr.textContent = myTurn ? "Your turn: choose a stat" : "Opponent’s turn…";
+
+        if (j.result_msg) {
+          alert(j.result_msg);
+          elRes.textContent = j.result_msg;
+        }
       }
 
       if (j.phase === "finished") {
-        elRes.textContent = j.result_msg || "Match finished.";
-        if (j.result_msg) alert(j.result_msg);
-        document.getElementById("restartArea").style.display = "block";
+        if (lastPhase !== "finished") {
+          // Only alert once on transition to finished
+          if (j.result_msg) alert(j.result_msg);
+          elRes.textContent = j.result_msg || "Match finished.";
+          document.getElementById("restartArea").style.display = "block";
+        }
       }
 
-      if (j.result_msg && j.phase !== "finished") {
-        // Round result popup
-        alert(j.result_msg);
+      // Update score board whenever present
+      if (j.scores) {
+        document.getElementById("p1Wins").textContent = j.scores.you ?? 0;
+        document.getElementById("p2Wins").textContent = j.scores.opp ?? 0;
       }
+
+      lastPhase = j.phase;
     }
   } catch (e) {
     console.error("poll error", e);
@@ -66,30 +81,39 @@ async function pollMatch() {
   setTimeout(pollMatch, 3000);
 }
 
-function renderCards(cur) {
+function renderCards(cur, canClick) {
   if (!cur) return;
-  elP1.innerHTML = cardHtml(cur.me, true);
+  elP1.innerHTML = cardHtml(cur.me, canClick);
   elP2.innerHTML = cardHtml(cur.opponent, false);
 }
 
-function cardHtml(card, isMe) {
+function cardHtml(card, isClickable) {
   if (!card) return "";
-  const clickAttr = isMe ? 'class="stat-row" onclick="chooseStat(this.dataset.stat)"' : "";
-  return `<div class="card">
-    <div class="card-name">${card.display_name}</div>
-    <img src="${imageUrl(card.card_image)}" class="card-image">
-    <div class="card-stats">
-      ${Object.keys(STAT_LABELS)
-        .map(
-          (k) =>
-            `<div data-stat="${k}" ${clickAttr}><strong>${STAT_LABELS[k]}</strong>: ${
-              card[k]
-            }</div>`
-        )
-        .join("")}
-    </div>
-  </div>`;
+  return `
+    <div class="card">
+      <div class="card-name">${card.display_name}</div>
+      <img src="${imageUrl(card.card_image)}" class="card-image" alt="${card.display_name}">
+      <div class="card-element">${card.animorph_type ?? ""}</div>
+      <div class="card-stats">
+        ${Object.keys(STAT_LABELS)
+          .map((k) => {
+            const row = `<div class="stat-row${isClickable ? "" : " disabled"}" data-stat="${k}">
+              <strong>${STAT_LABELS[k]}</strong>: ${Number(card[k]).toLocaleString()}
+            </div>`;
+            return row;
+          })
+          .join("")}
+      </div>
+    </div>`;
 }
+
+document.addEventListener("click", (e) => {
+  const row = e.target.closest(".stat-row");
+  if (!row) return;
+  if (!myTurn || row.classList.contains("disabled")) return;
+  const stat = row.getAttribute("data-stat");
+  chooseStat(stat);
+});
 
 async function chooseStat(stat) {
   try {
@@ -103,19 +127,17 @@ async function chooseStat(stat) {
     if (j.success) {
       if (j.result_msg) alert(j.result_msg);
       elRes.textContent = j.result_msg || "";
-      updateScores(j.scores);
+      if (j.scores) {
+        document.getElementById("p1Wins").textContent = j.scores.p1 ?? j.scores.you ?? 0;
+        document.getElementById("p2Wins").textContent = j.scores.p2 ?? j.scores.opp ?? 0;
+      }
+      myTurn = false; // after choosing, turn flips
     } else if (j.error) {
       alert(j.error);
     }
   } catch (e) {
     console.error("chooseStat error", e);
   }
-}
-
-function updateScores(sc) {
-  if (!sc) return;
-  document.getElementById("p1Wins").textContent = sc.you ?? 0;
-  document.getElementById("p2Wins").textContent = sc.opp ?? 0;
 }
 
 async function sendSignal(type) {

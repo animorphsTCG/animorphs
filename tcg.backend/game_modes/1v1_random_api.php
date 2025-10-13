@@ -64,10 +64,15 @@ if($action==='owner_start_match'){
   $pdo->beginTransaction();
   $pdo->prepare("INSERT INTO battles(lobby_id,mode,p1_user_id,p2_user_id,status,state_json)
                  VALUES(:l,'1v1_random',:p1,:p2,'active',:s)")->execute([':l'=>$lobbyId,':p1'=>$p1,':p2'=>$p2,':s'=>json_encode($state)]);
+    // Mark lobby as in match and broadcast launch signal
   $pdo->prepare("UPDATE lobbies SET status='in_match',updated_at=now() WHERE id=:l")->execute([':l'=>$lobbyId]);
-  signal($pdo,$lobbyId,$userId,'MATCH_STARTED');
-  $pdo->commit(); echo json_encode(['success'=>true]); exit;
-}
+
+  // ✅ NEW: notify both players to open the match page
+  signal($pdo, $lobbyId, $userId, 'MATCH_LAUNCH');
+
+  $pdo->commit();
+  echo json_encode(['success'=>true]);
+  exit;
 
 /* ---------- POLL STATUS ---------- */
 if($action==='match_status'){

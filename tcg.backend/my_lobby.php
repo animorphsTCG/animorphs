@@ -188,7 +188,29 @@ function checkStartAvailability(){
 
 function startMatch(){
   if(!chosenMode){ alert("Choose a mode first"); return; }
-  window.location.href='/game_modes/'+chosenMode+'.php?lobby_id='+currentLobby;
+
+  // === NEW: trigger the backend to actually start the match ===
+  fetch('/game_modes/1v1_random_api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action: 'owner_start_match',
+      lobby_id: currentLobby
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      // Notify: match created successfully, redirect owner to game
+      window.location.href = `/game_modes/${chosenMode}.php?lobby_id=${currentLobby}`;
+    } else {
+      alert("Error starting match: " + (data.error || "Unknown"));
+    }
+  })
+  .catch(err => {
+    console.error("Start match failed", err);
+    alert("Failed to start match. Please try again.");
+  });
 }
 
 // Toggle ready state

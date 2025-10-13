@@ -396,7 +396,7 @@ if(currentLobby){
 // --- NEW: auto-redirect when match starts ---
 function pollMatchStart() {
   if (!currentLobby) return;
-  fetch(`/tcg.backend/game_modes/1v1_random_api.php?action=lobby_status&lobby_id=${currentLobby}`, {cache:'no-store'})
+  fetch(`/game_modes/1v1_random_api.php?action=lobby_status&lobby_id=${currentLobby}`, {cache:'no-store'})
     .then(r => r.json())
     .then(j => {
       if (j && j.success && j.status === 'in_match' && j.mode === '1v1_random') {
@@ -410,7 +410,7 @@ setInterval(pollMatchStart, 4000);
 async function pollMatchSignal() {
   if (!currentLobby) return;
   try {
-    const res = await fetch(`/tcg.backend/game_modes/1v1_random_api.php?action=lobby_status&lobby_id=${currentLobby}`, {cache:'no-store'});
+    const res = await fetch(`/game_modes/1v1_random_api.php?action=lobby_status&lobby_id=${currentLobby}`, {cache:'no-store'});
     const data = await res.json();
     if (data && data.signals) {
       const gotLaunch = data.signals.some(s => s.signal === 'MATCH_LAUNCH');

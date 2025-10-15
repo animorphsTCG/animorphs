@@ -405,7 +405,7 @@ function pollMatchStart() {
       btnStart.disabled = false;
       alert("Error: " + j.error);
     }
-  });
+  })
     .catch(()=>{});
 }
 setInterval(pollMatchStart, 4000);

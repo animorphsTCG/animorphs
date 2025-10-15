@@ -393,22 +393,6 @@ if(currentLobby){
   setInterval(loadFriends,10000);
 }
 
-// --- NEW: auto-redirect when match starts ---
-function pollMatchStart() {
-  if (!currentLobby) return;
-  fetch('/game_modes/1v1_random_api.php?action=owner_start_match&lobby_id=' + lobbyId)
-  .then(r => r.json())
-  .then(j => {
-    if (j.success) {
-      window.location.href = '/game_modes/1v1_random.php?lobby_id=' + lobbyId;
-    } else {
-      btnStart.disabled = false;
-      alert("Error: " + j.error);
-    }
-  })
-    .catch(()=>{});
-}
-setInterval(pollMatchStart, 4000);
               // --- NEW PATCH: also detect MATCH_LAUNCH so both players redirect ---
 async function pollMatchSignal() {
   if (!currentLobby) return;

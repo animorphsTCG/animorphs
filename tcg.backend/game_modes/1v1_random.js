@@ -1,150 +1,119 @@
-// /var/www/tcg.backend/game_modes/1v1_random.js
+let lobbyId = new URLSearchParams(window.location.search).get("lobby_id");
+let intervalId = null;
+let hasSubmittedStat = false;
 
-const STAT_LABELS = {
-  power_rating: "Power",
-  health: "Health",
-  attack: "Attack",
-  sats: "SATS",
-  size: "Size"
-};
+const resultDiv = document.getElementById("result");
+const yourCardDiv = document.getElementById("yourCard");
+const oppCardDiv = document.getElementById("oppCard");
+const scoreDiv = document.getElementById("score");
+const statButtons = document.getElementById("statButtons");
 
-function imageUrl(path) {
-  return `image.php?file=${encodeURIComponent(path)}`;
-}
+function fetchMatchStatus() {
+  fetch(`/game_modes/1v1_random_api.php?action=match_status&lobby_id=${lobbyId}`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        resultDiv.textContent = "Error: " + (data.error || "unknown");
+        return;
+      }
 
-let elScore, elField, elRes, elP1, elP2, elInstr, btnAgain, btnLobby;
-let lastPhase = null; // to avoid duplicate popups on same finish frame
-let myTurn = false;
+      if (data.phase === "pregame") {
+        resultDiv.textContent = "Waiting for match to start...";
+        return;
+      }
 
-document.addEventListener("DOMContentLoaded", () => {
-  elScore  = document.getElementById("scoreboard");
-  elField  = document.getElementById("battlefield");
-  elRes    = document.getElementById("roundResult");
-  elP1     = document.getElementById("p1Card");
-  elP2     = document.getElementById("p2Card");
-  elInstr  = document.getElementById("instructions");
-  btnAgain = document.getElementById("playAgain");
-  btnLobby = document.getElementById("returnLobby");
+      const cardMe = data.current.me;
+      const cardOpp = data.current.opponent;
+      yourCardDiv.innerHTML = renderCard(cardMe);
+      oppCardDiv.innerHTML = renderCard(data.turn_is_me || data.phase === "finished" ? cardOpp : null);
 
-  btnAgain.onclick = () => sendSignal("play_again");
-  btnLobby.onclick = () => sendSignal("return_lobby");
+      scoreDiv.textContent = `You: ${data.scores.you} | Opponent: ${data.scores.opp}`;
 
-  pollMatch();
-});
+      if (data.phase === "finished") {
+        resultDiv.innerHTML = `${data.result_msg || "Match complete."}`;
+        statButtons.innerHTML = `
+          <button onclick="sendSignal('play_again')">🔁 Play Again</button>
+          <button onclick="sendSignal('return_lobby')">↩️ Return to Lobby</button>
+        `;
+        clearInterval(intervalId);
+        return;
+      }
 
-async function pollMatch() {
-  try {
-    const r = await fetch(`/game_modes/1v1_random_api.php?action=match_status&lobby_id=${LOBBY_ID}`, {
-      cache: "no-store",
-      credentials: "same-origin"
+      if (data.turn_is_me && !hasSubmittedStat) {
+        resultDiv.textContent = "Your turn! Choose a stat.";
+        renderStatButtons(cardMe);
+      } else if (!data.turn_is_me && !hasSubmittedStat) {
+        resultDiv.textContent = "Waiting for opponent's move...";
+        statButtons.innerHTML = ""; // prevent stat selection
+      }
+    })
+    .catch(err => {
+      console.error("Fetch error:", err);
+      resultDiv.textContent = "Network error.";
     });
-    const j = await r.json();
-
-    if (j.success) {
-      if (j.phase === "pregame") {
-        elInstr.textContent = "Waiting for opponent…";
-      }
-
-      if (j.phase === "active") {
-        elScore.style.display = "flex";
-        elField.style.display = "flex";
-        renderCards(j.current, j.turn_is_me);
-        myTurn = !!j.turn_is_me;
-        elInstr.textContent = myTurn ? "Your turn: choose a stat" : "Opponent’s turn…";
-
-        if (j.result_msg) {
-          alert(j.result_msg);
-          elRes.textContent = j.result_msg;
-        }
-      }
-
-      if (j.phase === "finished") {
-        if (lastPhase !== "finished") {
-          // Only alert once on transition to finished
-          if (j.result_msg) alert(j.result_msg);
-          elRes.textContent = j.result_msg || "Match finished.";
-          document.getElementById("restartArea").style.display = "block";
-        }
-      }
-
-      // Update score board whenever present
-      if (j.scores) {
-        document.getElementById("p1Wins").textContent = j.scores.you ?? 0;
-        document.getElementById("p2Wins").textContent = j.scores.opp ?? 0;
-      }
-
-      lastPhase = j.phase;
-    }
-  } catch (e) {
-    console.error("poll error", e);
-  }
-  setTimeout(pollMatch, 3000);
 }
 
-function renderCards(cur, canClick) {
-  if (!cur) return;
-  elP1.innerHTML = cardHtml(cur.me, canClick);
-  elP2.innerHTML = cardHtml(cur.opponent, false);
-}
-
-function cardHtml(card, isClickable) {
-  if (!card) return "";
+function renderCard(card) {
+  if (!card) return `<div class="card-back">Opponent Card</div>`;
   return `
     <div class="card">
-      <div class="card-name">${card.display_name}</div>
-      <img src="${imageUrl(card.card_image)}" class="card-image" alt="${card.display_name}">
-      <div class="card-element">${card.animorph_type ?? ""}</div>
-      <div class="card-stats">
-        ${Object.keys(STAT_LABELS)
-          .map((k) => {
-            const row = `<div class="stat-row${isClickable ? "" : " disabled"}" data-stat="${k}">
-              <strong>${STAT_LABELS[k]}</strong>: ${Number(card[k]).toLocaleString()}
-            </div>`;
-            return row;
-          })
-          .join("")}
-      </div>
-    </div>`;
+      <img src="/image.php?file=${card.card_image}" alt="${card.display_name}" height="160">
+      <h3>${card.display_name}</h3>
+      <ul>
+        <li>Power: ${card.power_rating}</li>
+        <li>Health: ${card.health}</li>
+        <li>Attack: ${card.attack}</li>
+        <li>Sats: ${card.sats}</li>
+        <li>Size: ${card.size}</li>
+      </ul>
+    </div>
+  `;
 }
 
-document.addEventListener("click", (e) => {
-  const row = e.target.closest(".stat-row");
-  if (!row) return;
-  if (!myTurn || row.classList.contains("disabled")) return;
-  const stat = row.getAttribute("data-stat");
-  chooseStat(stat);
-});
-
-async function chooseStat(stat) {
-  try {
-    const r = await fetch("/game_modes/1v1_random_api.php", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "choose_stat", lobby_id: LOBBY_ID, stat })
-    });
-    const j = await r.json();
-    if (j.success) {
-      if (j.result_msg) alert(j.result_msg);
-      elRes.textContent = j.result_msg || "";
-      if (j.scores) {
-        document.getElementById("p1Wins").textContent = j.scores.p1 ?? j.scores.you ?? 0;
-        document.getElementById("p2Wins").textContent = j.scores.p2 ?? j.scores.opp ?? 0;
-      }
-      myTurn = false; // after choosing, turn flips
-    } else if (j.error) {
-      alert(j.error);
-    }
-  } catch (e) {
-    console.error("chooseStat error", e);
-  }
+function renderStatButtons(card) {
+  const stats = ["power", "health", "attack", "sats", "size"];
+  statButtons.innerHTML = stats.map(stat =>
+    `<button onclick="chooseStat('${stat}')">${stat.toUpperCase()}</button>`
+  ).join(" ");
 }
 
-async function sendSignal(type) {
-  await fetch("/game_modes/1v1_random_api.php", {
+function chooseStat(stat) {
+  if (hasSubmittedStat) return;
+  hasSubmittedStat = true;
+
+  fetch(`/game_modes/1v1_random_api.php`, {
     method: "POST",
-    credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: type, lobby_id: LOBBY_ID })
-  });
+    body: JSON.stringify({ action: "choose_stat", lobby_id: lobbyId, stat })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        resultDiv.textContent = data.result_msg || "Stat chosen.";
+        setTimeout(() => { hasSubmittedStat = false; }, 2000);
+      } else {
+        resultDiv.textContent = "Error: " + (data.error || "unknown");
+        hasSubmittedStat = false;
+      }
+    });
 }
+
+function sendSignal(type) {
+  fetch(`/game_modes/1v1_random_api.php`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: type, lobby_id: lobbyId })
+  })
+    .then(() => {
+      if (type === "return_lobby") {
+        window.location.href = "/lobbies/my_lobby.php";
+      } else {
+        window.location.reload();
+      }
+    });
+}
+
+window.onload = () => {
+  fetchMatchStatus();
+  intervalId = setInterval(fetchMatchStatus, 3000);
+};

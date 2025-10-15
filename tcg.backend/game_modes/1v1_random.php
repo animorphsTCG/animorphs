@@ -62,6 +62,18 @@ const LOBBY_ID = <?= (int)$lobbyId ?>;
     <p id="instructions" class="instructions">
       You’ll each get 10 random cards. Pick a stat on your turn (owner: odd rounds, opponent: even rounds).
     </p>
+<div id="score" style="font-size: 18px; margin-bottom: 10px;">Score: 0 – 0</div>
+
+<div class="cards" style="display: flex; gap: 20px; margin-bottom: 20px;">
+  <div id="yourCard" style="flex: 1; border: 2px solid #444; padding: 10px;"></div>
+  <div id="oppCard" style="flex: 1; border: 2px solid #444; padding: 10px;"></div>
+</div>
+
+<div id="result" style="font-size: 20px; font-weight: bold; margin-bottom: 15px;">Waiting for match to begin...</div>
+
+<div id="statButtons" style="margin-top: 10px;"></div>
+
+<script src="1v1_random.js"></script>
 
     <div id="scoreboard" class="scoreboard" style="display:none;">
       <div>You: <span id="p1Wins">0</span></div>

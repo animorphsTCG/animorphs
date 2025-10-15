@@ -396,13 +396,16 @@ if(currentLobby){
 // --- NEW: auto-redirect when match starts ---
 function pollMatchStart() {
   if (!currentLobby) return;
-  fetch(`/game_modes/1v1_random_api.php?action=lobby_status&lobby_id=${currentLobby}`, {cache:'no-store'})
-    .then(r => r.json())
-    .then(j => {
-      if (j && j.success && j.status === 'in_match' && j.mode === '1v1_random') {
-        window.location.href = `/game_modes/1v1_random.php?lobby_id=${currentLobby}`;
-      }
-    })
+  fetch('/game_modes/1v1_random_api.php?action=owner_start_match&lobby_id=' + lobbyId)
+  .then(r => r.json())
+  .then(j => {
+    if (j.success) {
+      window.location.href = '/game_modes/1v1_random.php?lobby_id=' + lobbyId;
+    } else {
+      btnStart.disabled = false;
+      alert("Error: " + j.error);
+    }
+  });
     .catch(()=>{});
 }
 setInterval(pollMatchStart, 4000);

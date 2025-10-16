@@ -1,194 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mossel Bay Medical Waste Solutions</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    }
-    body {
-      background-color: #f9f9f9;
-      color: #333;
-      line-height: 1.6;
-    }
-    header {
-      background: linear-gradient(90deg, #00796b, #26a69a);
-      color: #fff;
-      padding: 20px 10%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    header h1 {
-      font-size: 1.8em;
-      letter-spacing: 0.5px;
-    }
-    nav a {
-      color: #fff;
-      margin-left: 20px;
-      text-decoration: none;
-      font-weight: 500;
-      transition: opacity 0.2s;
-    }
-    nav a:hover {
-      opacity: 0.8;
-    }
-
-    .hero {
-      background: url('https://images.unsplash.com/photo-1581094651181-3592dc28c242?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
-      color: white;
-      text-align: center;
-      padding: 120px 20px;
-      position: relative;
-    }
-    .hero::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: rgba(0,0,0,0.5);
-    }
-    .hero-content {
-      position: relative;
-      z-index: 1;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    .hero h2 {
-      font-size: 2.5em;
-      margin-bottom: 10px;
-    }
-    .hero p {
-      font-size: 1.2em;
-      margin-bottom: 20px;
-    }
-    .btn {
-      background-color: #26a69a;
-      color: white;
-      padding: 12px 25px;
-      text-decoration: none;
-      border-radius: 5px;
-      font-weight: bold;
-      transition: background 0.3s;
-    }
-    .btn:hover {
-      background-color: #1f8f82;
-    }
-
-    section {
-      padding: 60px 10%;
-    }
-
-    .services {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 30px;
-      margin-top: 40px;
-    }
-    .service-card {
-      background-color: white;
-      border-radius: 10px;
-      padding: 30px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      transition: transform 0.2s;
-    }
-    .service-card:hover {
-      transform: translateY(-5px);
-    }
-    .service-card h3 {
-      color: #00796b;
-      margin-bottom: 10px;
-    }
-
-    .coverage {
-      background-color: #e0f2f1;
-      border-radius: 10px;
-      padding: 40px;
-      margin-top: 60px;
-      text-align: center;
-    }
-
-    footer {
-      background-color: #004d40;
-      color: white;
-      padding: 30px 10%;
-      text-align: center;
-    }
-    footer p {
-      font-size: 0.9em;
-    }
-
-    @media (max-width: 768px) {
-      header {
-        flex-direction: column;
-        text-align: center;
-      }
-      nav {
-        margin-top: 10px;
-      }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[Company Name] • Certified Medical Waste & Sanitary Bin Services</title>
+<meta name="description" content="Certified medical waste collection and disposal up to Schedule 5 across the Garden Route. Sanitary bin services for restaurants, clinics, vets, dentists, and more. Fast quotes, manifest & certificates supplied.">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#0E7C86; --primary-600:#0b646c; --accent:#4DD0E1;
+    --bg:#0b1216; --panel:#0f1820; --muted:#93a3af; --ring:#49e1f3;
+    --ok:#22c55e; --warn:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:#0b0f12;color:#e7edf3}
+  a{color:#c9f2ff;text-decoration:none}
+  img{max-width:100%;display:block}
+  .container{max-width:1200px;margin:0 auto;padding:0 20px}
+  /* Header */
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(11,15,18,.8);backdrop-filter:saturate(160%) blur(10px);border-bottom:1px solid rgba(255,255,255,.06)}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#35b8c7);display:grid;place-items:center;font-weight:800;color:#052b31}
+  .brand h1{font-size:18px;margin:0}
+  .nav a{margin-left:18px;font-weight:600;color:#e7edf3;opacity:.9}
+  .cta{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,var(--accent),#35b8c7);color:#052b31;padding:10px 16px;border-radius:12px;font-weight:800;border:0}
+  .cta:hover{filter:brightness(1.1)}
+  /* Hero */
+  .hero{
+    position:relative;overflow:hidden;background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(73,225,243,.18), transparent 60%),
+      radial-gradient(900px 500px at 90% 10%, rgba(77,208,225,.12), transparent 60%),
+      linear-gradient(180deg,#0b0f12 0%, #0d1217 60%, #0b0f12 100%);
+    border-bottom:1px solid rgba(255,255,255,.06)
+  }
+  .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;padding:56px 0}
+  .eyebrow{color:#c9f2ff;font-weight:700;letter-spacing:.18em;text-transform:uppercase;font-size:12px}
+  .hero h2{font-size:42px;line-height:1.1;margin:12px 0 12px}
+  .hero p{color:#c7d3dc;font-size:18px;max-width:56ch}
+  .badges{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
+  .chip{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:8px 12px;border-radius:999px;font-size:13px;color:#d8e7ee}
+  .hero-cards{display:grid;gap:14px}
+  .card{
+    background:linear-gradient(180deg,#0f1820 0%, #0d161d 100%);
+    border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px
+  }
+  .card h3{margin:0 0 8px;font-size:16px;color:#dff6fb}
+  .meta{color:#9fb1bd;font-size:14px}
+  .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  /* Quote form */
+  .panel{background:linear-gradient(180deg,#0f1820 0%, #0a1218 100%);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px}
+  .panel h3{margin:0 0 10px}
+  .form{display:grid;gap:10px}
+  input,select,textarea{
+    width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.14);
+    background:#0a1116;color:#e7edf3;outline:none
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--ring);box-shadow:0 0 0 4px rgba(73,225,243,.08)}
+  button[type=submit]{background:linear-gradient(135deg,#4DD0E1,#31b5c5);color:#052b31;font-weight:800;border:0;border-radius:12px;padding:12px 16px}
+  .whatsapp{display:inline-flex;gap:10px;align-items:center;background:#22c55e;color:#041a10;padding:10px 14px;border-radius:10px;font-weight:800}
+  /* Sections */
+  section{padding:64px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  h2.section-title{font-size:28px;margin:0 0 12px}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;text-align:center}
+  .kpi strong{font-size:28px;display:block}
+  .services{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .service{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:18px}
+  .service h3{margin:0 0 6px;font-size:18px}
+  .timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .step{background:linear-gradient(180deg,#0f1820,#0a1218);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px}
+  .trust{display:grid;grid-template-columns:2fr 1fr;gap:20px}
+  .list{display:grid;gap:8px;color:#c7d3dc}
+  .list li{list-style:none;display:flex;gap:10px}
+  .tick{color:#58ffc8}
+  .faq{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  details{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px}
+  summary{cursor:pointer;font-weight:600}
+  /* Footer */
+  footer{padding:42px 0;background:#0a0f12}
+  .foot{display:grid;gap:10px;color:#9fb1bd}
+  /* Responsive */
+  @media (max-width:1024px){
+    .hero-grid{grid-template-columns:1fr}
+    .services{grid-template-columns:repeat(2,1fr)}
+    .timeline{grid-template-columns:repeat(2,1fr)}
+    .trust{grid-template-columns:1fr}
+    .faq{grid-template-columns:1fr}
+    .kpis{grid-template-columns:1fr 1fr 1fr}
+  }
+  @media (max-width:640px){
+    .services{grid-template-columns:1fr}
+    .kpis{grid-template-columns:1fr}
+  }
+</style>
 </head>
 <body>
-  <header>
-    <h1>MedWaste Disposal Solutions</h1>
+
+<header class="topbar">
+  <div class="container nav">
+    <div class="brand">
+      <div class="logo">MW</div>
+      <h1>[Company Name]</h1>
+    </div>
     <nav>
-      <a href="#">Home</a>
       <a href="#services">Services</a>
-      <a href="#coverage">Coverage</a>
-      <a href="#contact">Contact</a>
+      <a href="#process">Process</a>
+      <a href="#compliance">Compliance</a>
+      <a href="#faq">FAQs</a>
+      <a class="cta" href="#quote">Get a Quote</a>
     </nav>
-  </header>
+  </div>
+</header>
 
+<main>
+  <!-- HERO -->
   <section class="hero">
-    <div class="hero-content">
-      <h2>Safe, Certified Medical Waste Removal</h2>
-      <p>Serving clinics, vets, dentists, tattoo parlours, and more across the Garden Route — from Mossel Bay to Oudtshoorn.</p>
-      <a href="#contact" class="btn">Get in Touch</a>
-    </div>
-  </section>
-
-  <section id="services">
-    <h2>Our Professional Services</h2>
-    <div class="services">
-      <div class="service-card">
-        <h3>Medical Waste Collection</h3>
-        <p>Certified to handle and dispose of medical waste up to Schedule 5. Trusted by hospitals, vets, clinics, and pharmacies.</p>
-      </div>
-      <div class="service-card">
-        <h3>Sanitary Bin Cleaning</h3>
-        <p>Reliable, discreet, and hygienic cleaning and replacement of female sanitary bins for restaurants, offices, and businesses.</p>
-      </div>
-      <div class="service-card">
-        <h3>COVID & Hazardous Waste Handling</h3>
-        <p>Specialized disposal for biohazardous waste — with experience in COVID-related medical disposal for hospitals and major chains.</p>
-      </div>
-      <div class="service-card">
-        <h3>Fleet & Staff</h3>
-        <p>Friendly, professional staff supported by a well-maintained fleet — including a panel truck and smaller collection vehicles for flexible service.</p>
-      </div>
-    </div>
-  </section>
-
-  <section id="coverage" class="coverage">
-    <h2>Service Areas</h2>
-    <p>Based on the outskirts of Mossel Bay, proudly serving:</p>
-    <p><strong>Plett, Knysna, Sedgefield, George, Mossel Bay & Oudtshoorn</strong></p>
-  </section>
-
-  <section id="contact">
-    <h2>Contact Us</h2>
-    <p>We’ll be happy to discuss your needs and provide a quote tailored to your facility.</p>
-    <p><strong>Email:</strong> info@yourcompany.co.za<br>
-       <strong>Phone:</strong> +27 00 000 0000</p>
-  </section>
-
-  <footer>
-    <p>&copy; 2025 MedWaste Disposal Solutions | Certified Schedule 5 Waste Removal | Designed by Daniel for [Cousin’s Business Name]</p>
-  </footer>
-</body>
-</html>
+    <div class="container hero-grid">
+      <div>
+        <div class="eyebr

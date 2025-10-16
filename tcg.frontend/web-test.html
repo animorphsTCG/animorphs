@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mossel Bay Medical Waste Solutions</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      background-color: #f9f9f9;
+      color: #333;
+      line-height: 1.6;
+    }
+    header {
+      background: linear-gradient(90deg, #00796b, #26a69a);
+      color: #fff;
+      padding: 20px 10%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 {
+      font-size: 1.8em;
+      letter-spacing: 0.5px;
+    }
+    nav a {
+      color: #fff;
+      margin-left: 20px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+    nav a:hover {
+      opacity: 0.8;
+    }
+
+    .hero {
+      background: url('https://images.unsplash.com/photo-1581094651181-3592dc28c242?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+      color: white;
+      text-align: center;
+      padding: 120px 20px;
+      position: relative;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .hero h2 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+    .hero p {
+      font-size: 1.2em;
+      margin-bottom: 20px;
+    }
+    .btn {
+      background-color: #26a69a;
+      color: white;
+      padding: 12px 25px;
+      text-decoration: none;
+      border-radius: 5px;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    .btn:hover {
+      background-color: #1f8f82;
+    }
+
+    section {
+      padding: 60px 10%;
+    }
+
+    .services {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 30px;
+      margin-top: 40px;
+    }
+    .service-card {
+      background-color: white;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .service-card:hover {
+      transform: translateY(-5px);
+    }
+    .service-card h3 {
+      color: #00796b;
+      margin-bottom: 10px;
+    }
+
+    .coverage {
+      background-color: #e0f2f1;
+      border-radius: 10px;
+      padding: 40px;
+      margin-top: 60px;
+      text-align: center;
+    }
+
+    footer {
+      background-color: #004d40;
+      color: white;
+      padding: 30px 10%;
+      text-align: center;
+    }
+    footer p {
+      font-size: 0.9em;
+    }
+
+    @media (max-width: 768px) {
+      header {
+        flex-direction: column;
+        text-align: center;
+      }
+      nav {
+        margin-top: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MedWaste Disposal Solutions</h1>
+    <nav>
+      <a href="#">Home</a>
+      <a href="#services">Services</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-content">
+      <h2>Safe, Certified Medical Waste Removal</h2>
+      <p>Serving clinics, vets, dentists, tattoo parlours, and more across the Garden Route — from Mossel Bay to Oudtshoorn.</p>
+      <a href="#contact" class="btn">Get in Touch</a>
+    </div>
+  </section>
+
+  <section id="services">
+    <h2>Our Professional Services</h2>
+    <div class="services">
+      <div class="service-card">
+        <h3>Medical Waste Collection</h3>
+        <p>Certified to handle and dispose of medical waste up to Schedule 5. Trusted by hospitals, vets, clinics, and pharmacies.</p>
+      </div>
+      <div class="service-card">
+        <h3>Sanitary Bin Cleaning</h3>
+        <p>Reliable, discreet, and hygienic cleaning and replacement of female sanitary bins for restaurants, offices, and businesses.</p>
+      </div>
+      <div class="service-card">
+        <h3>COVID & Hazardous Waste Handling</h3>
+        <p>Specialized disposal for biohazardous waste — with experience in COVID-related medical disposal for hospitals and major chains.</p>
+      </div>
+      <div class="service-card">
+        <h3>Fleet & Staff</h3>
+        <p>Friendly, professional staff supported by a well-maintained fleet — including a panel truck and smaller collection vehicles for flexible service.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="coverage" class="coverage">
+    <h2>Service Areas</h2>
+    <p>Based on the outskirts of Mossel Bay, proudly serving:</p>
+    <p><strong>Plett, Knysna, Sedgefield, George, Mossel Bay & Oudtshoorn</strong></p>
+  </section>
+
+  <section id="contact">
+    <h2>Contact Us</h2>
+    <p>We’ll be happy to discuss your needs and provide a quote tailored to your facility.</p>
+    <p><strong>Email:</strong> info@yourcompany.co.za<br>
+       <strong>Phone:</strong> +27 00 000 0000</p>
+  </section>
+
+  <footer>
+    <p>&copy; 2025 MedWaste Disposal Solutions | Certified Schedule 5 Waste Removal | Designed by Daniel for [Cousin’s Business Name]</p>
+  </footer>
+</body>
+</html>
